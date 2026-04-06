@@ -1101,9 +1101,53 @@ New dictionary:
     <!-- Button for opening info dialog
      string will probably be removed once data gathering is finished (end of 2026 latest) -->
     <string name="gesture_data_passive_gathering_info">More information</string>
-    <!-- Info dialog message
+    <!-- Info dialog main message (other sections in different strings)
      string will probably be removed once data gathering is finished (end of 2026 latest) -->
-    <string name="gesture_data_passive_gathering_info_message">...</string>
+    <string name="gesture_data_passive_gathering_info_message">
+        Turning on passive data gathering may potentially record any word you enter with gesture typing.
+        This is useful for the gesture typing project as it can produce a considerable amount of data, but at the same time has high potential of giving away data that is too sensitive even for anonymized publishing.
+        For this reason we want to clarify when gesture data is being gathered, and how you can influence it.
+    </string>
+    <!-- Title for info dialog section about passive data gathering indicator
+     string will probably be removed once data gathering is finished (end of 2026 latest) -->
+    <string name="gesture_data_passive_gathering_indicator">Data gathering indicator</string> <!-- todo: show the icons! -->
+    <!-- Message for info dialog section about passive data gathering indicator
+     string will probably be removed once data gathering is finished (end of 2026 latest) -->
+    <string name="gesture_data_passive_gathering_indicator_message">
+        Any time data can potentially be saved, you will see an indicator icon (red circle) on bottom left of the keyboard.
+        When the circle is filled, recently entered gesture data is waiting to be saved (see the other sections for details).
+        Saving usually happens when switching text field or closing the keyboard, but may also happen on other occasions such as text field changes controlled by the app.
+    </string>
+    <!-- Title for info dialog section about controlling passive data gathering
+     string will probably be removed once data gathering is finished (end of 2026 latest) -->
+    <string name="gesture_data_passive_gathering_control">How to control what is saved</string>
+    <!-- Message for info dialog section about controlling passive data gathering, parsed as HTML
+     %1$s -> gesture_data_passive_apps_button
+     %2$s -> gesture_data_passive_excluded_words_button
+     string will probably be removed once data gathering is finished (end of 2026 latest) -->
+    <string name="gesture_data_passive_gathering_control_message">
+        Independent of the setting, passive data gathering is disabled for sensitive input fields (passwords, email, whenever the input field requests "no learning").
+        Using &lt;i&gt;%1$s&lt;/i&gt; you can select the apps where passive data gathering may be used (indicated by accent color and checkmark).
+        Default is to not allow any app, and opt-in per app.
+        You can invert the default, and only exclude specific apps. When using an excluded app, the indicator icon will never even show up.
+
+        With &lt;i&gt;%2$s&lt;/i&gt; you can exclude specific sensitive words.
+        When gesturing these, the indicator icon will still show filled ("data waiting to be saved"), but the data will be discarded instead.
+        If an excluded word is in the top suggestions, the data will also be discarded.
+        If you want to stop pending data from being saved, enable incognito mode or disable data gathering using the toolbar keys.
+        For the latter, you will get a new toolbar key after you enabled passive data gathering at least once.
+        Simple press enables / disabled passive gathering, and long-press disables for 5 min (only if it was enabled before iirc)
+    </string>
+    <!-- Message for info dialog section about reviewing and sharing passively gathered data, parsed as HTML
+     %1$s -> gesture_data_review_screen_title
+     %2$s -> https://codeberg.org/eclexic/swipe-o-scope
+     string will probably be removed once data gathering is finished (end of 2026 latest) -->
+    <string name="gesture_data_passive_gathering_review_message">
+        Using &lt;i&gt;%1$s&lt;/i&gt; you can check and filter the gathered data, delete data if you consider it too sensitive, and share data.
+        The delete and share buttons will work on the currently displayed data, or on the selection if there is any (long-press!).
+        (the "normal" share icon at the bottom will only share data from active gathering)
+        If you want to view the full data that is stored for a gesture, you can share it to a file, and load the file in &lt;a href=%2$s&gt;Swipe-O-Scope&lt;a&gt;.
+    </string>
     <!-- Button for opening app selection for passive data gathering
      string will probably be removed once data gathering is finished (end of 2026 latest) -->
     <string name="gesture_data_passive_apps_button">Manage allowed apps</string>

@@ -20,7 +20,7 @@
         android:visibility="visible"
         android:layout_width="16dp"
         android:layout_height="16dp"
-        android:src="@drawable/btn_keyboard_key_functional_rounded_base_border"
+        android:src="@drawable/btn_keyboard_key_action_normal_lxx_base"
         android:tint="#a00"
         android:layout_gravity="bottom"
         />

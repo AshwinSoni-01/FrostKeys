@@ -2,6 +2,7 @@
 package helium314.keyboard.settings.screens.gesturedata
 
 import android.graphics.drawable.Drawable
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -29,6 +30,7 @@ import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -40,11 +42,14 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.fromHtml
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
@@ -56,10 +61,11 @@ import helium314.keyboard.latin.utils.DeleteButton
 import helium314.keyboard.latin.utils.GestureDataGatheringSettings
 import helium314.keyboard.latin.utils.dpToPx
 import helium314.keyboard.latin.utils.prefs
-import helium314.keyboard.settings.dialogs.InfoDialog
 import helium314.keyboard.settings.dialogs.ThreeButtonAlertDialog
 import kotlinx.coroutines.launch
 import kotlin.collections.plus
+import androidx.core.graphics.toColorInt
+import helium314.keyboard.settings.painterResourceCompat
 
 // functionality for gesture data gathering as part of the NLNet Project https://nlnet.nl/project/GestureTyping/
 // will be removed once the project is finished
@@ -85,28 +91,61 @@ fun PassiveGatheringSettings() {
     ButtonWithText(stringResource(R.string.gesture_data_passive_excluded_words_button), Modifier.fillMaxWidth()) { showExcludedWordsDialog = true }
     ButtonWithText(stringResource(R.string.gesture_data_passive_apps_button), Modifier.fillMaxWidth()) { showIncludedAppsDialog = true }
     if (showInfoDialog) {
-        // todo: explanation text
-        //   include / exclude apps (included are accent colored + checkmark, others are red + x)
-        //   exclude words: simple list -> word will not be saved (passive data gathering only!)
-        //   data is filtered when saving, and in case of words also when exporting
-        //   what is not saved?
-        //    user-choices obviously
-        //    text fields marked as passwords (but there is no glide typing anyway)
-        //    text fields asking "no learning"
-        //    email text fields
-        //    mIncognitoModeEnabled
-        //    excluded word in top suggestions
-        //   recommend users can review data with swipe-o-scope, can check and blacklist there (send to yourself!)
-        //   icon at the bottom of the keyboard when passive data gathering may record data (at least for now)
-        //    icon is empty if nothing recorded for this session / text field
-        //    icon is filled if a words are ready to be saved -> will happen when switching text field, closing keyboard, some other cases
-        //    clear that cache by entering incognito mode or disabling passive gathering (via toolbar key / key code)
-        //  toolbar key for toggling passive gathering
-        //   only available if you at least once enabled the setting
-        //   press to toggle (clears cache)
-        //   long press to disable for 5 min (clears cache, gathering enabled on next input field change when the 5 min are over)
         // todo: read over the other texts too, maybe need update
-        InfoDialog(stringResource(R.string.gesture_data_passive_gathering_info_message)) { showInfoDialog = false }
+        var indicatorInfo by remember { mutableStateOf(false) }
+        var controlInfo by remember { mutableStateOf(false) }
+        var reviewInfo by remember { mutableStateOf(false) }
+        ThreeButtonAlertDialog(
+            onDismissRequest = { showInfoDialog = false },
+            title = { Text(stringResource(R.string.passive_gathering)) },
+            content = {
+                Column {
+                    Text(stringResource(R.string.gesture_data_passive_gathering_info_message))
+                    TextButton({ indicatorInfo = !indicatorInfo }) {
+                        Text(stringResource(R.string.gesture_data_passive_gathering_indicator))
+                    }
+                    AnimatedVisibility(indicatorInfo) {
+                        val color = Color("#a00000".toColorInt())
+                        Column {
+                            Row {
+                                Icon(painterResourceCompat(R.drawable.btn_keyboard_key_action_normal_lxx_base, 24), null, tint = color)
+                                Icon(painterResourceCompat(R.drawable.ring, 24), null, tint = color)
+                            }
+                            Text(stringResource(R.string.gesture_data_passive_gathering_indicator_message))
+                        }
+                    }
+                    TextButton({ controlInfo = !controlInfo }) {
+                        Text(stringResource(R.string.gesture_data_passive_gathering_control))
+                    }
+                    AnimatedVisibility(controlInfo) {
+                        val text = stringResource(R.string.gesture_data_passive_gathering_control_message,
+                            stringResource(R.string.gesture_data_passive_apps_button),
+                            stringResource(R.string.gesture_data_passive_excluded_words_button)
+                        )
+                        Text(AnnotatedString.fromHtml(text))
+                    }
+                    TextButton({ reviewInfo = !reviewInfo }) {
+                        val text = stringResource(R.string.gesture_data_review_screen_title,
+                            stringResource(R.string.gesture_data_passive_apps_button),
+                            stringResource(R.string.gesture_data_passive_excluded_words_button)
+                        )
+                        Text(stringResource(R.string.gesture_data_review_screen_title))
+                    }
+                    AnimatedVisibility(reviewInfo) {
+                        val text = stringResource(
+                            R.string.gesture_data_passive_gathering_review_message,
+                            stringResource(R.string.gesture_data_review_screen_title),
+                            "https://codeberg.org/eclexic/swipe-o-scope"
+                        )
+                        Text(AnnotatedString.fromHtml(text))
+                    }
+                }
+            },
+            scrollContent = true,
+            cancelButtonText = stringResource(android.R.string.ok),
+            onConfirmed = { },
+            confirmButtonText = null
+        )
     }
     var packageInfos by remember { mutableStateOf(emptyList<Triple<String, String, Drawable?>>()) }
     val scope = rememberCoroutineScope()
