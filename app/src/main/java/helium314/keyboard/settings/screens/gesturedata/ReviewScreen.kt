@@ -259,32 +259,32 @@ fun ReviewScreen(
                             DropdownMenu(
                                 expanded = showMenu,
                                 onDismissRequest = { showMenu = false }
-                            ) {// todo: strings
+                            ) {
                                 DropdownMenuItem(
                                     text = { Row(verticalAlignment = Alignment.CenterVertically) {
                                         Checkbox(includeActive, { includeActive = it })
-                                        Text("Show actively gathered data")
+                                        Text(stringResource(R.string.gesture_data_show_active))
                                     } },
                                     onClick = { showMenu = false; includeActive = !includeActive }
                                 )
                                 DropdownMenuItem(
                                     text = { Row(verticalAlignment = Alignment.CenterVertically) {
                                         Checkbox(includePassive, { includePassive = it })
-                                        Text("Show passively gathered data")
+                                        Text(stringResource(R.string.gesture_data_show_passive))
                                     } },
                                     onClick = { showMenu = false; includePassive = !includePassive }
                                 )
                                 DropdownMenuItem(
                                     text = { Row(verticalAlignment = Alignment.CenterVertically) {
                                         Checkbox(includeExported, { includeExported = it })
-                                        Text("Include already shared data")
+                                        Text(stringResource(R.string.gesture_data_include_shared))
                                     } },
                                     onClick = { showMenu = false; includeExported = !includeExported }
                                 )
                                 DropdownMenuItem(
                                     text = { Row(verticalAlignment = Alignment.CenterVertically) {
                                         Checkbox(false, { showMenu = false; infoDialog = true }, Modifier.alpha(0f)) // just for alignment
-                                        Text("Info")
+                                        Text(stringResource(R.string.gesture_data_passive_gathering_info))
                                     } },
                                     onClick = { showMenu = false; infoDialog = true }
                                 )
