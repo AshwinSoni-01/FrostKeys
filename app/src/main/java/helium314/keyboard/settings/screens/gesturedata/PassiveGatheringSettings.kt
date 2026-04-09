@@ -92,7 +92,6 @@ fun PassiveGatheringSettings() {
     ButtonWithText(stringResource(R.string.gesture_data_passive_excluded_words_button), Modifier.fillMaxWidth()) { showExcludedWordsDialog = true }
     ButtonWithText(stringResource(R.string.gesture_data_passive_apps_button), Modifier.fillMaxWidth()) { showIncludedAppsDialog = true }
     if (showInfoDialog) {
-        // todo: read over the other texts too, maybe need update
         var indicatorInfo by remember { mutableStateOf(false) }
         var controlInfo by remember { mutableStateOf(false) }
         var reviewInfo by remember { mutableStateOf(false) }

@@ -942,7 +942,7 @@ New dictionary:
     <!-- Descriptive text about gesture data gathering (parsed as HTML)
     string will probably be removed once data gathering is finished (end of 2026 latest) -->
     <string name="gesture_data_description">
-        Welcome to the gesture data gathering screen!&lt;br/&gt;&lt;br/&gt;
+        &lt;b&gt;Welcome to the gesture data gathering screen!&lt;/b&gt;&lt;br/&gt;&lt;br/&gt;
         This is part of an &lt;a href=https://nlnet.nl/project/GestureTyping&gt;NLnet-funded project&lt;/a&gt; striving to produce a fully open source gesture typing library capable of replacing the closed source Google library.&lt;br/&gt;
         The result is planned to be a simple replacement for AOSP-based keyboards, but also usable with other keyboards, e.g. FlorisBoard.&lt;br/&gt;&lt;br/&gt;
         For developing the library, it is tremendously helpful to have detailed gesture data in different languages and by different users available.&lt;br/&gt;
@@ -955,9 +955,9 @@ New dictionary:
     <!-- Descriptive text about gesture data gathering modes
     string will probably be removed once data gathering is finished (end of 2026 latest) -->
     <string name="gesture_data_description_modes">
-        Currently there is only the "active gathering" mode, where you are shown a specific word, and enter this word using gesture typing.\n
-        Later a "passive gathering" mode will be added, where you can provide samples from your normal gesture typing from other apps.
-        Due to the sensitivity of this approach, this will be opt-in, configurable, and have a review screen for the data you\'re about to submit.
+        The \"safe\" way to contribute there is the \"active gathering\" mode, where you are shown a specific word, and enter this word using gesture typing.\n
+        You can also use the \"passive gathering\" mode, where you can provide samples from your normal gesture typing from other apps.
+        Due to the sensitivity of this approach, this is opt-in, configurable, and has a review screen for the data you\'re about to submit.
     </string>
     <!-- Descriptive text about privacy of gesture data
     string will probably be removed once data gathering is finished (end of 2026 latest) -->
@@ -1105,16 +1105,16 @@ New dictionary:
      string will probably be removed once data gathering is finished (end of 2026 latest) -->
     <string name="gesture_data_passive_gathering_info_message">
         Turning on passive data gathering may potentially record any word you enter using gesture typing.
-        This is useful for the gesture typing project as it can produce a considerable amount of data, but at the same time has high potential of giving away data you may consider be too sensitive even for anonymized publishing.
+        This is very useful for the gesture typing project as it can produce a considerable amount of data, but at the same time has high potential of giving away data you may consider be too sensitive even for anonymized publishing.
         For this reason we want to clarify when gesture data is being gathered, and how you can influence it.
     </string>
     <!-- Title for info dialog section about passive data gathering indicator
      string will probably be removed once data gathering is finished (end of 2026 latest) -->
     <string name="gesture_data_passive_gathering_indicator">Data gathering indicator</string>
-    <!-- Message for info dialog section about passive data gathering indicator
+    <!-- Message for info dialog section about passive data gathering indicator (which is displayed above the text)
      string will probably be removed once data gathering is finished (end of 2026 latest) -->
     <string name="gesture_data_passive_gathering_indicator_message">
-        Any time data can potentially be saved, you will see an indicator icon (shown above) on bottom left of the keyboard.
+        Any time gesture data could potentially be saved, you will see an indicator icon on bottom left of the keyboard.
         When the circle is filled, recently entered gesture data is waiting to be saved.
         Saving usually happens when switching text field or closing the keyboard, but may also happen on other occasions such as text field changes not under this app\'s control.
     </string>
@@ -1126,21 +1126,20 @@ New dictionary:
      %2$s -> gesture_data_passive_excluded_words_button
      string will probably be removed once data gathering is finished (end of 2026 latest) -->
     <string name="gesture_data_passive_gathering_control_message">
-        Independent of the setting, passive data gathering is disabled for sensitive input fields (passwords, email, whenever the input field requests the keyboard to not learn the words).
-        Using &lt;i&gt;%1$s&lt;/i&gt; you can select the apps where passive data gathering may be used (indicated by accent color and checkmark).
-        The default setting is to not allow any app, with opt-in per app.&lt;br&gt;
-        You can invert the default, and only exclude specific apps. When using an excluded app, the indicator icon will never even show up.
+        Independent of the setting, passive data gathering is disabled for sensitive input fields (passwords, email, or whenever the input field requests the keyboard to not learn the words).
+        Using &lt;i&gt;%1$s&lt;/i&gt; you can select in which apps passive data gathering may be used.
+        The default setting is to not allow any app, with opt-in per app. You can invert the default, and only exclude specific apps.
         &lt;br&gt;&lt;br&gt;
 
         With &lt;i&gt;%2$s&lt;/i&gt; you can exclude specific sensitive words.
-        When gesturing an excluded word, the indicator icon will still show the filled icon ("data waiting to be saved"), but the data will be discarded when normally it would be saved.
+        When gesturing an excluded word, the indicator icon will still show the filled icon (\"data waiting to be saved\"), but the data will be discarded when normally it would be saved.
         When an excluded word is in the top suggestions, the gesture data will be discarded as well.
         &lt;br&gt;&lt;br&gt;
 
-        If you want to stop pending data from being saved, you can enable incognito mode or disable data gathering using the toolbar keys.
-        For the latter, you will get a new toolbar key after you enabled passive data gathering at least once.
-        A simple press toggles passive gathering, and long-press disables it temporarily.
-        It will switch to the previous state after 5 minutes, meaning it will remain off if it was off when long pressing.
+        If you want to stop pending data from being saved, you can enable incognito mode or disable data gathering using the toolbar keys.&lt;br&gt;
+        For disabling data gathering you will get a new toolbar key if you enabled passive data gathering at least once.
+        A simple press on the key toggles passive gathering, and long-press disables it for five minutes.
+        When the time is over, data gathering will be enabled again if it was enabled before,
         You can re-enable passive data gathering earlier using the toolbar key.
     </string>
     <!-- Message for info dialog section about reviewing and sharing passively gathered data, parsed as HTML
@@ -1149,8 +1148,8 @@ New dictionary:
      string will probably be removed once data gathering is finished (end of 2026 latest) -->
     <string name="gesture_data_passive_gathering_review_message">
         Using &lt;i&gt;%1$s&lt;/i&gt; you can check and filter the gathered data, delete data if you consider it too sensitive, and share data.
-        The delete and share buttons will work on the currently displayed data, or on the selection if there is any (long-press!).
-        (the "normal" share icon at the bottom will only share data from active gathering)
+        The delete and share buttons will work on the currently displayed data, or on the selection if you used long-press to select words.
+        (Note that the \"normal\" share icon at the bottom will only share data from active gathering.)&lt;br&gt;
         If you want to view the full data that is stored for a gesture, you can share it to a file, and load the file in &lt;a href=%2$s&gt;Swipe-O-Scope&lt;a&gt;.
     </string>
     <!-- Button for opening app selection for passive data gathering
