@@ -247,7 +247,7 @@ public final class InputLogic {
                 getActualCapsMode(settingsValues, keyboardShiftMode));
         mConnection.beginBatchEdit();
         if (GestureDataGatheringKt.usePassiveGathering && mConnection.hasSelection())
-            PassiveGatheringCache.INSTANCE.onEditSelection(mConnection.getSelectedText(0));
+            PassiveGatheringCache.INSTANCE.onEditSelection(mConnection.getSelectedText(0), mConnection.getTextBeforeCursor(40, 0), mConnection.getTextAfterCursor(40, 0));
         if (mWordComposer.isComposingWord()) {
             if (mWordComposer.isCursorFrontOrMiddleOfComposingWord()) {
                 if (GestureDataGatheringKt.usePassiveGathering)
@@ -481,7 +481,7 @@ public final class InputLogic {
         mJustRevertedACommit = false;
 
         if (GestureDataGatheringKt.usePassiveGathering && mConnection.hasSelection())
-            PassiveGatheringCache.INSTANCE.onEditSelection(mConnection.getSelectedText(0));
+            PassiveGatheringCache.INSTANCE.onEditSelection(mConnection.getSelectedText(0), mConnection.getTextBeforeCursor(40, 0), mConnection.getTextAfterCursor(40, 0));
         if (GestureDataGatheringKt.usePassiveGathering && mWordComposer.isComposingWord() && mWordComposer.isCursorFrontOrMiddleOfComposingWord())
             PassiveGatheringCache.INSTANCE.onEditWord(mWordComposer.getTypedWord());
 
@@ -547,7 +547,7 @@ public final class InputLogic {
         ++mAutoCommitSequenceNumber;
 
         if (GestureDataGatheringKt.usePassiveGathering && mConnection.hasSelection())
-            PassiveGatheringCache.INSTANCE.onEditSelection(mConnection.getSelectedText(0));
+            PassiveGatheringCache.INSTANCE.onEditSelection(mConnection.getSelectedText(0), mConnection.getTextBeforeCursor(40, 0), mConnection.getTextAfterCursor(40, 0));
         if (GestureDataGatheringKt.usePassiveGathering && mWordComposer.isComposingWord() && mWordComposer.isCursorFrontOrMiddleOfComposingWord())
             PassiveGatheringCache.INSTANCE.onEditWord(mWordComposer.getTypedWord());
 

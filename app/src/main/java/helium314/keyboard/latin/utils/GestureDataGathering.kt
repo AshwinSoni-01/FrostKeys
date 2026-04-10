@@ -12,6 +12,7 @@ import helium314.keyboard.latin.BuildConfig
 import helium314.keyboard.latin.InputAttributes
 import helium314.keyboard.latin.NgramContext
 import helium314.keyboard.latin.R
+import helium314.keyboard.latin.RichInputMethodManager
 import helium314.keyboard.latin.SingleDictionaryFacilitator
 import helium314.keyboard.latin.SuggestedWords
 import helium314.keyboard.latin.SuggestedWords.SuggestedWordInfo.KIND_SHORTCUT
@@ -19,6 +20,7 @@ import helium314.keyboard.latin.common.ComposedData
 import helium314.keyboard.latin.common.Constants
 import helium314.keyboard.latin.common.InputPointers
 import helium314.keyboard.latin.common.StringUtils
+import helium314.keyboard.latin.common.getTouchedWordRange
 import helium314.keyboard.latin.dictionary.Dictionary
 import helium314.keyboard.latin.dictionary.ReadOnlyBinaryDictionary
 import helium314.keyboard.latin.settings.Settings
@@ -102,6 +104,8 @@ object PassiveGatheringCache {
         updateIcon()
     }
 
+    // todo: undo button!
+
     fun onEditWord(word: String) {
         // this is pretty aggressive, because repeated backspace might remove different words
         // but better remove a few % of the words instead of having potentially bad data
@@ -110,14 +114,23 @@ object PassiveGatheringCache {
         updateIcon()
     }
 
-    fun onEditSelection(selection: CharSequence?) {
-        if (selection == null) return
-        // todo: what do we do now?
-        //  we may not have the complete word, and even when getting the touched word it does not include the selection
-        //  selection is a word -> probably unwanted -> remove
-        //  selection contains spaces -> user deletes/replaces multiple words, or parts -> should we relly remove all?
-        //  selection is part of a word -> probably a correction...
-        Log.i(TAG, "replace selection $selection")
+    fun onEditSelection(selection: CharSequence?, before: CharSequence?, after: CharSequence?) {
+        // null should only occur in very rare cases when there are problems communicating with the text field
+        if (selection == null || before == null || after == null) return
+
+        Log.i(TAG, "replace selection \"$selection\", before: \"$before\", after: \"$after\"")
+        val script = RichInputMethodManager.getInstance().currentSubtypeLocale.script
+        val spacingAndPunctuations = Settings.getValues().mSpacingAndPunctuations
+        val wordAtStart = getTouchedWordRange(before, "$selection$after", script, spacingAndPunctuations)
+        val wordAtEnd = getTouchedWordRange("$before$selection", after, script, spacingAndPunctuations)
+        Log.i(TAG, "at start \"${wordAtStart.mWord}\", at end \"${wordAtEnd.mWord}\"")
+        if (wordAtEnd.mWord == wordAtStart.mWord && selection in wordAtStart.mWord) {
+            Log.i(TAG, "word or part of word selected, removing word")
+            cachedWords.removeAll { it.usedWord == wordAtStart.mWord }
+        } else {
+            // more than one word selected
+            // todo: what to do? removing all words from cache might be overkill, because deleting much is unlikely to happen because of bad gesture typing
+        }
         updateIcon()
     }
 
