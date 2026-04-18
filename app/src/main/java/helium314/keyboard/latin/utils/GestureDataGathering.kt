@@ -33,6 +33,13 @@ import kotlinx.serialization.json.Json
 // functionality for gesture data gathering as part of the NLNet Project https://nlnet.nl/project/GestureTyping/
 // will be removed once the project is finished
 
+// todo: add opt-in mode, where user needs to actively use the toolbar button to store cached data
+//  collect by default <-> discard by default switch
+//  need to think about when the cache is cleared, because we don't want previous text fields' content,
+//   but we probably (?) want data to stay in case of restart input (triggered by the app or system, possibly in connection with e.g. undo)
+//  what about rotation?
+//  what about switching app with keyboard open (especially connectbot that leaves keyboard open, but also others)
+//   this "always show keyboard" option that might come
 fun isInActiveGatheringMode(editorInfo: EditorInfo) =
     dictTestImeOption == editorInfo.privateImeOptions && gestureDataActiveFacilitator != null
 
