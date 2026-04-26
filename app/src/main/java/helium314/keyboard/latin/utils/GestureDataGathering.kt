@@ -41,6 +41,10 @@ import kotlinx.serialization.json.Json
 //  what about switching app with keyboard open (especially connectbot that leaves keyboard open, but also others)
 //   consider this "always show keyboard" option that might come
 //  in case of doubt: better discard too often instead of keeping data
+//  in opt-in mode all apps are allowed by default (this is ONLY the default -> write in description)
+//   also don't switch default if user changed allowed apps without touching the default-block setting?
+//  blocked words and app exclusions will still apply! ->  clarify in description
+//  different or same toolbar key -> better a different one, simply because of the icon (but also different code would be good)
 fun isInActiveGatheringMode(editorInfo: EditorInfo) =
     dictTestImeOption == editorInfo.privateImeOptions && gestureDataActiveFacilitator != null
 
@@ -150,10 +154,17 @@ object PassiveGatheringCache {
     }
 
     fun flush(context: Context) {
+        if (context.prefs().getBoolean(GestureDataGatheringSettings.PREF_PASSIVE_SAVE_ON_BUTTON, true)) { // todo: default?
+            Log.i(TAG, "clear instead of flush because PREF_PASSIVE_SAVE_ON_BUTTON is set")
+            clear()
+        }
         // save all words and clear cache
         val words = cachedWords.toList()
         Log.i(TAG, "flush cache")
         cachedWords.clear()
+        // todo: if anything was saved, we could shortly change the icon to green or so
+        //  but actual saving happens later...
+        //  maybe save should return a bool?
         updateIcon()
         scope.launch { words.forEach { it.save(context) } }
     }
