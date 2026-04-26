@@ -151,11 +151,14 @@ object PassiveGatheringCache {
         updateIcon()
     }
 
+    @JvmStatic
+    fun flushOrClear(context: Context) {
+        if (usePassiveGathering && !context.prefs().getBoolean(GestureDataGatheringSettings.PREF_PASSIVE_SAVE_ON_BUTTON, true)) // todo: default?
+            flush(context)
+        else clear()
+    }
+
     fun flush(context: Context) {
-        if (context.prefs().getBoolean(GestureDataGatheringSettings.PREF_PASSIVE_SAVE_ON_BUTTON, true)) { // todo: default?
-            Log.i(TAG, "clear instead of flush because PREF_PASSIVE_SAVE_ON_BUTTON is set")
-            clear()
-        }
         // save all words and clear cache
         val words = cachedWords.toList()
         Log.i(TAG, "flush cache")

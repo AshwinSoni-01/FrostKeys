@@ -154,11 +154,7 @@ public final class InputLogic {
      * @param settingsValues the current settings values
      */
     public void startInput(final String combiningSpec, final SettingsValues settingsValues) {
-        if (GestureDataGatheringKt.usePassiveGathering) {
-            PassiveGatheringCache.INSTANCE.flush(mLatinIME);
-        } else {
-            PassiveGatheringCache.INSTANCE.clear();
-        }
+        PassiveGatheringCache.flushOrClear(mLatinIME);
         mEnteredText = null;
         mWordBeingCorrectedByCursor = null;
         mConnection.onStartInput();
@@ -215,11 +211,7 @@ public final class InputLogic {
      * Clean up the input logic after input is finished.
      */
     public void finishInput() {
-        if (GestureDataGatheringKt.usePassiveGathering) {
-            PassiveGatheringCache.INSTANCE.flush(mLatinIME);
-        } else {
-            PassiveGatheringCache.INSTANCE.clear();
-        }
+        PassiveGatheringCache.flushOrClear(mLatinIME);
         if (mWordComposer.isComposingWord()) {
             mConnection.finishComposingText();
             StatsUtils.onWordCommitUserTyped(mWordComposer.getTypedWord(), mWordComposer.isBatchMode());
@@ -391,7 +383,7 @@ public final class InputLogic {
 
         // if all text is gone, we treat it like onStartInput and flush the passive data gathering cache
         if (GestureDataGatheringKt.usePassiveGathering && newSelStart == 0 && newSelEnd == 0 && !mConnection.hasTextAfterCursor())
-            PassiveGatheringCache.INSTANCE.flush(mLatinIME);
+            PassiveGatheringCache.flushOrClear(mLatinIME);
 
         // TODO: the following is probably better done in resetEntireInputState().
         // it should only happen when the cursor moved, and the very purpose of the
