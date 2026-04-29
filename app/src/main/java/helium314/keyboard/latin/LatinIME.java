@@ -1556,7 +1556,7 @@ public class LatinIME extends InputMethodService implements
             return;
         }
         final SuggestedWords neutralSuggestions = currentSettings.mSuggestPunctuation
-                ? currentSettings.mSpacingAndPunctuations.mSuggestPuncList
+                ? currentSettings.mPunctuationSuggestions
                 : SuggestedWords.getEmptyInstance();
         setSuggestedWords(neutralSuggestions);
         if (hasSuggestionStripView() && currentSettings.mAutoShowToolbar) {

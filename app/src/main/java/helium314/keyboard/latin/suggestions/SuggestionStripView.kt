@@ -397,7 +397,8 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
         var showIcon = true
         if (wordView.tag is Int) {
             val index = wordView.tag as Int
-            if (index < suggestedWords.size() && suggestedWords.getInfo(index).mSourceDict == Dictionary.DICTIONARY_USER_TYPED)
+            val type = suggestedWords.getInfo(index).mSourceDict
+            if (type == Dictionary.DICTIONARY_USER_TYPED || type == Dictionary.DICTIONARY_HARDCODED)
                 showIcon = false
         }
         if (showIcon) {

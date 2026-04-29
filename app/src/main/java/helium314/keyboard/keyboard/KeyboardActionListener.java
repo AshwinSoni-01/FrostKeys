@@ -118,11 +118,7 @@ public interface KeyboardActionListener {
 
     KeyboardActionListener EMPTY_LISTENER = new Adapter();
 
-    int SWIPE_NO_ACTION = 0;
-    int SWIPE_MOVE_CURSOR = 1;
-    int SWIPE_SWITCH_LANGUAGE = 2;
-    int SWIPE_TOGGLE_NUMPAD = 3;
-    int SWIPE_HIDE_KEYBOARD = 4;
+    enum SwipeAction { NONE, MOVE_CURSOR, SWITCH_LANGUAGE, TOGGLE_NUMPAD, HIDE_KEYBOARD, TOUCHPAD_MODE }
 
     class Adapter implements KeyboardActionListener {
         @Override

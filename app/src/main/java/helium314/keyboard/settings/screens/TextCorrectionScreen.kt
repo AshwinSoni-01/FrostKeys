@@ -3,7 +3,6 @@ package helium314.keyboard.settings.screens
 
 import android.Manifest
 import android.content.Context
-import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material3.Surface
@@ -18,7 +17,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
-import helium314.keyboard.dictionarypack.DictionaryPackConstants
 import helium314.keyboard.keyboard.KeyboardSwitcher
 import helium314.keyboard.latin.R
 import helium314.keyboard.latin.permissions.PermissionsUtil
@@ -44,6 +42,8 @@ import helium314.keyboard.settings.preferences.SwitchPreference
 import helium314.keyboard.settings.preferences.SwitchPreferenceWithEmojiDictWarning
 import helium314.keyboard.latin.utils.previewDark
 import androidx.core.content.edit
+import helium314.keyboard.keyboard.internal.PopupKeySpec
+import helium314.keyboard.settings.preferences.TextInputPreference
 
 @Composable
 fun TextCorrectionScreen(
@@ -85,6 +85,8 @@ fun TextCorrectionScreen(
         Settings.PREF_KEY_USE_PERSONALIZED_DICTS,
         Settings.PREF_BIGRAM_PREDICTIONS,
         Settings.PREF_SUGGEST_PUNCTUATION,
+        if (prefs.getBoolean(Settings.PREF_SUGGEST_PUNCTUATION, Defaults.PREF_SUGGEST_PUNCTUATION))
+            Settings.PREF_PUNCTUATION_SUGGESTIONS else null,
         Settings.PREF_SUGGEST_CLIPBOARD_CONTENT,
         Settings.PREF_USE_CONTACTS,
         Settings.PREF_USE_APPS,
@@ -209,6 +211,11 @@ fun createCorrectionSettings(context: Context) = listOf(
     Setting(context, Settings.PREF_SUGGEST_PUNCTUATION, R.string.suggest_punctuation, R.string.suggest_punctuation_summary
     ) {
         SwitchPreference(it, Defaults.PREF_SUGGEST_PUNCTUATION) { KeyboardSwitcher.getInstance().setThemeNeedsReload() }
+    },
+    Setting(context, Settings.PREF_PUNCTUATION_SUGGESTIONS, R.string.custom_punctuation_suggestions) { setting ->
+        val defaultSpecs = PopupKeySpec.splitKeySpecs(stringResource(R.string.suggested_punctuations))
+            ?.joinToString(" ") { if (it.length > 1 && it.startsWith('\\')) it.substring(1) else it }
+        TextInputPreference(setting, defaultSpecs ?: "")
     },
     Setting(context, Settings.PREF_CENTER_SUGGESTION_TEXT_TO_ENTER,
         R.string.center_suggestion_text_to_enter, R.string.center_suggestion_text_to_enter_summary

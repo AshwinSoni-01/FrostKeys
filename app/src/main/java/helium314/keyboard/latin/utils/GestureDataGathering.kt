@@ -250,6 +250,11 @@ class WordData(
         )
         val filteredSuggestions = mutableListOf<SuggestedWords.SuggestedWordInfo>()
         for (word in suggestions) { // suggestions are sorted with highest score first
+            if (word.mWord == targetWord) {
+                // always add the targetWord if we have it
+                filteredSuggestions.add(word)
+                continue
+            }
             if (word.mSourceDict.mDictType == Dictionary.TYPE_CONTACTS
                 || suggestions.any { it.mWord == word.mWord && it.mSourceDict.mDictType == Dictionary.TYPE_CONTACTS })
                 continue // never store contacts (might be in user history too)
@@ -258,7 +263,8 @@ class WordData(
                 continue // no need to add bad matches
             if (filteredSuggestions.any { it.mWord == word.mWord })
                 continue // only first occurrence word, todo: ask whether this is ok!
-            if (filteredSuggestions.size > 12)
+            if (filteredSuggestions.size > 18) // user sees 18 suggestions at most
+            // todo: some data contains more suggestions than allowed -> there is something broken here!
                 continue // should be enough
             if (!activeMode && word.mWord in GestureDataGatheringSettings.getWordExclusions(context))
                 continue // keep blocked suggestions in active mode because otherwise one might find out which word is blocked

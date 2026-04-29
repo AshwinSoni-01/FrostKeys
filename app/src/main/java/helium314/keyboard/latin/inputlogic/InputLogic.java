@@ -1745,7 +1745,7 @@ public final class InputLogic {
     public void performUpdateSuggestionStripSync(final SettingsValues settingsValues, final int inputStyle) {
         long startTimeMillis = 0;
         if (DebugFlags.DEBUG_ENABLED) {
-            startTimeMillis = System.currentTimeMillis();
+            startTimeMillis = SystemClock.elapsedRealtime();
             Log.d(TAG, "performUpdateSuggestionStripSync()");
         }
         // Check if we have a suggestion engine attached.
@@ -1797,7 +1797,7 @@ public final class InputLogic {
             }
         }
         if (DebugFlags.DEBUG_ENABLED) {
-            long runTimeMillis = System.currentTimeMillis() - startTimeMillis;
+            long runTimeMillis = SystemClock.elapsedRealtime() - startTimeMillis;
             Log.d(TAG, "performUpdateSuggestionStripSync() : " + runTimeMillis + " ms to finish");
         }
     }
@@ -2445,7 +2445,7 @@ public final class InputLogic {
             final int commitType, final String separatorString) {
         long startTimeMillis = 0;
         if (DebugFlags.DEBUG_ENABLED) {
-            startTimeMillis = System.currentTimeMillis();
+            startTimeMillis = SystemClock.elapsedRealtime();
             Log.d(TAG, "commitChosenWord() : [" + chosenWord + "]");
         }
         // essentially reverted https://github.com/lineageos/android_packages_inputmethods_LatinIME/commit/ee6de1466bc98e27bd414c9a7451f2aee3f9e721
@@ -2453,10 +2453,10 @@ public final class InputLogic {
         final CharSequence chosenWordWithSuggestions = getTextWithSuggestionSpan(mLatinIME, chosenWord,
                 mSuggestedWords, getDictionaryFacilitatorLocale());
         if (DebugFlags.DEBUG_ENABLED) {
-            long runTimeMillis = System.currentTimeMillis() - startTimeMillis;
+            long runTimeMillis = SystemClock.elapsedRealtime() - startTimeMillis;
             Log.d(TAG, "commitChosenWord() : " + runTimeMillis + " ms to run "
                     + "SuggestionSpanUtils.getTextWithSuggestionSpan()");
-            startTimeMillis = System.currentTimeMillis();
+            startTimeMillis = SystemClock.elapsedRealtime();
         }
         // When we are composing word, get n-gram context from the 2nd previous word because the
         // 1st previous word is the word to be committed. Otherwise get n-gram context from the 1st
@@ -2464,26 +2464,26 @@ public final class InputLogic {
         final NgramContext ngramContext = mConnection.getNgramContextFromNthPreviousWord(
                 settingsValues.mSpacingAndPunctuations, mWordComposer.isComposingWord() ? 2 : 1);
         if (DebugFlags.DEBUG_ENABLED) {
-            long runTimeMillis = System.currentTimeMillis() - startTimeMillis;
+            long runTimeMillis = SystemClock.elapsedRealtime() - startTimeMillis;
             Log.d(TAG, "commitChosenWord() : " + runTimeMillis + " ms to run "
                     + "Connection.getNgramContextFromNthPreviousWord()");
             Log.d(TAG, "commitChosenWord() : NgramContext = " + ngramContext);
-            startTimeMillis = System.currentTimeMillis();
+            startTimeMillis = SystemClock.elapsedRealtime();
         }
         mConnection.commitText(chosenWordWithSuggestions, 1);
         if (DebugFlags.DEBUG_ENABLED) {
-            long runTimeMillis = System.currentTimeMillis() - startTimeMillis;
+            long runTimeMillis = SystemClock.elapsedRealtime() - startTimeMillis;
             Log.d(TAG, "commitChosenWord() : " + runTimeMillis + " ms to run "
                     + "Connection.commitText");
-            startTimeMillis = System.currentTimeMillis();
+            startTimeMillis = SystemClock.elapsedRealtime();
         }
         // Add the word to the user history dictionary
         performAdditionToUserHistoryDictionary(settingsValues, chosenWord, ngramContext);
         if (DebugFlags.DEBUG_ENABLED) {
-            long runTimeMillis = System.currentTimeMillis() - startTimeMillis;
+            long runTimeMillis = SystemClock.elapsedRealtime() - startTimeMillis;
             Log.d(TAG, "commitChosenWord() : " + runTimeMillis + " ms to run "
                     + "performAdditionToUserHistoryDictionary()");
-            startTimeMillis = System.currentTimeMillis();
+            startTimeMillis = SystemClock.elapsedRealtime();
         }
         // TODO: figure out here if this is an auto-correct or if the best word is actually
         // what user typed. Note: currently this is done much later in
@@ -2491,7 +2491,7 @@ public final class InputLogic {
         // strings.
         mLastComposedWord = mWordComposer.commitWord(commitType, chosenWord, separatorString, ngramContext);
         if (DebugFlags.DEBUG_ENABLED) {
-            long runTimeMillis = System.currentTimeMillis() - startTimeMillis;
+            long runTimeMillis = SystemClock.elapsedRealtime() - startTimeMillis;
             Log.d(TAG, "commitChosenWord() : " + runTimeMillis + " ms to run "
                     + "WordComposer.commitWord()");
         }
