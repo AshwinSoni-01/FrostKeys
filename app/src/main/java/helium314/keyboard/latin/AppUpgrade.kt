@@ -664,6 +664,12 @@ private object AppUpgrade {
                     }
                 }
             }
+            prefs.edit {
+                if (prefs.contains(Settings.PREF_SPACE_HORIZONTAL_SWIPE))
+                    putString(Settings.PREF_SPACE_HORIZONTAL_SWIPE, prefs.getString(Settings.PREF_SPACE_HORIZONTAL_SWIPE, "")!!.uppercase())
+                if (prefs.contains(Settings.PREF_SPACE_VERTICAL_SWIPE))
+                    putString(Settings.PREF_SPACE_VERTICAL_SWIPE, prefs.getString(Settings.PREF_SPACE_VERTICAL_SWIPE, "")!!.uppercase())
+            }
         }
         upgradeToolbarPrefs(prefs)
         LayoutUtilsCustom.onLayoutFileChanged() // just to be sure

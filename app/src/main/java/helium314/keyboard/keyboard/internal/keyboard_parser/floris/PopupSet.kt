@@ -27,6 +27,7 @@ open class PopupSet<T : AbstractKeyData>(
     }
     open fun isEmpty(): Boolean = main == null && relevant.isNullOrEmpty()
 
+    // todo: this is mutable... bad idea because we cache instances of this over multiple keyboards (see LayoutParser where this is cleaned up...)
     var numberLabel: String? = null
     var symbol: String? = null // maybe list of keys?
 
@@ -48,7 +49,7 @@ open class PopupSet<T : AbstractKeyData>(
     }
 }
 
-class SimplePopups(val popupKeys: Collection<String>?) :  PopupSet<AbstractKeyData>() {
+class SimplePopups(val popupKeys: Collection<String>?) : PopupSet<AbstractKeyData>() {
     override fun getPopupKeyLabels(params: KeyboardParams) = popupKeys?.map { KeyLabel.keyLabelToActualLabel(it, params) }
     override fun isEmpty(): Boolean = popupKeys.isNullOrEmpty()
 }

@@ -87,6 +87,7 @@ import helium314.keyboard.latin.settings.Settings
 import helium314.keyboard.latin.utils.ChecksumCalculator
 import helium314.keyboard.latin.utils.DictionaryInfoUtils
 import helium314.keyboard.latin.utils.GestureDataDao
+import helium314.keyboard.latin.utils.GestureDataGatheringSettings
 import helium314.keyboard.latin.utils.ScriptUtils
 import helium314.keyboard.latin.utils.SubtypeLocaleUtils
 import helium314.keyboard.latin.utils.SubtypeSettings
@@ -95,7 +96,6 @@ import helium314.keyboard.latin.utils.UncachedInputMethodManagerUtils
 import helium314.keyboard.latin.utils.WordData
 import helium314.keyboard.latin.utils.dictTestImeOption
 import helium314.keyboard.latin.utils.gestureDataActiveFacilitator
-import helium314.keyboard.latin.utils.getExportedActiveDeletionCount
 import helium314.keyboard.latin.utils.getSecondaryLocales
 import helium314.keyboard.latin.utils.locale
 import helium314.keyboard.settings.DropDownField
@@ -145,17 +145,17 @@ fun GestureDataScreen(
     // ideally we'd move all the active gathering stuff into a separate (non-local) function,
     // but either it has issues with the floating button positioning (if they are in the function)
     // or the keyboard flashes during recomposition if they are outside the function
-    var wordFromDict by remember { mutableStateOf<String?>(null) } // some word from the dictionary
+    var wordFromDict by rememberSaveable { mutableStateOf<String?>(null) } // some word from the dictionary
     var lastData by remember { mutableStateOf<WordData?>(null) }
-    var sessionWordCount by remember { mutableIntStateOf(0) }
-    var dbActiveWordCount by remember { mutableIntStateOf(dao.count(activeMode = true)) }
+    var sessionWordCount by rememberSaveable { mutableIntStateOf(0) }
+    var dbActiveWordCount by rememberSaveable { mutableIntStateOf(dao.count(activeMode = true)) }
     var showMuchDataDialog by rememberSaveable { mutableStateOf(true) }
     var showEndDialog by rememberSaveable { mutableStateOf(true) }
     val focusRequester = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
-    val words = remember { mutableListOf<Pair<String, Long>>() }
+    val words = rememberSaveable { mutableListOf<Pair<String, Long>>() }
     val scope = rememberCoroutineScope()
-    var activeGathering by remember { mutableStateOf(false) }
+    var activeGathering by rememberSaveable { mutableStateOf(false) }
     var showActiveInfoDialog by remember { mutableStateOf(false) }
     val maybeNotEnoughSpace = activeGathering && useWideLayout
     fun nextWord(save: Boolean) {
@@ -338,7 +338,7 @@ fun GestureDataScreen(
                     buttons()
                     texts()
                 }
-                val exportedAndDeletedCount by remember { mutableIntStateOf(getExportedActiveDeletionCount(ctx)) }
+                val exportedAndDeletedCount by remember { mutableIntStateOf(GestureDataGatheringSettings.getExportedActiveDeletionCount(ctx)) }
                 val oldActiveWords by remember {
                     sessionWordCount = 0
                     dbActiveWordCount = dao.count(activeMode = true)

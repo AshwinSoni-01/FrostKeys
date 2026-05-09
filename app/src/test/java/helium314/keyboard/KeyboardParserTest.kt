@@ -473,9 +473,10 @@ f""", // no newline at the end
         dir.walk().forEach {
             if (it.isDirectory) return@forEach
             val content = it.readText()
-            if (it.endsWith(".json"))
+            val data = if (it.name.endsWith(".json"))
                 LayoutParser.parseJsonString(content)
             else LayoutParser.parseSimpleString(content)
+            data.flatten().mapNotNull { it.compute(params)?.toKeyParams(params) }
         }
     }
 

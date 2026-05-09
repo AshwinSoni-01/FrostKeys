@@ -170,6 +170,9 @@ public final class PointerTracker implements PointerTrackerQueue.Element,
     private boolean mKeySwipeAllowed = false;
     private static boolean sInKeySwipe = false;
 
+    // Touchpad mode for cursor control
+    private final TouchpadHandler mTouchpadHandler = new TouchpadHandler();
+
     private final BatchInputArbiter mBatchInputArbiter;
     private final GestureStrokeDrawingPoints mGestureStrokeDrawingPoints;
 
@@ -729,7 +732,7 @@ public final class PointerTracker implements PointerTrackerQueue.Element,
             setPressedKeyGraphics(key, eventTime);
             mStartX = x;
             mStartY = y;
-            mStartTime = System.currentTimeMillis();
+            mStartTime = SystemClock.elapsedRealtime();
         }
     }
 
@@ -752,8 +755,8 @@ public final class PointerTracker implements PointerTrackerQueue.Element,
     private boolean isSwiper(final int code) {
         final SettingsValues sv = Settings.getValues();
         return switch (code) {
-            case Constants.CODE_SPACE -> sv.mSpaceSwipeHorizontal != KeyboardActionListener.SWIPE_NO_ACTION
-                    || sv.mSpaceSwipeVertical != KeyboardActionListener.SWIPE_NO_ACTION;
+            case Constants.CODE_SPACE -> sv.mSpaceSwipeHorizontal != KeyboardActionListener.SwipeAction.NONE
+                    || sv.mSpaceSwipeVertical != KeyboardActionListener.SwipeAction.NONE;
             case KeyCode.DELETE -> sv.mDeleteSwipeEnabled;
             default -> false;
         };
@@ -917,10 +920,9 @@ public final class PointerTracker implements PointerTrackerQueue.Element,
         }
     }
 
-    private boolean oneShotSwipe(final int swipeSetting) {
+    private boolean oneShotSwipe(KeyboardActionListener.SwipeAction swipeSetting) {
         return switch (swipeSetting) {
-            case KeyboardActionListener.SWIPE_NO_ACTION, KeyboardActionListener.SWIPE_TOGGLE_NUMPAD,
-                 KeyboardActionListener.SWIPE_HIDE_KEYBOARD -> true;
+            case NONE, TOGGLE_NUMPAD, HIDE_KEYBOARD -> true;
             default -> false;
         };
     }
@@ -930,11 +932,14 @@ public final class PointerTracker implements PointerTrackerQueue.Element,
         final int fastTypingTimeout = 2 * sv.mKeyLongpressTimeout / 3;
         // we don't want keyswipes to start immediately if the user is fast-typing,
         // see https://github.com/openboard-team/openboard/issues/411
-        if (System.currentTimeMillis() < mStartTime + fastTypingTimeout && sTypingTimeRecorder.isInFastTyping(eventTime))
+        if (SystemClock.elapsedRealtime() < mStartTime + fastTypingTimeout && sTypingTimeRecorder.isInFastTyping(eventTime))
             return;
         if (code == Constants.CODE_SPACE) {
             int dX = x - mStartX;
             int dY = y - mStartY;
+
+            // Touchpad mode
+            mTouchpadHandler.enableTouchpadMove(x, y, sListener);
 
             // Vertical movement
             int stepsY = dY / sPointerStep;
@@ -1078,6 +1083,10 @@ public final class PointerTracker implements PointerTrackerQueue.Element,
         if (mKeySwipeAllowed) {
             mKeySwipeAllowed = false;
             sInKeySwipe = false;
+
+            // Touchpad mode
+            mTouchpadHandler.disableTouchpadMode();
+
             if (mInHorizontalSwipe || mInVerticalSwipe) {
                 mInHorizontalSwipe = false;
                 mInVerticalSwipe = false;

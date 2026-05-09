@@ -71,6 +71,7 @@ import helium314.keyboard.latin.touchinputconsumer.GestureConsumer;
 import helium314.keyboard.latin.utils.ColorUtilKt;
 import helium314.keyboard.latin.utils.FoldableUtils;
 import helium314.keyboard.latin.utils.GestureDataGatheringKt;
+import helium314.keyboard.latin.utils.GestureDataGatheringSettings;
 import helium314.keyboard.latin.utils.InlineAutofillUtils;
 import helium314.keyboard.latin.utils.InputMethodPickerKt;
 import helium314.keyboard.latin.utils.JniUtils;
@@ -848,14 +849,7 @@ public class LatinIME extends InputMethodService implements
     void onStartInputViewInternal(final EditorInfo editorInfo, final boolean restarting) {
         super.onStartInputView(editorInfo, restarting);
 
-        // only for active gesture data gathering, remove when data gathering phase is done (end of 2026 latest)
-        if (GestureDataGatheringKt.isInActiveGatheringMode(editorInfo)) {
-            mDictionaryFacilitator = GestureDataGatheringKt.getGestureDataActiveFacilitator();
-        } else {
-            mDictionaryFacilitator = mOriginalDictionaryFacilitator;
-        }
-        GestureDataGatheringKt.showEndNotificationIfNecessary(this); // will do nothing for a long time
-        mInputLogic.setFacilitator(mDictionaryFacilitator);
+        setGestureDataGatheringMode(editorInfo);
 
         mDictionaryFacilitator.onStartInput();
         // Switch to the null consumer to handle cases leading to early exit below, for which we
@@ -1566,7 +1560,7 @@ public class LatinIME extends InputMethodService implements
             return;
         }
         final SuggestedWords neutralSuggestions = currentSettings.mSuggestPunctuation
-                ? currentSettings.mSpacingAndPunctuations.mSuggestPuncList
+                ? currentSettings.mPunctuationSuggestions
                 : SuggestedWords.getEmptyInstance();
         setSuggestedWords(neutralSuggestions);
         if (hasSuggestionStripView() && currentSettings.mAutoShowToolbar) {
@@ -1852,5 +1846,16 @@ public class LatinIME extends InputMethodService implements
             }
             // deallocateMemory always called on hiding, and should not be called when showing
         }
+    }
+
+    private void setGestureDataGatheringMode(EditorInfo editorInfo) {
+        // only for active gesture data gathering, remove when data gathering phase is done (end of 2026 latest)
+        if (GestureDataGatheringSettings.INSTANCE.isInActiveGatheringMode(editorInfo)) {
+            mDictionaryFacilitator = GestureDataGatheringKt.getGestureDataActiveFacilitator();
+        } else {
+            mDictionaryFacilitator = mOriginalDictionaryFacilitator;
+        }
+        GestureDataGatheringSettings.INSTANCE.showEndNotificationIfNecessary(this); // will do nothing for a long time
+        mInputLogic.setFacilitator(mDictionaryFacilitator);
     }
 }

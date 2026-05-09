@@ -8,11 +8,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import helium314.keyboard.keyboard.KeyboardSwitcher
 import helium314.keyboard.latin.utils.prefs
 import helium314.keyboard.settings.Setting
 import helium314.keyboard.settings.dialogs.TextInputDialog
 import androidx.core.content.edit
+import helium314.keyboard.latin.R
 
 @Composable
 fun TextInputPreference(setting: Setting, default: String, info: String? = null, checkTextValid: (String) -> Boolean = { true }) {
@@ -33,7 +35,9 @@ fun TextInputPreference(setting: Setting, default: String, info: String? = null,
             initialText = prefs.getString(setting.key, default) ?: "",
             title = { Text(setting.title) },
             description = if (info == null) null else { { Text(info) } },
-            checkTextValid = checkTextValid
+            checkTextValid = checkTextValid,
+            onNeutral = { prefs.edit { remove(setting.key) }; showDialog = false },
+            neutralButtonText = stringResource(R.string.button_default)
         )
     }
 }
