@@ -41,7 +41,11 @@ object LayoutParser {
             else params.mId.mSubtype.layouts[layoutType] ?: Settings.readDefaultLayoutName(layoutType, context.prefs())
         return layoutCache.getOrPut(layoutType.name + layoutName) {
             createCacheLambda(layoutType, layoutName, context)
-        }(params)
+        }(params).apply {
+            // popup symbols and numberLabels are changed in KeyboardParser, but should be clean initially
+            // todo: actually the symbols / numberLabels should be handled in a better way that doesn't change the popupSet
+            forEach { row -> row.forEach { it.popup.symbol = null; it.popup.numberLabel = null } }
+        }
     }
 
     /**

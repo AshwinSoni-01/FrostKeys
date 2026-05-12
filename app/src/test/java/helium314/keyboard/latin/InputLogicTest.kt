@@ -92,6 +92,25 @@ class InputLogicTest {
         assertEquals("there", composingText)
     }
 
+    @Test fun deleteMultiCodepointText() {
+        reset()
+        setText("hello there \uD83E\uDF00")
+        functionalKeyPress(KeyCode.DELETE)
+        assertEquals("hello there ", text)
+    }
+
+    @Test fun deleteCombinedText() {
+        reset()
+        setText("hello there э́")
+        functionalKeyPress(KeyCode.DELETE)
+        assertEquals("hello there ", text)
+
+        reset()
+        setText("hello there H̵̛͕̞̦̰̜͍̰̥̟͆̏͂̌͑́ͅ")
+        functionalKeyPress(KeyCode.DELETE)
+        assertEquals("hello there ", text)
+    }
+
     @Test fun deleteInsideWord() {
         reset()
         setText("hello you there")

@@ -185,12 +185,14 @@ private fun restoreLauncher(onError: (String) -> Unit): ManagedActivityResultLau
                             if (entry.name.startsWith("unprotected${File.separator}")) {
                                 val adjustedName = entry.name.substringAfter("unprotected${File.separator}")
                                 if (backupFilePatterns.any { adjustedName.matches(it) }) {
-                                    val file = File(deviceProtectedFilesDir, adjustedName)
-                                    FileUtils.copyStreamToNewFile(zip, file)
+                                    if (!restoreEntryToDir(zip, deviceProtectedFilesDir, adjustedName)) {
+                                        Log.w("AdvancedScreen", "skipping unsafe backup entry $adjustedName")
+                                    }
                                 }
                             } else if (backupFilePatterns.any { entry.name.matches(it) }) {
-                                val file = File(filesDir, entry.name)
-                                FileUtils.copyStreamToNewFile(zip, file)
+                                if (!restoreEntryToDir(zip, filesDir, entry.name)) {
+                                    Log.w("AdvancedScreen", "skipping unsafe backup entry ${entry.name}")
+                                }
                             } else if (entry.name == Database.NAME) {
                                 FileUtils.copyStreamToNewFile(zip, restoredDb)
                             } else if (entry.name == PREFS_FILE_NAME) {
@@ -277,6 +279,17 @@ private fun readJsonLinesToSettings(list: List<String>, prefs: SharedPreferences
     } catch (e: Exception) {
         return false
     }
+}
+
+private fun restoreEntryToDir(zip: ZipInputStream, baseDir: File, entryName: String): Boolean {
+    val file = File(baseDir, entryName)
+    val canonicalBase = baseDir.canonicalFile
+    val canonicalTarget = file.canonicalFile
+    if (canonicalTarget.path != canonicalBase.path
+        && !canonicalTarget.path.startsWith(canonicalBase.path + File.separator)
+    ) return false
+    FileUtils.copyStreamToNewFile(zip, file)
+    return true
 }
 
 private const val PREFS_FILE_NAME = "preferences.json"

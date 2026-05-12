@@ -402,7 +402,7 @@ private object AppUpgrade {
             }
         }
         if (oldVersion <= 2305) {
-            (prefs.all.keys.filter { it.startsWith(Settings.PREF_POPUP_KEYS_ORDER) || it.startsWith(Settings.PREF_POPUP_KEYS_LABELS_ORDER) } +
+            (prefs.all.keys.filter { it.startsWith(Settings.PREF_POPUP_KEYS_ORDER) || it.startsWith(Settings.PREF_POPUP_KEYS_HINT_ORDER) } +
                 listOf(Settings.PREF_TOOLBAR_KEYS, Settings.PREF_PINNED_TOOLBAR_KEYS, Settings.PREF_CLIPBOARD_TOOLBAR_KEYS)).forEach {
                 if (!prefs.contains(it)) return@forEach
                 val newValue = prefs.getString(it, "")!!.replace(",", Separators.KV).replace(";", Separators.ENTRY)
@@ -475,7 +475,7 @@ private object AppUpgrade {
         }
         if (oldVersion <= 2307) {
             prefs.all.keys.forEach {
-                if (!it.startsWith(Settings.PREF_POPUP_KEYS_ORDER) && !it.startsWith(Settings.PREF_POPUP_KEYS_LABELS_ORDER))
+                if (!it.startsWith(Settings.PREF_POPUP_KEYS_ORDER) && !it.startsWith(Settings.PREF_POPUP_KEYS_HINT_ORDER))
                     return@forEach
                 prefs.edit { putString(it, prefs.getString(it, "")!!.replace("popup_keys_", "")) }
             }
@@ -499,8 +499,8 @@ private object AppUpgrade {
                     }
                     prefs.edit { remove(key) }
                 }
-                if (key.startsWith(Settings.PREF_POPUP_KEYS_LABELS_ORDER+"_")) {
-                    val locale = key.substringAfter(Settings.PREF_POPUP_KEYS_LABELS_ORDER+"_").constructLocale()
+                if (key.startsWith(Settings.PREF_POPUP_KEYS_HINT_ORDER+"_")) {
+                    val locale = key.substringAfter(Settings.PREF_POPUP_KEYS_HINT_ORDER+"_").constructLocale()
                     SubtypeSettings.getEnabledSubtypes().forEach {
                         if (it.locale() == locale && !SubtypeSettings.isAdditionalSubtype(it)) {
                             SubtypeUtilsAdditional.changeAdditionalSubtype(it.toSettingsSubtype(), it.toSettingsSubtype(), context)

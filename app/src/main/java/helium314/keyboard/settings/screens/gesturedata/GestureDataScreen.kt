@@ -224,7 +224,8 @@ fun GestureDataScreen(
                     if (!composedData.mIsBatchMode || inputStyle != SuggestedWords.INPUT_STYLE_TAIL_BATCH) return
                     val target = wordFromDict ?: return
                     val newData = WordData(target, suggestions, composedData, ngramContext, keyboard, inputStyle, true)
-                    if (suggestions.any { it.mWord == target && it.mScore >= 0 }) { // just not negative should be fine
+                    if (suggestions.any { it.mWord == target && it.mScore >= 0 } // just not negative should be fine
+                            || suggestions.first().mWord == target) { // or the target word first (but negative), which can happen in some cases
                         scope.launch {
                             ++sessionWordCount
                             newData.save(ctx)

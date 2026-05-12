@@ -3,6 +3,7 @@ package helium314.keyboard.settings.screens
 
 import android.Manifest
 import android.content.Context
+import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material3.Surface
@@ -91,7 +92,9 @@ fun TextCorrectionScreen(
         Settings.PREF_USE_CONTACTS,
         Settings.PREF_USE_APPS,
         if (prefs.getBoolean(Settings.PREF_KEY_USE_PERSONALIZED_DICTS, Defaults.PREF_KEY_USE_PERSONALIZED_DICTS))
-            Settings.PREF_ADD_TO_PERSONAL_DICTIONARY else null
+            Settings.PREF_ADD_TO_PERSONAL_DICTIONARY else null,
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
+            Settings.PREF_SPELLCHECK_SUGGEST else null,
     )
     SearchSettingsScreen(
         onClickBack = onClickBack,
@@ -264,6 +267,11 @@ fun createCorrectionSettings(context: Context) = listOf(
         R.string.add_to_personal_dictionary, R.string.add_to_personal_dictionary_summary
     ) {
         SwitchPreference(it, Defaults.PREF_ADD_TO_PERSONAL_DICTIONARY)
+    },
+    Setting(context, Settings.PREF_SPELLCHECK_SUGGEST,
+        R.string.spell_check_suggestions, R.string.spell_check_suggestions_summary
+    ) {
+        SwitchPreference(it, Defaults.PREF_SPELLCHECK_SUGGEST)
     },
 )
 

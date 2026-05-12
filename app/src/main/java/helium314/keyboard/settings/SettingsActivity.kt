@@ -112,6 +112,7 @@ open class SettingsActivity : ComponentActivity(), SharedPreferences.OnSharedPre
                                 settingsContainer[Settings.PREF_USE_CONTACTS]!!.Preference()
                                 settingsContainer[Settings.PREF_USE_APPS]!!.Preference()
                                 settingsContainer[Settings.PREF_BLOCK_POTENTIALLY_OFFENSIVE]!!.Preference()
+                                settingsContainer[Settings.PREF_SPELLCHECK_SUGGEST]!!.Preference()
                             }
                         }
                     else {

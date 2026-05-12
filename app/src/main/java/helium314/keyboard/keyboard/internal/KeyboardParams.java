@@ -83,8 +83,8 @@ public class KeyboardParams {
     public final KeyboardIconsSet mIconsSet = KeyboardIconsSet.Companion.getInstance();
     @NonNull // todo: not good, this only works because params are currently always created for the active subtype
     public final List<Locale> mSecondaryLocales = Settings.getValues().mSecondaryLocales;
-    public final ArrayList<String> mPopupKeyTypes = new ArrayList<>();
-    public final ArrayList<String> mPopupKeyLabelSources = new ArrayList<>();
+    public final ArrayList<String> mPopupKeyOrder = new ArrayList<>();
+    public final ArrayList<String> mPopupKeyHintOrder = new ArrayList<>();
 
     @NonNull
     private final UniqueKeysCache mUniqueKeysCache;

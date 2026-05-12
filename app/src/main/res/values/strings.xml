@@ -894,6 +894,10 @@ New dictionary:
     <string name="space_swipe_touchpad_mode_entry">Touchpad mode</string>
     <!-- Option to adjust spacebar-touchpad sensitivity -->
     <string name="touchpad_sensitivity">Touchpad sensitivity</string>
+    <!-- Option to enable or disable automatic scrolling when the cursor reaches the keyboard edges -->
+    <string name="touchpad_edge_scroll">Touchpad edge scrolling</string>
+    <!-- Description for the touchpad edge scrolling option -->
+    <string name="touchpad_edge_scroll_description">Automatically scroll when sliding to the edge of the keyboard</string>
     <!-- Title of the setting for variable toolbar direction -->
     <string name="var_toolbar_direction">Variable toolbar direction</string>
     <!-- Description of the variable toolbar direction setting -->
@@ -938,6 +942,10 @@ New dictionary:
     <string name="search_field_placeholder">Search</string>
     <!-- Button to show later -->
     <string name="ask_later">Ask me later</string>
+    <!-- Switch to toggle suggestions when using the spell checker -->
+    <string name="spell_check_suggestions">Show spellchecker suggestions</string>
+    <!-- Description for toggling suggestions when using the spell checker -->
+    <string name="spell_check_suggestions_summary">Show suggestions when selecting a word with red underline. Requires setting app as default spell checker.</string>
 
 
     <!-- gesture data gathering, new strings for normal use should go above -->

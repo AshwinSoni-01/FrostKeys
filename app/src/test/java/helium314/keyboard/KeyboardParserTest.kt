@@ -52,7 +52,7 @@ class ParserTest {
         ShadowLog.stream = System.out
         params = KeyboardParams()
         params.mId = KeyboardLayoutSet.getFakeKeyboardId(KeyboardId.ELEMENT_ALPHABET)
-        params.mPopupKeyTypes.add(POPUP_KEYS_LAYOUT)
+        params.mPopupKeyOrder.add(POPUP_KEYS_LAYOUT)
         addLocaleKeyTextsToParams(latinIME, params, POPUP_KEYS_NORMAL)
     }
 
@@ -473,9 +473,10 @@ f""", // no newline at the end
         dir.walk().forEach {
             if (it.isDirectory) return@forEach
             val content = it.readText()
-            if (it.endsWith(".json"))
+            val data = if (it.name.endsWith(".json"))
                 LayoutParser.parseJsonString(content)
             else LayoutParser.parseSimpleString(content)
+            data.flatten().mapNotNull { it.compute(params)?.toKeyParams(params) }
         }
     }
 

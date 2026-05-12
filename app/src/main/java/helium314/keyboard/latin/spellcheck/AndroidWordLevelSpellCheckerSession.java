@@ -14,6 +14,8 @@ import android.provider.UserDictionary.Words;
 import android.service.textservice.SpellCheckerService.Session;
 import android.text.TextUtils;
 
+import helium314.keyboard.latin.settings.Defaults;
+import helium314.keyboard.latin.settings.Settings;
 import helium314.keyboard.latin.utils.KtxKt;
 import helium314.keyboard.latin.utils.Log;
 import android.util.LruCache;
@@ -323,6 +325,10 @@ public abstract class AndroidWordLevelSpellCheckerSession extends Session {
             if (DebugFlags.DEBUG_ENABLED) {
                 Log.i(TAG, "onGetSuggestionsInternal() : [" + text + "] is NOT a valid word");
             }
+
+            // unknown word -> don't show suggestions if switched off
+            if (!KtxKt.prefs(mService).getBoolean(Settings.PREF_SPELLCHECK_SUGGEST, Defaults.PREF_SPELLCHECK_SUGGEST))
+                return AndroidSpellCheckerService.getTypoNoUiSuggestions();
 
             final Keyboard keyboard = mService.getKeyboardForLocale(mLocale);
             final WordComposer composer = new WordComposer();

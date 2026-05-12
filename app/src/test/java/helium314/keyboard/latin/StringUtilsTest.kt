@@ -10,6 +10,9 @@ import helium314.keyboard.latin.common.endsWithWordCodepoint
 import helium314.keyboard.latin.common.getFullEmojiAtEnd
 import helium314.keyboard.latin.common.getTouchedWordRange
 import helium314.keyboard.latin.common.isEmoji
+import helium314.keyboard.latin.common.isSingleGrapheme
+import helium314.keyboard.latin.common.lastGrapheme
+import helium314.keyboard.latin.common.moveStepsToCharCount
 import helium314.keyboard.latin.common.nonWordCodePointAndNoSpaceBeforeCursor
 import helium314.keyboard.latin.common.splitOnWhitespace
 import helium314.keyboard.latin.settings.SpacingAndPunctuations
@@ -18,6 +21,7 @@ import helium314.keyboard.latin.utils.TextRange
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import kotlin.system.measureTimeMillis
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -117,6 +121,20 @@ class StringUtilsTest {
         checkTextRange("@@@", "", spUrl, script, 0, 3)
     }
 
+    @Test fun singleGrapheme() {
+        assert(!"".isSingleGrapheme)
+        assert(",".isSingleGrapheme)
+        assert(!"!!".isSingleGrapheme)
+        assert("э́".isSingleGrapheme)
+        assert(!"\uD83C\uDFF4\u200D☠️\uD83C\uDFF3️\u200D\uD83C\uDF08".isSingleGrapheme)
+        assert("\uD83C\uDFF3️\u200D\uD83C\uDF08".isSingleGrapheme)
+        assert("\uD83C\uDFF4\u200D☠️".isSingleGrapheme)
+        assert(!" 🏼".isSingleGrapheme)
+        assert(!"a🏼".isSingleGrapheme)
+        assert(!"🏼🏼".isSingleGrapheme)
+        assert("🏼".isSingleGrapheme)
+    }
+
     @Test fun detectEmojisAtEnd() {
         assertEquals("", getFullEmojiAtEnd("\uD83C\uDF83 "))
         assertEquals("", getFullEmojiAtEnd("a"))
@@ -134,16 +152,15 @@ class StringUtilsTest {
         assertEquals("\uD83C\uDFFC", getFullEmojiAtEnd(" \uD83C\uDFFC"))
         assertEquals("1\uFE0F⃣", getFullEmojiAtEnd("1\uFE0F⃣")) // 1️⃣
         assertEquals("©\uFE0F", getFullEmojiAtEnd("©\uFE0F")) // ©️
-    }
-
-    @Test fun detectEmojisAtEndFail() {
-        if (BuildConfig.BUILD_TYPE == "runTests") return
-        // fails, but unlikely enough that we leave it unfixed
-        assertEquals("\uD83C\uDFFC", getFullEmojiAtEnd("\uD83C\uDF84\uD83C\uDFFC")) // 🎄🏼
-        // below also fail, because current ZWJ handling is not suitable for some unusual cases
         assertEquals("", getFullEmojiAtEnd("\u200D"))
         assertEquals("", getFullEmojiAtEnd("a\u200D"))
         assertEquals("\uD83D\uDE22", getFullEmojiAtEnd(" \u200D\uD83D\uDE22"))
+    }
+
+    @Test fun detectEmojisAtEndFails() {
+        if (BuildConfig.BUILD_TYPE == "runTests") return
+        // fails, but unlikely enough that we leave it unfixed
+        assertEquals("\uD83C\uDFFC", getFullEmojiAtEnd("\uD83C\uDF84\uD83C\uDFFC")) // 🎄🏼
     }
 
     @Test fun isEmojiDetectsSingleEmojis() {
@@ -155,6 +172,27 @@ class StringUtilsTest {
         assert(isEmoji("🖐️"))
         assert(isEmoji("🖐🏾"))
         assert(!isEmoji("🖐🏾🏼"))
+    }
+
+    @Test fun moveStepsToCharCount() {
+        assertEquals(3, moveStepsToCharCount("abcd", 3))
+        assertEquals(-3, moveStepsToCharCount("abcd", -3))
+        assertEquals(4, moveStepsToCharCount("abcd", 10))
+        assertEquals(-4, moveStepsToCharCount("abcd", -10))
+        assertEquals(8, moveStepsToCharCount("\uD83C\uDFF3️\u200D\uD83C\uDF08bcd", 3))
+        assertEquals(-3, moveStepsToCharCount("\uD83C\uDFF3️\u200D\uD83C\uDF08bcd", -3))
+        assertEquals(4, moveStepsToCharCount("aэ́cd", 3))
+        assertEquals(-2, moveStepsToCharCount("abcэ́", -1))
+        assertEquals(19, moveStepsToCharCount("H̵̛͕̞̦̰̜͍̰̥̟͆̏͂̌͑́ͅэ́cd", 1))
+        assertEquals(21, moveStepsToCharCount("H̵̛͕̞̦̰̜͍̰̥̟͆̏͂̌͑́ͅэ́cd", 2))
+        assertEquals(22, moveStepsToCharCount("H̵̛͕̞̦̰̜͍̰̥̟͆̏͂̌͑́ͅэ́cd", 3))
+        assertEquals(23, moveStepsToCharCount("H̵̛͕̞̦̰̜͍̰̥̟͆̏͂̌͑́ͅэ́cd", 4))
+        assertEquals(-2, moveStepsToCharCount("aH̵̛͕̞̦̰̜͍̰̥̟͆̏͂̌͑́ͅcэ́", -1))
+        assertEquals(-3, moveStepsToCharCount("aH̵̛͕̞̦̰̜͍̰̥̟͆̏͂̌͑́ͅcэ́", -2))
+        assertEquals(-23, moveStepsToCharCount("aH̵̛͕̞̦̰̜͍̰̥̟͆̏͂̌͑́ͅcэ́", -4))
+        assertEquals(3, moveStepsToCharCount("abcd", 3))
+        assertEquals(5, moveStepsToCharCount("\uD83C\uDFF4\u200D☠️\uD83C\uDFF3️\u200D\uD83C\uDF08", 1))
+        assertEquals(-6, moveStepsToCharCount("\uD83C\uDFF4\u200D☠️\uD83C\uDFF3️\u200D\uD83C\uDF08", -1))
     }
 
     @Test fun isEmojiDetectsAllAvailableEmojis() {

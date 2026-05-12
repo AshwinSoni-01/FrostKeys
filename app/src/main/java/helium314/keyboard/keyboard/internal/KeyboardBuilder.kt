@@ -71,9 +71,9 @@ open class KeyboardBuilder<KP : KeyboardParams>(protected val mContext: Context,
                 || (mParams.mId.isAlphabetKeyboard && !mParams.mId.mSubtype.hasExtraValue(Constants.Subtype.ExtraValue.NO_SHIFT_PROXIMITY_CORRECTION))
 
         addLocaleKeyTextsToParams(mContext, mParams, sv.mShowMorePopupKeys)
-        mParams.mPopupKeyTypes.addAll(sv.mPopupKeyTypes)
+        mParams.mPopupKeyOrder.addAll(sv.mPopupKeyOrder)
         // add label source only if popup key type enabled
-        sv.mPopupKeyLabelSources.forEach { if (it in sv.mPopupKeyTypes) mParams.mPopupKeyLabelSources.add(it) }
+        sv.mPopupKeyHintOrder.forEach { if (it in sv.mPopupKeyOrder) mParams.mPopupKeyHintOrder.add(it) }
     }
 
     // todo: remnant of old parser, replace it if reasonably simple

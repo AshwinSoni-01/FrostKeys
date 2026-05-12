@@ -18,6 +18,7 @@ import android.text.TextUtils;
 import android.text.style.CharacterStyle;
 
 import helium314.keyboard.keyboard.KeyboardSwitcher;
+import helium314.keyboard.latin.common.ConstantsKt;
 import helium314.keyboard.latin.define.DebugFlags;
 import helium314.keyboard.latin.settings.Settings;
 import helium314.keyboard.latin.utils.Log;
@@ -1023,13 +1024,13 @@ public final class RichInputConnection implements PrivateCommandPerformer {
     }
 
     public int getCharCountToDeleteBeforeCursor() {
-        final int lastCodePoint = getCodePointBeforeCursor();
-        if (StringUtils.mightBeEmoji(lastCodePoint)) {
-            final String text = mCommittedTextBeforeComposingText.toString() + mComposingText;
-            final int emojiLength = StringUtilsKt.getFullEmojiAtEnd(text).length();
-            if (emojiLength > 0) return emojiLength;
+        int lastCodePoint = getCodePointBeforeCursor();
+        if (StringUtils.mightBeEmoji(lastCodePoint) || Character.isSupplementaryCodePoint(lastCodePoint) || ConstantsKt.getCombiningRange().contains(lastCodePoint)) {
+            CharSequence text = getTextBeforeCursor(NUM_CHARS_TO_GET_BEFORE_CURSOR, 0);
+            if (TextUtils.isEmpty(text)) return 1;
+            return StringUtilsKt.getLastGrapheme(text.toString()).length();
         }
-        return Character.isSupplementaryCodePoint(lastCodePoint) ? 2 : 1;
+        return 1;
     }
 
     public boolean hasLetterBeforeLastSpaceBeforeCursor() {

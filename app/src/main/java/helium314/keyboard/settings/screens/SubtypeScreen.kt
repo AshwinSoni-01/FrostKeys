@@ -329,8 +329,8 @@ fun SubtypeScreen(
             PopupOrderDialog(
                 onDismissRequest = { showHintOrderDialog = false },
                 initialValue = setting ?: prefs.getString(
-                    Settings.PREF_POPUP_KEYS_LABELS_ORDER,
-                    Defaults.PREF_POPUP_KEYS_LABELS_ORDER
+                    Settings.PREF_POPUP_KEYS_HINT_ORDER,
+                    Defaults.PREF_POPUP_KEYS_HINT_ORDER
                 )!!,
                 title = stringResource(R.string.hint_source),
                 showDefault = setting != null,
