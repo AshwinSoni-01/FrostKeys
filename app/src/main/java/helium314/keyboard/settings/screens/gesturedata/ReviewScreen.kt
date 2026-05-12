@@ -121,7 +121,6 @@ fun ReviewScreen(
         }
     }
     fun reloadGestureDataInfos() {
-        // todo: if slow, do in background, keep all entries in memory, or try returning a cursor (then sorting needs to be done by db)
         val infos = if (!includeActive && !includePassive) emptyList() else dao.filterInfos(
             filter.text.takeIf { it.isNotEmpty() },
             startDate,
