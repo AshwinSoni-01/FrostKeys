@@ -70,6 +70,7 @@ import helium314.keyboard.latin.common.Links
 import helium314.keyboard.latin.utils.GestureDataGatheringSettings.getAppExclusions
 import helium314.keyboard.latin.utils.GestureDataGatheringSettings.getAppIncludeByDefault
 import helium314.keyboard.settings.painterResourceCompat
+import kotlinx.coroutines.Dispatchers
 
 // functionality for gesture data gathering as part of the NLNet Project https://nlnet.nl/project/GestureTyping/
 // will be removed once the project is finished
@@ -94,7 +95,8 @@ fun PassiveGatheringSettings() {
             Text(stringResource(R.string.gesture_data_passive_gathering_switch))
             val allowedCount = if (getAppIncludeByDefault(ctx)) packageInfos.size - getAppExclusions(ctx).size
                 else getAppExclusions(ctx).size
-            Text(stringResource(R.string.gesture_data_passive_gathering_allowed_apps, allowedCount), style = MaterialTheme.typography.bodySmall)
+            val allowedCountText = if (packageInfos.isEmpty()) "" else allowedCount.toString()
+            Text(stringResource(R.string.gesture_data_passive_gathering_allowed_apps, allowedCountText), style = MaterialTheme.typography.bodySmall)
         }
         Switch(passiveGathering, { passiveGathering = it; GestureDataGatheringSettings.setPassiveGatheringEnabled(ctx.prefs(), it) })
     }
@@ -180,7 +182,7 @@ fun PassiveGatheringSettings() {
     val scope = rememberCoroutineScope()
     LaunchedEffect(packageInfos) {
         if (packageInfos.isEmpty())
-            scope.launch { packageInfos = AppsManager(ctx).getPackagesWithNameAndIcon() }
+            scope.launch(Dispatchers.IO) { packageInfos = AppsManager(ctx).getPackagesWithNameAndIcon() }
     }
     if (showIncludedAppsDialog) {
         var defaultInclude by remember { mutableStateOf(getAppIncludeByDefault(ctx)) }
