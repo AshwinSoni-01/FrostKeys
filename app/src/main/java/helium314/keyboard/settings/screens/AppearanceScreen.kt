@@ -56,6 +56,7 @@ fun AppearanceScreen(
     if ((b?.value ?: 0) < 0)
         Log.v("irrelevant", "stupid way to trigger recomposition on preference change")
     val dayNightMode = Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && prefs.getBoolean(Settings.PREF_THEME_DAY_NIGHT, Defaults.PREF_THEME_DAY_NIGHT)
+    val isFrostedActive = helium314.keyboard.latin.FrostedGlassHelper.isFrostedTheme(ctx)
     val items = listOf(
         R.string.settings_screen_theme,
         Settings.PREF_THEME_STYLE,
@@ -67,6 +68,7 @@ fun AppearanceScreen(
             Settings.PREF_THEME_DAY_NIGHT else null,
         if (dayNightMode) Settings.PREF_THEME_COLORS_NIGHT else null,
         Settings.PREF_NAVBAR_COLOR,
+        if (isFrostedActive) "adjust_frosted_glass_dialog" else null,
         SettingsWithoutKey.BACKGROUND_IMAGE,
         SettingsWithoutKey.BACKGROUND_IMAGE_LANDSCAPE,
         R.string.settings_category_miscellaneous,
@@ -92,6 +94,7 @@ fun AppearanceScreen(
             Settings.PREF_EMOJI_KEY_FIT else null,
         if (prefs.getInt(Settings.PREF_EMOJI_MAX_SDK, 0) >= 24)
             Settings.PREF_EMOJI_SKIN_TONE else null,
+        Settings.PREF_PERSISTENT_EMOJI_ROW,
     )
     SearchSettingsScreen(
         onClickBack = onClickBack,
@@ -328,6 +331,21 @@ fun createAppearanceSettings(context: Context) = listOf(
             "\uD83C\uDFFF" to "\uD83C\uDFFF"
         )
         ListPreference(setting, items, Defaults.PREF_EMOJI_SKIN_TONE) { KeyboardSwitcher.getInstance().setThemeNeedsReload() }
+    },
+    Setting(context, Settings.PREF_PERSISTENT_EMOJI_ROW, R.string.prefs_persistent_emoji_row) {
+        SwitchPreference(it, Defaults.PREF_PERSISTENT_EMOJI_ROW) { KeyboardSwitcher.getInstance().setThemeNeedsReload() }
+    },
+    Setting(context, "adjust_frosted_glass_dialog", R.string.button_adjust_frosted_glass) { setting ->
+        var showDialog by rememberSaveable { mutableStateOf(false) }
+        Preference(
+            name = setting.title,
+            onClick = { showDialog = true }
+        )
+        if (showDialog) {
+            helium314.keyboard.settings.dialogs.FrostedGlassAdjustDialog(
+                onDismissRequest = { showDialog = false }
+            )
+        }
     },
 )
 

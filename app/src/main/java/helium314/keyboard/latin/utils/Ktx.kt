@@ -121,16 +121,20 @@ fun Context.getDisplayContext(): Context {
 }
 
 /** Override layout parameters to expand SoftInputWindow to the entire screen, See setInputView and SoftInputWindow.updateWidthHeight */
-fun InputMethodService.updateSoftInputWindowLayoutParameters(inputView: View?) {
+fun InputMethodService.updateSoftInputWindowLayoutParameters(inputView: View?, forceWrapContent: Boolean = false) {
     val window = window.window ?: return
-    ViewLayoutUtils.updateLayoutHeightOf(window, ViewGroup.LayoutParams.MATCH_PARENT)
+    val windowHeight = if (forceWrapContent)
+        ViewGroup.LayoutParams.WRAP_CONTENT
+    else
+        ViewGroup.LayoutParams.MATCH_PARENT
+    ViewLayoutUtils.updateLayoutHeightOf(window, windowHeight)
 
     if (inputView == null) return
     // In non-fullscreen mode, InputView and its parent inputArea should expand to the entire screen
     // and be placed at the bottom of SoftInputWindow. In fullscreen mode, these shouldn't
     // expand to the entire screen and should be coexistent with mExtractedArea above.
     // See setInputView and com.android.internal.R.layout.input_method.xml.
-    val layoutHeight = if (isFullscreenMode)
+    val layoutHeight = if (isFullscreenMode || forceWrapContent)
         ViewGroup.LayoutParams.WRAP_CONTENT
     else
         ViewGroup.LayoutParams.MATCH_PARENT

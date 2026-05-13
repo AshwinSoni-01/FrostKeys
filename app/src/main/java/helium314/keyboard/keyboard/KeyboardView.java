@@ -7,6 +7,7 @@
 package helium314.keyboard.keyboard;
 
 import static helium314.keyboard.keyboard.KeyboardTheme.STYLE_ROUNDED;
+import static helium314.keyboard.keyboard.KeyboardTheme.STYLE_CIRCLE;
 
 import android.content.Context;
 import android.content.res.TypedArray;
@@ -64,7 +65,7 @@ public class KeyboardView extends View {
     private final float mSpacebarIconWidthRatio;
     private final Rect mKeyBackgroundPadding = new Rect();
     private static final float KET_TEXT_SHADOW_RADIUS_DISABLED = -1.0f;
-    private final Colors mColors;
+    private Colors mColors;
     private float mKeyScaleForText;
     protected float mFontSizeMultiplier;
 
@@ -351,6 +352,52 @@ public class KeyboardView extends View {
             @NonNull final Drawable background) {
         final int keyWidth = key.getDrawWidth();
         final int keyHeight = key.getHeight();
+
+        final String themeStyle = mColors.getThemeStyle();
+        if (themeStyle.equals(STYLE_ROUNDED) || themeStyle.equals(STYLE_CIRCLE)) {
+            final boolean isSpaceBar = key.getCode() == Constants.CODE_SPACE;
+            final boolean isCircleStyle = themeStyle.equals(STYLE_CIRCLE);
+            final boolean isRoundableKey = isCircleStyle 
+                ? (!key.isSpacer() && !isSpaceBar)
+                : (!key.isSpacer() && !key.hasFunctionalBackground() && key.getCode() > 0 && !isSpaceBar);
+
+            if (isSpaceBar || isRoundableKey) {
+                ColorType colorType;
+                if (isSpaceBar) {
+                    colorType = ColorType.SPACE_BAR_BACKGROUND;
+                } else if (key.hasActionKeyBackground()) {
+                    colorType = ColorType.ACTION_KEY_BACKGROUND;
+                } else if (key.hasFunctionalBackground()) {
+                    colorType = ColorType.FUNCTIONAL_KEY_BACKGROUND;
+                } else {
+                    colorType = ColorType.KEY_BACKGROUND;
+                }
+
+                final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+                paint.setColor(mColors.get(colorType));
+                final Rect padding = mKeyBackgroundPadding;
+                final int bgWidth = keyWidth + padding.left + padding.right;
+                final int bgHeight = keyHeight + padding.top + padding.bottom;
+                final int bgX = -padding.left;
+                final int bgY = -padding.top;
+
+                canvas.translate(bgX, bgY);
+                if (isSpaceBar) {
+                    final float spaceRadius = bgHeight * 0.5f;
+                    canvas.drawRoundRect((float) 0, (float) 0, (float) bgWidth, (float) bgHeight, spaceRadius, spaceRadius, paint);
+                } else if (isCircleStyle) {
+                    final float centerX = bgWidth * 0.5f;
+                    final float centerY = bgHeight * 0.5f;
+                    final float circleRadius = Math.min(bgWidth * 0.5f, bgHeight * 0.5f);
+                    canvas.drawCircle(centerX, centerY, circleRadius, paint);
+                } else {
+                    canvas.drawRoundRect((float) 0, (float) 0, (float) bgWidth, (float) bgHeight, bgWidth * 0.5f, bgWidth * 0.5f, paint);
+                }
+                canvas.translate(-bgX, -bgY);
+                return;
+            }
+        }
+
         final int bgWidth, bgHeight, bgX, bgY;
         if (key.needsToKeepBackgroundAspectRatio(mDefaultKeyLabelFlags)
                 // HACK: To disable expanding normal/functional key background.
@@ -462,7 +509,7 @@ public class KeyboardView extends View {
             blendAlpha(paint, params.mAnimAlpha);
             final float labelCharHeight = TypefaceUtils.getReferenceCharHeight(paint);
             final float labelCharWidth = TypefaceUtils.getReferenceCharWidth(paint);
-            final boolean isFunctionalKeyAndRoundedStyle = mColors.getThemeStyle().equals(STYLE_ROUNDED) && key.hasFunctionalBackground();
+            final boolean isFunctionalKeyAndRoundedStyle = (mColors.getThemeStyle().equals(STYLE_ROUNDED) || mColors.getThemeStyle().equals(STYLE_CIRCLE)) && key.hasFunctionalBackground();
             final float hintX, hintBaseline;
             if (key.hasHintLabel()) {
                 // The hint label is placed just right of the key label. Used mainly on
@@ -541,7 +588,7 @@ public class KeyboardView extends View {
         paint.setTextSize(params.mHintLetterSize);
         paint.setColor(params.mHintLabelColor);
         paint.setTextAlign(Align.CENTER);
-        if (mColors.getThemeStyle().equals(STYLE_ROUNDED)) {
+        if (mColors.getThemeStyle().equals(STYLE_ROUNDED) || mColors.getThemeStyle().equals(STYLE_CIRCLE)) {
             if (key.getBackgroundType() == Key.BACKGROUND_TYPE_SPACEBAR)
                 hintX = keyWidth + hintBaseline + labelCharWidth * 0.1f;
             else
@@ -581,6 +628,23 @@ public class KeyboardView extends View {
      * draws the cached buffer.
      * @see #invalidateKey(Key)
      */
+    public void updateThemeColors(final Colors colors) {
+        mColors = colors;
+        if (mKeyBackground != null) {
+            colors.setColor(mKeyBackground, this instanceof MoreSuggestionsView ? ColorType.MORE_SUGGESTIONS_WORD_BACKGROUND : (this instanceof PopupKeysKeyboardView ? ColorType.POPUP_KEYS_BACKGROUND : ColorType.KEY_BACKGROUND));
+        }
+        if (mFunctionalKeyBackground != null) {
+            colors.setColor(mFunctionalKeyBackground, ColorType.FUNCTIONAL_KEY_BACKGROUND);
+        }
+        if (mSpacebarBackground != null) {
+            colors.setColor(mSpacebarBackground, ColorType.SPACE_BAR_BACKGROUND);
+        }
+        if (mActionKeyBackground != null) {
+            colors.setColor(mActionKeyBackground, this instanceof PopupKeysKeyboardView ? ColorType.ACTION_KEY_POPUP_KEYS_BACKGROUND : ColorType.ACTION_KEY_BACKGROUND);
+        }
+        invalidateAllKeys();
+    }
+
     public void invalidateAllKeys() {
         mInvalidatedKeys.clear();
         mInvalidateAllKeys = true;

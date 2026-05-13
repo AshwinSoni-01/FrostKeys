@@ -374,6 +374,7 @@ class DefaultColors (
     private val spaceBarText: Int = keyHintText,
     private val gesture: Int = accent,
     private var keyboardBackground: Drawable? = null,
+    val isFrosted: Boolean = false,
 ) : Colors {
     private val navBar: Int
     /** brightened or darkened variant of [background], to be used if exact background color would be
@@ -418,7 +419,11 @@ class DefaultColors (
 
         val stripBackground: Int
         val pressedStripElementBackground: Int
-        if (keyboardBackground != null || (themeStyle == STYLE_HOLO && hasKeyBorders)) {
+        if (isFrosted) {
+            stripBackground = Color.TRANSPARENT
+            pressedStripElementBackground = if (isDarkColor(background)) 0x22ffffff
+                else 0x11000000
+        } else if (keyboardBackground != null || (themeStyle == STYLE_HOLO && hasKeyBorders)) {
             stripBackground = Color.TRANSPARENT
             pressedStripElementBackground = if (isDarkColor(background)) 0x22ffffff // assume background is similar to the background color
                 else 0x11000000
@@ -484,7 +489,7 @@ class DefaultColors (
         MORE_SUGGESTIONS_WORD_BACKGROUND, MAIN_BACKGROUND -> background
         KEY_BACKGROUND -> keyBackground
         ACTION_KEY_POPUP_KEYS_BACKGROUND -> if (themeStyle == STYLE_HOLO) adjustedBackground else accent
-        STRIP_BACKGROUND -> if (!hasKeyBorders && themeStyle == STYLE_MATERIAL) adjustedBackground else background
+        STRIP_BACKGROUND -> if (isFrosted) Color.TRANSPARENT else if (!hasKeyBorders && themeStyle == STYLE_MATERIAL) adjustedBackground else background
         NAVIGATION_BAR -> navBar
         SUGGESTION_AUTO_CORRECT, EMOJI_CATEGORY, TOOL_BAR_KEY, TOOL_BAR_EXPAND_KEY, ONE_HANDED_MODE_BUTTON -> suggestionText
         MORE_SUGGESTIONS_HINT, SUGGESTED_WORD, SUGGESTION_TYPED_WORD, SUGGESTION_VALID_WORD -> adjustedSuggestionText

@@ -71,6 +71,8 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
     private FrameLayout mStripContainer;
     private ClipboardHistoryView mClipboardHistoryView;
     private TextView mFakeToastView;
+    private HorizontalScrollView mPersistentEmojiRowScroll;
+    private LinearLayout mPersistentEmojiRowContainer;
     private LatinIME mLatinIME;
     private RichInputMethodManager mRichImm;
     private boolean mIsHardwareAcceleratedDrawingEnabled;
@@ -121,6 +123,12 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
             mLatinIME.updateSuggestionStripView(mCurrentInputView);
         }
     }
+
+    private boolean mIsTransitioning = false;
+    public boolean isTransitioning() { return mIsTransitioning; }
+
+    private boolean mIsInPanel = false;
+    public boolean isInPanel() { return mIsInPanel; }
 
     private boolean updateKeyboardThemeAndContextThemeWrapper(final Context context, final KeyboardTheme keyboardTheme) {
         final Resources res = context.getResources();
@@ -202,6 +210,8 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
     private void setKeyboard(final int keyboardId, @NonNull final KeyboardSwitchState toggleState) {
         // with a hardware keyboard we might get here without ever calling onCreateInputView, so don't crash
         if (mKeyboardView == null) return;
+        mIsTransitioning = true;
+        mIsInPanel = false;
 
         // Make {@link MainKeyboardView} visible and hide {@link EmojiPalettesView}.
         final SettingsValues currentSettingsValues = Settings.getValues();
@@ -223,6 +233,11 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
                                     && (currentSettingsValues.mInlineEmojiSearch || currentSettingsValues.mSuggestEmojis)) {
             EmojiParserKt.loadEmojiDefaultVersionsAndPopupSpecs(mThemeContext);
         }
+        updatePersistentEmojiRow();
+        mCurrentInputView.post(() -> {
+            mIsTransitioning = false;
+            if (mCurrentInputView != null) mCurrentInputView.requestLayout();
+        });
     }
 
     public Keyboard getKeyboard() {
@@ -342,6 +357,7 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
         mSuggestionStripView.setVisibility(stripVisibility);
         mClipboardHistoryView.setVisibility(View.GONE);
         mClipboardHistoryView.stopClipboardHistory();
+        updatePersistentEmojiRow();
     }
 
     // Implements {@link KeyboardState.SwitchActions}.
@@ -350,19 +366,31 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
         if (DEBUG_ACTION) {
             Log.d(TAG, "setEmojiKeyboard");
         }
+        mIsTransitioning = true;
+        mIsInPanel = true;
         mMainKeyboardFrame.setVisibility(View.VISIBLE);
-        // The visibility of {@link #mKeyboardView} must be aligned with {@link #MainKeyboardFrame}.
-        // @see #getVisibleKeyboardView() and
-        // @see LatinIME#onComputeInset(android.inputmethodservice.InputMethodService.Insets)
-        mKeyboardView.setVisibility(View.GONE);
-        mSuggestionStripView.setVisibility(View.GONE);
-        mStripContainer.setVisibility(getSecondaryStripVisibility());
-        mClipboardStripScrollView.setVisibility(View.GONE);
-        mEmojiTabStripView.setVisibility(View.VISIBLE);
-        mClipboardHistoryView.setVisibility(View.GONE);
+        updatePersistentEmojiRow();
+        // Hide alphabet keyboard immediately so it does not remeasure/stretch during the taller expansion pass
+        mKeyboardView.setVisibility(View.INVISIBLE);
+
+        // Start emoji palettes and set INVISIBLE first to pre-render/pre-allocate window buffer off-screen
         mEmojiPalettesView.startEmojiPalettes(mKeyboardView.getKeyVisualAttribute(),
                 mLatinIME.getCurrentInputEditorInfo(), mLatinIME.mKeyboardActionListener);
-        mEmojiPalettesView.setVisibility(View.VISIBLE);
+        mEmojiPalettesView.setVisibility(View.INVISIBLE);
+        mEmojiTabStripView.setVisibility(View.VISIBLE);
+        mStripContainer.setVisibility(getSecondaryStripVisibility());
+
+        // Defer visual reveal until expanded content and window buffer are fully ready
+        mEmojiPalettesView.post(() -> {
+            mEmojiPalettesView.setVisibility(View.VISIBLE);
+            mKeyboardView.setVisibility(View.GONE);
+            mSuggestionStripView.setVisibility(View.GONE);
+            mClipboardStripScrollView.setVisibility(View.GONE);
+            mClipboardHistoryView.setVisibility(View.GONE);
+            updatePersistentEmojiRow();
+            mIsTransitioning = false;
+            if (mCurrentInputView != null) mCurrentInputView.requestLayout();
+        });
     }
 
     // Implements {@link KeyboardState.SwitchActions}.
@@ -371,20 +399,32 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
         if (DEBUG_ACTION) {
             Log.d(TAG, "setClipboardKeyboard");
         }
+        mIsTransitioning = true;
+        mIsInPanel = true;
         mMainKeyboardFrame.setVisibility(View.VISIBLE);
-        // The visibility of {@link #mKeyboardView} must be aligned with {@link #MainKeyboardFrame}.
-        // @see #getVisibleKeyboardView() and
-        // @see LatinIME#onComputeInset(android.inputmethodservice.InputMethodService.Insets)
-        mKeyboardView.setVisibility(View.GONE);
-        mEmojiTabStripView.setVisibility(View.GONE);
-        mSuggestionStripView.setVisibility(View.GONE);
+        updatePersistentEmojiRow();
+        // Hide alphabet keyboard immediately
+        mKeyboardView.setVisibility(View.INVISIBLE);
+
+        // Start clipboard and set INVISIBLE first
+        mClipboardHistoryView.startClipboardHistory(mLatinIME.getClipboardHistoryManager(), mKeyboardView.getKeyVisualAttribute(),
+                mLatinIME.getCurrentInputEditorInfo(), mLatinIME.mKeyboardActionListener);
+        mClipboardHistoryView.setVisibility(View.INVISIBLE);
         mStripContainer.setVisibility(getSecondaryStripVisibility());
         mClipboardStripScrollView.post(() -> mClipboardStripScrollView.fullScroll(HorizontalScrollView.FOCUS_RIGHT));
         mClipboardStripScrollView.setVisibility(View.VISIBLE);
-        mEmojiPalettesView.setVisibility(View.GONE);
-        mClipboardHistoryView.startClipboardHistory(mLatinIME.getClipboardHistoryManager(), mKeyboardView.getKeyVisualAttribute(),
-                mLatinIME.getCurrentInputEditorInfo(), mLatinIME.mKeyboardActionListener);
-        mClipboardHistoryView.setVisibility(View.VISIBLE);
+
+        // Defer visual reveal AFTER buffer reallocation
+        mClipboardHistoryView.post(() -> {
+            mClipboardHistoryView.setVisibility(View.VISIBLE);
+            mKeyboardView.setVisibility(View.GONE);
+            mEmojiTabStripView.setVisibility(View.GONE);
+            mSuggestionStripView.setVisibility(View.GONE);
+            mEmojiPalettesView.setVisibility(View.GONE);
+            updatePersistentEmojiRow();
+            mIsTransitioning = false;
+            if (mCurrentInputView != null) mCurrentInputView.requestLayout();
+        });
     }
 
     @Override
@@ -449,15 +489,22 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
             } else if (toggleState == KeyboardSwitchState.CLIPBOARD) {
                 setClipboardKeyboard();
             } else {
-                mEmojiPalettesView.stopEmojiPalettes();
-                mEmojiPalettesView.setVisibility(View.GONE);
-
-                mClipboardHistoryView.stopClipboardHistory();
-                mClipboardHistoryView.setVisibility(View.GONE);
-
                 mMainKeyboardFrame.setVisibility(View.VISIBLE);
                 mKeyboardView.setVisibility(View.VISIBLE);
                 setKeyboard(toggleState.mKeyboardId, toggleState);
+
+                // Hide secondary palettes immediately to avoid taller container constraints
+                mEmojiPalettesView.setVisibility(View.INVISIBLE);
+                mClipboardHistoryView.setVisibility(View.INVISIBLE);
+
+                // Defer hiding secondary palettes until alphabet keyboard is fully rendered
+                mKeyboardView.post(() -> {
+                    mEmojiPalettesView.stopEmojiPalettes();
+                    mEmojiPalettesView.setVisibility(View.GONE);
+
+                    mClipboardHistoryView.stopClipboardHistory();
+                    mClipboardHistoryView.setVisibility(View.GONE);
+                });
             }
         }
     }
@@ -735,6 +782,8 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
         mClipboardStripScrollView = mCurrentInputView.findViewById(R.id.clipboard_strip_scroll_view);
         mSuggestionStripView = mCurrentInputView.findViewById(R.id.suggestion_strip_view);
         mStripContainer = mCurrentInputView.findViewById(R.id.strip_container);
+        mPersistentEmojiRowScroll = mCurrentInputView.findViewById(R.id.persistent_emoji_row_scroll);
+        mPersistentEmojiRowContainer = mCurrentInputView.findViewById(R.id.persistent_emoji_row_container);
 
         prefs.registerOnSharedPreferenceChangeListener(mSuggestionStripView);
         prefs.registerOnSharedPreferenceChangeListener(mClipboardHistoryView);
@@ -766,6 +815,119 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
         return mLatinIME.getLocaleAndConfidenceInfo();
     }
 
+    public void updatePersistentEmojiRow() {
+        if (mPersistentEmojiRowScroll == null || mPersistentEmojiRowContainer == null || mCurrentInputView == null) {
+            return;
+        }
+        final android.content.SharedPreferences prefs = KtxKt.prefs(mCurrentInputView.getContext());
+        final boolean enabled = prefs.getBoolean(Settings.PREF_PERSISTENT_EMOJI_ROW, helium314.keyboard.latin.settings.Defaults.PREF_PERSISTENT_EMOJI_ROW);
+        final View divider = mMainKeyboardFrame != null ? mMainKeyboardFrame.findViewById(R.id.persistent_emoji_row_divider) : null;
+        final KeyboardSwitchState state = getKeyboardSwitchState();
+        final boolean inPanel = mIsInPanel || state == KeyboardSwitchState.EMOJI || state == KeyboardSwitchState.CLIPBOARD || (mEmojiPalettesView != null && mEmojiPalettesView.getVisibility() == View.VISIBLE) || (mClipboardHistoryView != null && mClipboardHistoryView.getVisibility() == View.VISIBLE);
+        if (!enabled || mMainKeyboardFrame == null || mMainKeyboardFrame.getVisibility() != View.VISIBLE) {
+            mPersistentEmojiRowScroll.setVisibility(View.GONE);
+            if (divider != null) divider.setVisibility(View.GONE);
+            if (mCurrentInputView != null) mCurrentInputView.requestLayout();
+            return;
+        }
+        if (inPanel) {
+            mPersistentEmojiRowScroll.setVisibility(View.GONE);
+            if (divider != null) divider.setVisibility(View.GONE);
+            if (mCurrentInputView != null) mCurrentInputView.requestLayout();
+            return;
+        }
+        mPersistentEmojiRowScroll.setVisibility(View.VISIBLE);
+        if (divider != null) divider.setVisibility(View.VISIBLE);
+        if (mCurrentInputView != null) mCurrentInputView.requestLayout();
+
+        final java.util.List<String> rawEmojis = helium314.keyboard.keyboard.emoji.EmojiPalettesView.AdaptiveEmojiEngine.getRankedEmojis(mPersistentEmojiRowContainer.getContext());
+        final java.util.List<String> emojis = new java.util.ArrayList<>();
+        if (rawEmojis.size() >= 10) {
+            // (6, 7, 8, 9, 10) on the left, (1, 2, 3, 4, 5) on the right just like old project
+            emojis.addAll(rawEmojis.subList(5, 10));
+            emojis.addAll(rawEmojis.subList(0, 5));
+        } else {
+            emojis.addAll(rawEmojis);
+        }
+
+        mPersistentEmojiRowContainer.removeAllViews();
+        final android.content.Context context = mPersistentEmojiRowContainer.getContext();
+        final SettingsValues sv = Settings.getValues();
+        final int kbWidth = sv != null ? helium314.keyboard.latin.utils.ResourceUtils.getKeyboardWidth(context, sv) : context.getResources().getDisplayMetrics().widthPixels;
+        final int itemWidth = kbWidth / 10;
+        final int height = (int) (36 * context.getResources().getDisplayMetrics().density);
+
+        for (final String emoji : emojis) {
+            final TextView tv = new TextView(context);
+            tv.setText(emoji);
+            tv.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 20f);
+            tv.setGravity(Gravity.CENTER);
+            tv.setLayoutParams(new LinearLayout.LayoutParams(itemWidth, height));
+            tv.setClickable(true);
+            tv.setFocusable(true);
+            final android.util.TypedValue outValue = new android.util.TypedValue();
+            context.getTheme().resolveAttribute(android.R.attr.selectableItemBackground, outValue, true);
+            tv.setBackgroundResource(outValue.resourceId);
+            tv.setOnClickListener(v -> {
+                if (mLatinIME != null && mLatinIME.mKeyboardActionListener != null) {
+                    mLatinIME.mKeyboardActionListener.onTextInput(emoji);
+                    if (mEmojiPalettesView != null) {
+                        mEmojiPalettesView.addRecentEmoji(emoji);
+                        updatePersistentEmojiRow();
+                    }
+                }
+            });
+            mPersistentEmojiRowContainer.addView(tv);
+        }
+
+        // Add the polished right-side "Remove Row" button from old project
+        final LinearLayout removeBtn = new LinearLayout(context);
+        removeBtn.setOrientation(LinearLayout.HORIZONTAL);
+        removeBtn.setGravity(Gravity.CENTER);
+        final int paddingH = (int) (12 * context.getResources().getDisplayMetrics().density);
+        final int paddingV = (int) (6 * context.getResources().getDisplayMetrics().density);
+        final int marginH = (int) (16 * context.getResources().getDisplayMetrics().density);
+        removeBtn.setPadding(paddingH, paddingV, paddingH, paddingV);
+
+        final LinearLayout.LayoutParams removeParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, (int) (32 * context.getResources().getDisplayMetrics().density));
+        removeParams.gravity = Gravity.CENTER_VERTICAL;
+        removeParams.leftMargin = marginH;
+        removeParams.rightMargin = marginH;
+        removeBtn.setLayoutParams(removeParams);
+
+        final android.graphics.drawable.GradientDrawable removeBg = new android.graphics.drawable.GradientDrawable();
+        removeBg.setColor(0x20808080); // subtle semi-transparent background matching t.keySurface.copy(alpha = 0.3f)
+        removeBg.setCornerRadius(16 * context.getResources().getDisplayMetrics().density);
+        removeBtn.setBackground(removeBg);
+        removeBtn.setClickable(true);
+        removeBtn.setFocusable(true);
+        removeBtn.setOnClickListener(v -> {
+            prefs.edit().putBoolean(Settings.PREF_PERSISTENT_EMOJI_ROW, false).apply();
+            updatePersistentEmojiRow();
+            if (mCurrentInputView != null) mCurrentInputView.requestLayout();
+        });
+
+        final TextView removeText = new TextView(context);
+        removeText.setText("Remove row");
+        removeText.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 12f);
+        removeText.setGravity(Gravity.CENTER);
+        removeText.setTextColor(0xFF808080); // subtle gray text matching t.keyText.copy(alpha = 0.6f)
+        removeBtn.addView(removeText);
+
+        mPersistentEmojiRowContainer.addView(removeBtn);
+    }
+
+    public boolean isShowingPersistentEmojiRow() {
+        return mPersistentEmojiRowScroll != null && mPersistentEmojiRowScroll.getVisibility() == View.VISIBLE;
+    }
+
+    public int getPersistentEmojiRowHeight() {
+        if (mPersistentEmojiRowScroll == null || mPersistentEmojiRowScroll.getVisibility() != View.VISIBLE) return 0;
+        final View divider = mMainKeyboardFrame != null ? mMainKeyboardFrame.findViewById(R.id.persistent_emoji_row_divider) : null;
+        final int divHeight = (divider != null && divider.getVisibility() == View.VISIBLE) ? divider.getHeight() : 0;
+        return mPersistentEmojiRowScroll.getHeight() + divHeight;
+    }
+
     /** Marks the theme as outdated. The theme will be reloaded next time the keyboard is shown.
      *  If the keyboard is currently showing, theme will be reloaded immediately. */
     public void setThemeNeedsReload() {
@@ -780,6 +942,51 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
             mLatinIME.showWindow(true);
         } catch (IllegalStateException e) {
             // in tests isInputViewShown returns true, but showWindow throws "IllegalStateException: Window token is not set yet."
+        }
+    }
+
+    public void updateLiveFrostedGlassColors() {
+        if (mCurrentInputView == null) return;
+        final Settings settings = Settings.getInstance();
+        final SettingsValues oldValues = Settings.getValues();
+        if (oldValues != null) {
+            settings.loadSettings(mCurrentInputView.getContext(), oldValues.mLocale, oldValues.mInputAttributes);
+        }
+        final SettingsValues settingsValues = Settings.getValues();
+        if (settingsValues == null) return;
+        final helium314.keyboard.latin.common.Colors colors = settingsValues.mColors;
+        if (colors == null) return;
+
+        // 1. Update mMainKeyboardFrame background
+        if (mMainKeyboardFrame != null) {
+            colors.setBackground(mMainKeyboardFrame, helium314.keyboard.latin.common.ColorType.MAIN_BACKGROUND);
+            mMainKeyboardFrame.invalidate();
+        }
+        if (mCurrentInputView != null) {
+            mCurrentInputView.invalidate();
+        }
+
+        // 2. Update mKeyboardView theme colors and force a redraw
+        if (mKeyboardView != null) {
+            mKeyboardView.updateThemeColors(colors);
+        }
+
+        // 3. Update mSuggestionStripView background and keys
+        if (mSuggestionStripView != null) {
+            colors.setBackground(mSuggestionStripView, helium314.keyboard.latin.common.ColorType.STRIP_BACKGROUND);
+            // also update its expand key
+            android.widget.ImageButton expandKey = mSuggestionStripView.findViewById(R.id.suggestions_strip_toolbar_key);
+            if (expandKey != null) {
+                colors.setBackground(expandKey, helium314.keyboard.latin.common.ColorType.STRIP_BACKGROUND);
+                colors.setColor(expandKey, helium314.keyboard.latin.common.ColorType.TOOL_BAR_EXPAND_KEY);
+                colors.setColor(expandKey.getBackground(), helium314.keyboard.latin.common.ColorType.TOOL_BAR_EXPAND_KEY_BACKGROUND);
+            }
+            mSuggestionStripView.invalidate();
+        }
+
+        // 4. Update the soft window background blur radius
+        if (mLatinIME != null) {
+            helium314.keyboard.latin.FrostedGlassHelper.configureFrostedGlass(mLatinIME, mCurrentInputView, helium314.keyboard.latin.FrostedGlassHelper.isFrostedTheme(mLatinIME));
         }
     }
 }

@@ -15,7 +15,7 @@
     android:background="@android:color/transparent"
     style="?attr/emojiPalettesViewStyle"
 >
-    <androidx.viewpager2.widget.ViewPager2
+    <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/emoji_pager"
         android:layout_width="match_parent"
         android:layout_height="wrap_content" />

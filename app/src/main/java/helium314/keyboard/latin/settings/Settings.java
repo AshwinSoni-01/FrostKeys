@@ -65,6 +65,12 @@ public final class Settings implements SharedPreferences.OnSharedPreferenceChang
     public static final String PREF_USER_ALL_COLORS_PREFIX = "user_all_colors_";
     public static final String PREF_USER_MORE_COLORS_PREFIX = "user_more_colors_";
 
+    public static final String PREF_FROSTED_BLUR_RADIUS = "pref_frosted_blur_radius";
+    public static final String PREF_FROSTED_KEY_TRANSPARENCY = "pref_frosted_key_transparency";
+    public static final String PREF_FROSTED_COLOR_BLEND = "pref_frosted_color_blend";
+    public static final String PREF_FROSTED_SATURATION = "pref_frosted_saturation";
+    public static final String PREF_FROSTED_BG_TRANSPARENCY = "pref_frosted_bg_transparency";
+
     public static final String PREF_CUSTOM_ICON_NAMES = "custom_icon_names";
     public static final String PREF_TOOLBAR_CUSTOM_KEY_CODES = "toolbar_custom_key_codes";
     public static final String PREF_LAYOUT_PREFIX = "layout_";
@@ -76,6 +82,7 @@ public final class Settings implements SharedPreferences.OnSharedPreferenceChang
     public static final String PREF_SUGGEST_EMOJIS = "suggest_emojis";
     public static final String PREF_INLINE_EMOJI_SEARCH = "inline_emoji_search";
     public static final String PREF_SHOW_EMOJI_DESCRIPTIONS = "show_emoji_descriptions";
+    public static final String PREF_PERSISTENT_EMOJI_ROW = "persistent_emoji_row";
     public static final String PREF_POPUP_ON = "popup_on";
     public static final String PREF_AUTO_CORRECTION = "auto_correction";
     public static final String PREF_MORE_AUTO_CORRECTION = "more_auto_correction";

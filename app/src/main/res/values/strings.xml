@@ -398,6 +398,7 @@
     <string name="prefs_emoji_key_fit">Scale emoji key size with font size</string>
     <!-- Title of the setting for setting default emoji skin tone -->
     <string name="prefs_emoji_skin_tone">Default emoji skin tone</string>
+    <string name="prefs_persistent_emoji_row">Quick emoji row</string>
     <!-- Name of the neutral / yellow skin tone -->
     <string name="prefs_emoji_skin_tone_neutral">Neutral</string>
     <!-- Title of the setting for customizing space bar text -->
@@ -721,6 +722,17 @@ New dictionary:
     <string name="theme_name_sand" tools:keep="@string/theme_name_sand">Sand</string>
     <!-- Theme name for violette theme -->
     <string name="theme_name_violette" tools:keep="@string/theme_name_violette">Violette</string>
+    <string name="theme_name_frosted_glass">Frosted Glass</string>
+    <string name="theme_frosted_glass_settings_header">Frosted Glass Settings</string>
+    <string name="pref_frosted_blur_radius_title">Background Blur Radius</string>
+    <string name="pref_frosted_key_transparency_title">Key Transparency</string>
+    <string name="pref_frosted_color_blend_title">Wallpaper Color Blend</string>
+    <string name="pref_frosted_saturation_title">Color Saturation Boost</string>
+    <string name="pref_frosted_bg_transparency_title">Background Transparency</string>
+    <string name="button_adjust_frosted_glass">Adjust Frosted Glass</string>
+    <string name="frosted_glass_test_input_title">Test Keyboard Settings Here</string>
+    <string name="frosted_glass_test_wallpaper_button">Test with your wallpaper</string>
+    <string name="button_reset">Reset</string>
     <!-- Theme name for user-defined theme -->
     <string name="theme_name_user" tools:keep="@string/theme_name_user">User-Defined</string>
     <!-- Theme name for user-defined theme night mode theme -->

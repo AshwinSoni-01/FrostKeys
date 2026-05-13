@@ -47,6 +47,7 @@ private constructor(val themeId: Int, @JvmField val mStyleId: Int) {
         const val STYLE_MATERIAL = "Material"
         const val STYLE_HOLO = "Holo"
         const val STYLE_ROUNDED = "Rounded"
+        const val STYLE_CIRCLE = "Circle"
 
         // new themes that are just colors
         const val THEME_LIGHT = "light"
@@ -65,9 +66,11 @@ private constructor(val themeId: Int, @JvmField val mStyleId: Int) {
         const val THEME_PINK = "pink"
         const val THEME_SAND = "sand"
         const val THEME_VIOLETTE = "violette"
+        const val THEME_FROSTED_GLASS = "frosted_glass"
         fun getAvailableDefaultColors(prefs: SharedPreferences, isNight: Boolean) = listOfNotNull(
             if (!isNight) THEME_LIGHT else null, THEME_DARK,
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) THEME_DYNAMIC else null,
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) THEME_FROSTED_GLASS else null,
             if (prefs.getString(Settings.PREF_THEME_STYLE, Defaults.PREF_THEME_STYLE) == STYLE_HOLO) THEME_HOLO_WHITE else null,
             THEME_DARKER,
             THEME_BLACK,
@@ -82,7 +85,7 @@ private constructor(val themeId: Int, @JvmField val mStyleId: Int) {
             if (!isNight) THEME_SAND else null,
             THEME_VIOLETTE
         )
-        val STYLES = arrayOf(STYLE_MATERIAL, STYLE_HOLO, STYLE_ROUNDED)
+        val STYLES = arrayOf(STYLE_MATERIAL, STYLE_HOLO, STYLE_ROUNDED, STYLE_CIRCLE)
 
         // These should be aligned with Keyboard.themeId and Keyboard.Case.keyboardTheme
         // attributes' values in attrs.xml.
@@ -120,7 +123,7 @@ private constructor(val themeId: Int, @JvmField val mStyleId: Int) {
             val borders = prefs.getBoolean(Settings.PREF_THEME_KEY_BORDERS, Defaults.PREF_THEME_KEY_BORDERS)
             val matchingId = when (style) {
                 STYLE_HOLO -> THEME_ID_HOLO_BASE
-                STYLE_ROUNDED -> if (borders) THEME_ID_ROUNDED_BASE_BORDER else THEME_ID_ROUNDED_BASE
+                STYLE_ROUNDED, STYLE_CIRCLE -> if (borders) THEME_ID_ROUNDED_BASE_BORDER else THEME_ID_ROUNDED_BASE
                 else -> if (borders) THEME_ID_LXX_BASE_BORDER else THEME_ID_LXX_BASE
             }
             return KEYBOARD_THEMES.firstOrNull { it.themeId == matchingId } ?: KEYBOARD_THEMES[DEFAULT_THEME_ID]
@@ -151,6 +154,73 @@ private constructor(val themeId: Int, @JvmField val mStyleId: Int) {
                 THEME_DYNAMIC -> {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) DynamicColors(context, themeStyle, hasBorders, backgroundImage)
                     else getThemeColors(THEME_LIGHT, themeStyle, context, prefs, isNight)
+                }
+                THEME_FROSTED_GLASS -> {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        val keyTransparency = prefs.getInt(Settings.PREF_FROSTED_KEY_TRANSPARENCY, Defaults.PREF_FROSTED_KEY_TRANSPARENCY)
+                        val colorBlendVal = prefs.getInt(Settings.PREF_FROSTED_COLOR_BLEND, Defaults.PREF_FROSTED_COLOR_BLEND) / 100f
+                        val saturationMult = prefs.getInt(Settings.PREF_FROSTED_SATURATION, Defaults.PREF_FROSTED_SATURATION) / 100f
+                        val bgTransparency = prefs.getInt(Settings.PREF_FROSTED_BG_TRANSPARENCY, Defaults.PREF_FROSTED_BG_TRANSPARENCY)
+
+                        val boostSaturation = { color: Int ->
+                            val alpha = android.graphics.Color.alpha(color)
+                            val hsl = FloatArray(3)
+                            androidx.core.graphics.ColorUtils.colorToHSL(color, hsl)
+                            hsl[1] = (hsl[1] * saturationMult).coerceAtMost(1.0f)
+                            val saturatedColor = androidx.core.graphics.ColorUtils.HSLToColor(hsl)
+                            androidx.core.graphics.ColorUtils.setAlphaComponent(saturatedColor, alpha)
+                        }
+                        val actionAlpha = (60 + (keyTransparency / 255f * 140).toInt()).coerceIn(0, 255)
+                        val accentBase = boostSaturation(if (isNight) ContextCompat.getColor(context, android.R.color.system_accent1_100)
+                            else ContextCompat.getColor(context, android.R.color.system_accent1_200))
+                        val accent = androidx.core.graphics.ColorUtils.setAlphaComponent(accentBase, actionAlpha)
+                        val baseBg = if (isNight) {
+                            val neutral1 = ContextCompat.getColor(context, android.R.color.system_neutral1_900)
+                            val accent1 = ContextCompat.getColor(context, android.R.color.system_accent1_700)
+                            val blendRatio = (colorBlendVal - 0.1f).coerceIn(0f, 1f)
+                            androidx.core.graphics.ColorUtils.blendARGB(neutral1, accent1, blendRatio)
+                        } else {
+                            val neutral1 = ContextCompat.getColor(context, android.R.color.system_neutral1_50)
+                            val accent1 = ContextCompat.getColor(context, android.R.color.system_accent1_300)
+                            val blendRatio = (colorBlendVal + 0.1f).coerceIn(0f, 1f)
+                            androidx.core.graphics.ColorUtils.blendARGB(neutral1, accent1, blendRatio)
+                        }
+                        val bgAlpha = if (isNight) bgTransparency else (bgTransparency * 0.8f).toInt().coerceAtMost(255)
+                        val background = boostSaturation(androidx.core.graphics.ColorUtils.setAlphaComponent(baseBg, bgAlpha))
+                        val keyBgBase = if (isNight) {
+                            val baseColor = ContextCompat.getColor(context, android.R.color.system_neutral1_800)
+                            val accentColor = ContextCompat.getColor(context, android.R.color.system_accent1_200)
+                            androidx.core.graphics.ColorUtils.blendARGB(baseColor, accentColor, (colorBlendVal * 0.7f).coerceIn(0f, 1f))
+                        } else {
+                            val baseColor = ContextCompat.getColor(context, android.R.color.system_neutral1_0)
+                            val accentColor = ContextCompat.getColor(context, android.R.color.system_accent1_200)
+                            androidx.core.graphics.ColorUtils.blendARGB(baseColor, accentColor, (colorBlendVal * 0.7f).coerceIn(0f, 1f))
+                        }
+                        val keyAlpha = 38 + (keyTransparency / 255f * 140).toInt().coerceIn(0, 140)
+                        val keyBackground = boostSaturation(androidx.core.graphics.ColorUtils.setAlphaComponent(keyBgBase, keyAlpha))
+                        val functionalBase = boostSaturation(if (isNight) ContextCompat.getColor(context, android.R.color.system_accent2_300)
+                            else ContextCompat.getColor(context, android.R.color.system_accent2_100))
+                        val functionalKey = androidx.core.graphics.ColorUtils.setAlphaComponent(functionalBase, actionAlpha)
+                        val keyText = if (isNight) ContextCompat.getColor(context, android.R.color.system_neutral1_50)
+                            else ContextCompat.getColor(context, android.R.color.system_accent3_900)
+                        val keyHintText = if (isNight) keyText
+                            else ContextCompat.getColor(context, android.R.color.system_accent3_700)
+                        DefaultColors(
+                            themeStyle,
+                            hasBorders,
+                            accent,
+                            background,
+                            keyBackground,
+                            functionalKey,
+                            keyBackground,
+                            keyText,
+                            keyHintText,
+                            keyboardBackground = backgroundImage,
+                            isFrosted = true
+                        )
+                    } else {
+                        getThemeColors(if (isNight) THEME_DARK else THEME_LIGHT, themeStyle, context, prefs, isNight)
+                    }
                 }
                 THEME_LIGHT -> DefaultColors(
                     themeStyle,
