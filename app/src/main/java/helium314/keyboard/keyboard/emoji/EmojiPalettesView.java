@@ -99,15 +99,16 @@ public final class EmojiPalettesView extends LinearLayout
 
     @Override
     protected void onMeasure(final int widthMeasureSpec, final int heightMeasureSpec) {
-        super.onMeasure(widthMeasureSpec, heightMeasureSpec);
         final Resources res = getContext().getResources();
-        // The main keyboard expands to the entire this {@link KeyboardView}.
-        final int width = ResourceUtils.getKeyboardWidth(getContext(), Settings.getValues())
-                + getPaddingLeft() + getPaddingRight();
-        final int defaultHeight = ResourceUtils.getSecondaryKeyboardHeight(res, Settings.getValues());
-        final int height = defaultHeight + getPaddingTop() + getPaddingBottom();
+        final helium314.keyboard.latin.settings.SettingsValues settings = Settings.getValues();
+        final int abcHeight = ResourceUtils.getKeyboardHeight(res, settings);
+        final boolean persistentEmojiEnabled = helium314.keyboard.latin.utils.KtxKt.prefs(getContext()).getBoolean(Settings.PREF_PERSISTENT_EMOJI_ROW, helium314.keyboard.latin.settings.Defaults.PREF_PERSISTENT_EMOJI_ROW);
+        final int emojiRowHeight = persistentEmojiEnabled ? (int) (41 * res.getDisplayMetrics().density) : 0;
+        final int finalHeight = abcHeight + emojiRowHeight + getPaddingTop() + getPaddingBottom();
+        super.onMeasure(widthMeasureSpec, MeasureSpec.makeMeasureSpec(finalHeight, MeasureSpec.EXACTLY));
+        final int width = ResourceUtils.getKeyboardWidth(getContext(), settings) + getPaddingLeft() + getPaddingRight();
         mEmojiCategoryPageIndicatorView.mWidth = width;
-        setMeasuredDimension(width, height);
+        setMeasuredDimension(width, finalHeight);
     }
 
     private void addTab(final LinearLayout host, final int categoryId) {

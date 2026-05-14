@@ -78,12 +78,13 @@ class ClipboardHistoryView @JvmOverloads constructor(
     }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-        super.onMeasure(widthMeasureSpec, heightMeasureSpec)
-        val res = context.resources
-        // The main keyboard expands to the entire this {@link KeyboardView}.
-        val width = ResourceUtils.getKeyboardWidth(context, Settings.getValues()) + paddingLeft + paddingRight
-        val height = ResourceUtils.getSecondaryKeyboardHeight(res, Settings.getValues()) + paddingTop + paddingBottom
-        setMeasuredDimension(width, height)
+        val settings = Settings.getValues()
+        val abcHeight = ResourceUtils.getKeyboardHeight(resources, settings)
+        val persistentEmojiEnabled = context.prefs().getBoolean(Settings.PREF_PERSISTENT_EMOJI_ROW, helium314.keyboard.latin.settings.Defaults.PREF_PERSISTENT_EMOJI_ROW)
+        val emojiRowHeight = if (persistentEmojiEnabled) (41 * resources.displayMetrics.density).toInt() else 0
+        val finalHeight = abcHeight + emojiRowHeight + paddingTop + paddingBottom
+        super.onMeasure(widthMeasureSpec, MeasureSpec.makeMeasureSpec(finalHeight, MeasureSpec.EXACTLY))
+        setMeasuredDimension(MeasureSpec.getSize(widthMeasureSpec), finalHeight)
     }
 
     @SuppressLint("ClickableViewAccessibility")

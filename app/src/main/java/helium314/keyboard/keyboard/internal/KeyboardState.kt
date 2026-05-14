@@ -35,6 +35,7 @@ class KeyboardState(private val switchActions: SwitchActions) {
         fun setAlphabetShiftLockShiftedKeyboard()
         fun setEmojiKeyboard()
         fun setClipboardKeyboard()
+        fun setAccessPointKeyboard()
         fun setNumpadKeyboard()
         fun toggleNumpad(withSliding: Boolean, autoCapsFlags: Int, recapitalizeMode: RecapitalizeMode?, forceReturnToAlpha: Boolean)
         fun setSymbolsKeyboard()
@@ -146,6 +147,7 @@ class KeyboardState(private val switchActions: SwitchActions) {
             Mode.SYMBOLS -> if (savedKeyboardState.shiftMode == ShiftMode.MANUAL) setSymbolsShiftedKeyboard() else setSymbolsKeyboard()
             Mode.EMOJI -> setEmojiKeyboard()
             Mode.CLIPBOARD -> setClipboardKeyboard()
+            Mode.ACCESS_POINT -> setAccessPointKeyboard()
             // don't overwrite toggle state if reloading from orientation change, etc.
             Mode.NUMPAD -> setNumpadKeyboard(false, false, false)
         }
@@ -301,6 +303,18 @@ class KeyboardState(private val switchActions: SwitchActions) {
         switchActions.setClipboardKeyboard()
     }
 
+    private fun setAccessPointKeyboard() {
+        if (DebugFlags.DEBUG_ENABLED) {
+            Log.d(TAG, "setAccessPointKeyboard")
+        }
+        mode = Mode.ACCESS_POINT
+        recapitalizeMode = null
+        // Remember caps lock mode and reset alphabet shift state.
+        prevMainKeyboardWasShiftLocked = alphabetShiftState.isShiftLocked
+        alphabetShiftState.setShiftLocked(false)
+        switchActions.setAccessPointKeyboard()
+    }
+
     private fun setNumpadKeyboard(withSliding: Boolean, forceReturnToAlpha: Boolean, rememberState: Boolean) {
         if (DebugFlags.DEBUG_ENABLED) {
             Log.d(TAG, "setNumpadKeyboard")
@@ -351,6 +365,7 @@ class KeyboardState(private val switchActions: SwitchActions) {
             }
             Mode.EMOJI -> setEmojiKeyboard()
             Mode.CLIPBOARD -> setClipboardKeyboard()
+            Mode.ACCESS_POINT -> setAccessPointKeyboard()
             Mode.NUMPAD -> {}
         }
         if (withSliding) switchState = SwitchState.MOMENTARY_FROM_NUMPAD
@@ -621,7 +636,7 @@ class KeyboardState(private val switchActions: SwitchActions) {
                     prevSymbolsKeyboardWasShifted = false
                 }
             SwitchState.SYMBOL_BEGIN ->
-                if (mode == Mode.EMOJI || mode == Mode.CLIPBOARD) {
+                if (mode == Mode.EMOJI || mode == Mode.CLIPBOARD || mode == Mode.ACCESS_POINT) {
                     // When in the Emoji keyboard or clipboard one, we don't want to switch back to the main layout even
                     // after the user hits an emoji letter followed by an enter or a space.
                 } else if (!isSpaceOrEnter(code) && (Constants.isLetterCode(code) || code == KeyCode.MULTIPLE_CODE_POINTS)) {
@@ -699,6 +714,7 @@ class KeyboardState(private val switchActions: SwitchActions) {
         SYMBOLS,
         EMOJI,
         CLIPBOARD,
+        ACCESS_POINT,
         NUMPAD,
     }
 

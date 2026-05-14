@@ -49,7 +49,7 @@ class ClipboardLayoutParams(ctx: Context) {
 
     fun setListProperties(recycler: RecyclerView) {
         (recycler.layoutParams as FrameLayout.LayoutParams).apply {
-            height = listHeight
+            height = FrameLayout.LayoutParams.MATCH_PARENT
             recycler.layoutParams = this
         }
     }

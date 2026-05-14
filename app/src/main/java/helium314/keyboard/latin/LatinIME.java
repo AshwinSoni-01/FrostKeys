@@ -1246,6 +1246,8 @@ public class LatinIME extends InputMethodService implements
                 visibleKeyboardView = mKeyboardSwitcher.getEmojiPalettesView();
             } else if (mKeyboardSwitcher.getClipboardHistoryView() != null && mKeyboardSwitcher.getClipboardHistoryView().getVisibility() == View.VISIBLE) {
                 visibleKeyboardView = mKeyboardSwitcher.getClipboardHistoryView();
+            } else if (mKeyboardSwitcher.getAccessPointMenuView() != null && mKeyboardSwitcher.getAccessPointMenuView().getVisibility() == View.VISIBLE) {
+                visibleKeyboardView = mKeyboardSwitcher.getAccessPointMenuView();
             }
         }
 

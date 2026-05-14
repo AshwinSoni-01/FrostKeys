@@ -18,7 +18,8 @@
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/emoji_pager"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content" />
+        android:layout_height="0dp"
+        android:layout_weight="1" />
     <helium314.keyboard.keyboard.emoji.EmojiCategoryPageIndicatorView
         android:id="@+id/emoji_category_page_id_view"
         android:layout_width="match_parent"

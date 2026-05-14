@@ -50,7 +50,8 @@ internal class EmojiLayoutParams(res: Resources) {
 
     fun setEmojiListProperties(vp: View) {
         val lp = vp.layoutParams as LinearLayout.LayoutParams
-        lp.height = emojiKeyboardHeight
+        lp.height = 0
+        lp.weight = 1f
         lp.bottomMargin = emojiListBottomMargin
         vp.layoutParams = lp
     }

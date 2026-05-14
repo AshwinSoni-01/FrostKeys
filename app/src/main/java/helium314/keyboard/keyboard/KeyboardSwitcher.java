@@ -71,6 +71,7 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
     private SuggestionStripView mSuggestionStripView;
     private FrameLayout mStripContainer;
     private ClipboardHistoryView mClipboardHistoryView;
+    private AccessPointMenuView mAccessPointMenuView;
     private TextView mFakeToastView;
     private HorizontalScrollView mPersistentEmojiRowScroll;
     private LinearLayout mPersistentEmojiRowContainer;
@@ -351,6 +352,9 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
         mSuggestionStripView.setVisibility(stripVisibility);
         mClipboardHistoryView.setVisibility(View.GONE);
         mClipboardHistoryView.stopClipboardHistory();
+        if (mAccessPointMenuView != null) {
+            mAccessPointMenuView.setVisibility(View.GONE);
+        }
         updatePersistentEmojiRow();
     }
 
@@ -399,6 +403,34 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
         mEmojiTabStripView.setVisibility(View.GONE);
         mSuggestionStripView.setVisibility(View.GONE);
         mEmojiPalettesView.setVisibility(View.GONE);
+        if (mAccessPointMenuView != null) {
+            mAccessPointMenuView.setVisibility(View.GONE);
+        }
+        updatePersistentEmojiRow();
+        if (mCurrentInputView != null) mCurrentInputView.requestLayout();
+    }
+
+    @Override
+    public void setAccessPointKeyboard() {
+        if (DEBUG_ACTION) {
+            Log.d(TAG, "setAccessPointKeyboard");
+        }
+        updatePersistentEmojiRow();
+        mMainKeyboardFrame.setVisibility(View.VISIBLE);
+        mKeyboardView.setVisibility(View.GONE);
+        mEmojiPalettesView.setVisibility(View.GONE);
+        mClipboardHistoryView.setVisibility(View.GONE);
+        mEmojiTabStripView.setVisibility(View.GONE);
+        mClipboardStripScrollView.setVisibility(View.GONE);
+
+        if (mAccessPointMenuView != null) {
+            mAccessPointMenuView.populateMenu();
+            mAccessPointMenuView.setVisibility(View.VISIBLE);
+        }
+        mStripContainer.setVisibility(View.VISIBLE);
+        if (mSuggestionStripView != null) {
+            mSuggestionStripView.setVisibility(View.VISIBLE);
+        }
         updatePersistentEmojiRow();
         if (mCurrentInputView != null) mCurrentInputView.requestLayout();
     }
@@ -425,6 +457,7 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
         SYMBOLS_SHIFTED(KeyboardId.ELEMENT_SYMBOLS_SHIFTED),
         EMOJI(KeyboardId.ELEMENT_EMOJI_RECENTS),
         CLIPBOARD(KeyboardId.ELEMENT_CLIPBOARD),
+        ACCESS_POINT(-1),
         OTHER(-1);
 
         final int mKeyboardId;
@@ -435,7 +468,7 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
     }
 
     public KeyboardSwitchState getKeyboardSwitchState() {
-        boolean hidden = !isShowingEmojiPalettes() && !isShowingClipboardHistory()
+        boolean hidden = !isShowingEmojiPalettes() && !isShowingClipboardHistory() && !isShowingAccessPointMenu()
                 && (mKeyboardLayoutSet == null
                 || mKeyboardView == null
                 || !mKeyboardView.isShown());
@@ -445,6 +478,8 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
             return KeyboardSwitchState.EMOJI;
         } else if (isShowingClipboardHistory()) {
             return KeyboardSwitchState.CLIPBOARD;
+        } else if (isShowingAccessPointMenu()) {
+            return KeyboardSwitchState.ACCESS_POINT;
         } else if (isShowingKeyboardId(KeyboardId.ELEMENT_SYMBOLS_SHIFTED)) {
             return KeyboardSwitchState.SYMBOLS_SHIFTED;
         }
@@ -455,15 +490,25 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
         KeyboardSwitchState currentState = getKeyboardSwitchState();
         Log.w(TAG, "onToggleKeyboard() : Current = " + currentState + " : Toggle = " + toggleState);
         if (currentState == toggleState) {
-            mLatinIME.stopShowingInputView();
-            mLatinIME.hideWindow();
-            setAlphabetKeyboard();
+            if (toggleState == KeyboardSwitchState.ACCESS_POINT) {
+                setAlphabetKeyboard();
+            } else {
+                mLatinIME.stopShowingInputView();
+                mLatinIME.hideWindow();
+                setAlphabetKeyboard();
+            }
         } else {
             mLatinIME.startShowingInputView(true);
             if (toggleState == KeyboardSwitchState.EMOJI) {
                 setEmojiKeyboard();
             } else if (toggleState == KeyboardSwitchState.CLIPBOARD) {
                 setClipboardKeyboard();
+            } else if (toggleState == KeyboardSwitchState.ACCESS_POINT) {
+                if (currentState == KeyboardSwitchState.CLIPBOARD || currentState == KeyboardSwitchState.EMOJI) {
+                    Log.w(TAG, "Ignoring ACCESS_POINT toggle because current state is " + currentState);
+                    return;
+                }
+                setAccessPointKeyboard();
             } else {
                 mMainKeyboardFrame.setVisibility(View.VISIBLE);
                 mKeyboardView.setVisibility(View.VISIBLE);
@@ -474,6 +519,10 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
 
                 mClipboardHistoryView.stopClipboardHistory();
                 mClipboardHistoryView.setVisibility(View.GONE);
+
+                if (mAccessPointMenuView != null) {
+                    mAccessPointMenuView.setVisibility(View.GONE);
+                }
 
                 if (mCurrentInputView != null) {
                     mCurrentInputView.requestLayout();
@@ -659,8 +708,12 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
         return mClipboardHistoryView != null && mClipboardHistoryView.isShown();
     }
 
+    public boolean isShowingAccessPointMenu() {
+        return mAccessPointMenuView != null && mAccessPointMenuView.isShown();
+    }
+
     public boolean isShowingPopupKeysPanel() {
-        if (isShowingEmojiPalettes() || isShowingClipboardHistory()) {
+        if (isShowingEmojiPalettes() || isShowingClipboardHistory() || isShowingAccessPointMenu()) {
             return false;
         }
         return mKeyboardView.isShowingPopupKeysPanel();
@@ -674,11 +727,17 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
         return mEmojiPalettesView;
     }
 
+    public AccessPointMenuView getAccessPointMenuView() {
+        return mAccessPointMenuView;
+    }
+
     public View getVisibleKeyboardView() {
         if (isShowingEmojiPalettes()) {
             return mEmojiPalettesView;
         } else if (isShowingClipboardHistory()) {
             return mClipboardHistoryView;
+        } else if (isShowingAccessPointMenu()) {
+            return mAccessPointMenuView;
         }
         return mKeyboardView;
     }
@@ -745,6 +804,7 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
         mMainKeyboardFrame = mCurrentInputView.findViewById(R.id.main_keyboard_frame);
         mEmojiPalettesView = mCurrentInputView.findViewById(R.id.emoji_palettes_view);
         mClipboardHistoryView = mCurrentInputView.findViewById(R.id.clipboard_history_view);
+        mAccessPointMenuView = mCurrentInputView.findViewById(R.id.access_point_menu_view);
         mFakeToastView = mCurrentInputView.findViewById(R.id.fakeToast);
 
         mKeyboardViewWrapper = mCurrentInputView.findViewById(R.id.keyboard_view_wrapper);
@@ -756,6 +816,9 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
         mEmojiPalettesView.setKeyboardActionListener(mLatinIME.mKeyboardActionListener);
         mClipboardHistoryView.setHardwareAcceleratedDrawingEnabled(isHardwareAcceleratedDrawingEnabled);
         mClipboardHistoryView.setKeyboardActionListener(mLatinIME.mKeyboardActionListener);
+        if (mAccessPointMenuView != null) {
+            mAccessPointMenuView.setKeyboardActionListener(mLatinIME.mKeyboardActionListener);
+        }
         mEmojiTabStripView = mCurrentInputView.findViewById(R.id.emoji_tab_strip);
         mClipboardStripView = mCurrentInputView.findViewById(R.id.clipboard_strip);
         mClipboardStripScrollView = mCurrentInputView.findViewById(R.id.clipboard_strip_scroll_view);
@@ -812,7 +875,7 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
         final boolean enabled = prefs.getBoolean(Settings.PREF_PERSISTENT_EMOJI_ROW, helium314.keyboard.latin.settings.Defaults.PREF_PERSISTENT_EMOJI_ROW);
         final View divider = mMainKeyboardFrame != null ? mMainKeyboardFrame.findViewById(R.id.persistent_emoji_row_divider) : null;
         final KeyboardSwitchState state = getKeyboardSwitchState();
-        final boolean inPanel = state == KeyboardSwitchState.EMOJI || state == KeyboardSwitchState.CLIPBOARD || (mEmojiPalettesView != null && mEmojiPalettesView.getVisibility() == View.VISIBLE) || (mClipboardHistoryView != null && mClipboardHistoryView.getVisibility() == View.VISIBLE);
+        final boolean inPanel = state == KeyboardSwitchState.EMOJI || state == KeyboardSwitchState.CLIPBOARD || state == KeyboardSwitchState.ACCESS_POINT || (mEmojiPalettesView != null && mEmojiPalettesView.getVisibility() == View.VISIBLE) || (mClipboardHistoryView != null && mClipboardHistoryView.getVisibility() == View.VISIBLE) || (mAccessPointMenuView != null && mAccessPointMenuView.getVisibility() == View.VISIBLE);
         if (!enabled || mMainKeyboardFrame == null || mMainKeyboardFrame.getVisibility() != View.VISIBLE) {
             mPersistentEmojiRowScroll.setVisibility(View.GONE);
             if (divider != null) divider.setVisibility(View.GONE);
@@ -958,15 +1021,7 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
 
         // 3. Update mSuggestionStripView background and keys
         if (mSuggestionStripView != null) {
-            colors.setBackground(mSuggestionStripView, helium314.keyboard.latin.common.ColorType.STRIP_BACKGROUND);
-            // also update its expand key
-            android.widget.ImageButton expandKey = mSuggestionStripView.findViewById(R.id.suggestions_strip_toolbar_key);
-            if (expandKey != null) {
-                colors.setBackground(expandKey, helium314.keyboard.latin.common.ColorType.STRIP_BACKGROUND);
-                colors.setColor(expandKey, helium314.keyboard.latin.common.ColorType.TOOL_BAR_EXPAND_KEY);
-                colors.setColor(expandKey.getBackground(), helium314.keyboard.latin.common.ColorType.TOOL_BAR_EXPAND_KEY_BACKGROUND);
-            }
-            mSuggestionStripView.invalidate();
+            mSuggestionStripView.updateThemeColors(colors);
         }
 
         // 4. Update the soft window background blur radius

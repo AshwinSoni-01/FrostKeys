@@ -115,12 +115,11 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
     // toolbar views, drawables and setup
     private val toolbar: ViewGroup = findViewById(R.id.toolbar)
     private val toolbarContainer: View = findViewById(R.id.toolbar_container)
-    private val pinnedKeys: ViewGroup = findViewById(R.id.pinned_keys)
+    private val pinnedKeys: ViewGroup = findViewById(R.id.pinned_keys_container)
     private val suggestionsStrip: ViewGroup = findViewById(R.id.suggestions_strip)
-    private val toolbarExpandKey = findViewById<ImageButton>(R.id.suggestions_strip_toolbar_key)
+    private val toolbarExpandKey: ImageButton? = null
     private val incognitoIcon = KeyboardIconsSet.instance.getNewDrawable(ToolbarKey.INCOGNITO.name, context)
     private val toolbarArrowIcon = KeyboardIconsSet.instance.getNewDrawable(KeyboardIconsSet.NAME_TOOLBAR_KEY, context)
-    private val defaultToolbarBackground: Drawable = toolbarExpandKey.background
     private val enabledToolKeyBackground = GradientDrawable()
     private var direction = 1 // 1 if LTR, -1 if RTL
 
@@ -133,14 +132,15 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
         val colors = Settings.getValues().mColors
 
         // expand key
-        // weird way of setting size (default is config_suggestions_strip_edge_key_width)
-        // but better not change it or people will complain
-        val toolbarHeight = min(toolbarExpandKey.layoutParams.height, resources.getDimension(R.dimen.config_suggestions_strip_height).toInt())
-        toolbarExpandKey.layoutParams.height = toolbarHeight
-        toolbarExpandKey.layoutParams.width = toolbarHeight // we want it square
-        colors.setBackground(toolbarExpandKey, ColorType.STRIP_BACKGROUND) // necessary because background is re-used for defaultToolbarBackground
-        colors.setColor(toolbarExpandKey, ColorType.TOOL_BAR_EXPAND_KEY)
-        colors.setColor(toolbarExpandKey.background, ColorType.TOOL_BAR_EXPAND_KEY_BACKGROUND)
+        toolbarExpandKey?.let {
+            val toolbarHeight = min(it.layoutParams.height, resources.getDimension(R.dimen.config_suggestions_strip_height).toInt())
+            it.layoutParams.height = toolbarHeight
+            it.layoutParams.width = toolbarHeight // we want it square
+            colors.setBackground(it, ColorType.STRIP_BACKGROUND) // necessary because background is re-used for defaultToolbarBackground
+            colors.setColor(it, ColorType.TOOL_BAR_EXPAND_KEY)
+            colors.setColor(it.background, ColorType.TOOL_BAR_EXPAND_KEY_BACKGROUND)
+            it.isVisible = false
+        }
 
         // background indicator for pinned keys
         val color = colors.get(ColorType.TOOL_BAR_KEY_ENABLED_BACKGROUND) or -0x1000000 // ignore alpha (in Java this is more readable 0xFF000000)
@@ -154,24 +154,10 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
         }
 
         // toolbar keys setup
-        if (mToolbarMode == ToolbarMode.TOOLBAR_KEYS || mToolbarMode == ToolbarMode.EXPANDABLE) {
-            for (key in getEnabledToolbarKeys(context.prefs())) {
-                val button = createToolbarKey(context, key)
-                button.layoutParams = toolbarKeyLayoutParams
-                setupKey(button, colors)
-                toolbar.addView(button)
-            }
-        }
-        if (!isGone && !Settings.getValues().mSuggestionStripHiddenPerUserSettings) {
-            for (pinnedKey in getPinnedToolbarKeys(context.prefs())) {
-                val button = createToolbarKey(context, pinnedKey)
-                button.layoutParams = toolbarKeyLayoutParams
-                setupKey(button, colors)
-                pinnedKeys.addView(button)
-                val pinnedKeyInToolbar = toolbar.findViewWithTag<View>(pinnedKey)
-                if (pinnedKeyInToolbar != null && Settings.getValues().mQuickPinToolbarKeys)
-                    pinnedKeyInToolbar.background = enabledToolKeyBackground
-            }
+        findViewById<ImageButton>(R.id.access_point_trigger_btn)?.let {
+            setupKey(it, colors)
+            it.imageTintList = android.content.res.ColorStateList.valueOf(colors.get(ColorType.KEY_TEXT))
+            colors.setColor(it.background, ColorType.TOOL_BAR_EXPAND_KEY_BACKGROUND)
         }
 
         updateKeys()
@@ -219,7 +205,7 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
         else {
             newLayoutDirection = if (isRtlLanguage) LAYOUT_DIRECTION_RTL else LAYOUT_DIRECTION_LTR
             direction = if (isRtlLanguage) -1 else 1
-            toolbarExpandKey.scaleX = (if (toolbarContainer.visibility != VISIBLE) 1f else -1f) * direction
+            toolbarExpandKey?.scaleX = (if (toolbarContainer.visibility != VISIBLE) 1f else -1f) * direction
         }
         layoutDirection = newLayoutDirection
         suggestionsStrip.layoutDirection = newLayoutDirection
@@ -236,7 +222,7 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
             }
         }
 
-        toolbarExpandKey.scaleX = (if (toolbarVisible) -1f else 1f) * direction
+        toolbarExpandKey?.scaleX = (if (toolbarVisible) -1f else 1f) * direction
     }
 
     fun setSuggestions(suggestions: SuggestedWords, isRtlLanguage: Boolean) {
@@ -328,6 +314,10 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
 
     override fun onClick(view: View) {
         AudioAndHapticFeedbackManager.getInstance().performHapticAndAudioFeedback(KeyCode.NOT_SPECIFIED, this, HapticEvent.KEY_PRESS)
+        if (view.id == R.id.access_point_trigger_btn) {
+            KeyboardSwitcher.getInstance().onToggleKeyboard(KeyboardSwitcher.KeyboardSwitchState.ACCESS_POINT)
+            return
+        }
         val tag = view.tag
         if (tag is ToolbarKey) {
             val code = getCodeForToolbarKey(tag)
@@ -336,9 +326,6 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
                 listener.onCodeInput(code, Constants.SUGGESTION_STRIP_COORDINATE, Constants.SUGGESTION_STRIP_COORDINATE, false)
                 return
             }
-        }
-        if (view === toolbarExpandKey) {
-            setToolbarVisibility(toolbarContainer.visibility != VISIBLE)
         }
 
         // tag for word views is set in SuggestionStripLayoutHelper (setupWordViewsTextAndColor, layoutPunctuationSuggestions)
@@ -381,7 +368,7 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
                 addPinnedKey(context.prefs(), tag)
             } else {
                 removePinnedKey(context.prefs(), tag)
-                toolbar.findViewWithTag<View>(tag).background = defaultToolbarBackground.constantState?.newDrawable(resources)
+                Settings.getValues().mColors.setBackground(toolbar.findViewWithTag(tag), ColorType.STRIP_BACKGROUND)
                 pinnedKeys.removeView(pinnedKeyView)
             }
         }
@@ -516,32 +503,57 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
 
         val toolbarIsExpandable = settingsValues.mToolbarMode == ToolbarMode.EXPANDABLE
         if (settingsValues.mIncognitoModeEnabled) {
-            toolbarExpandKey.setImageDrawable(incognitoIcon)
-            toolbarExpandKey.isVisible = true
+            toolbarExpandKey?.setImageDrawable(incognitoIcon)
+            toolbarExpandKey?.isVisible = true
         } else {
-            toolbarExpandKey.setImageDrawable(toolbarArrowIcon)
-            toolbarExpandKey.isVisible = toolbarIsExpandable
+            toolbarExpandKey?.setImageDrawable(toolbarArrowIcon)
+            toolbarExpandKey?.isVisible = toolbarIsExpandable
         }
 
-        toolbarExpandKey.setOnClickListener(if (!toolbarIsExpandable) null else this)
+        toolbarExpandKey?.setOnClickListener(if (!toolbarIsExpandable) null else this)
         pinnedKeys.visibility = suggestionsStrip.visibility
         isExternalSuggestionVisible = false
+        populatePinnedKeys()
     }
 
     private fun addKeyToPinnedKeys(pinnedKey: ToolbarKey) {
-        val original = toolbar.findViewWithTag<ImageButton>(pinnedKey) ?: return
-        // copy the original key to a new ImageButton
-        val copy = ImageButton(context, null, R.attr.suggestionWordStyle)
-        copy.tag = pinnedKey
-        copy.scaleType = original.scaleType
-        copy.scaleX = original.scaleX
-        copy.scaleY = original.scaleY
-        copy.contentDescription = original.contentDescription
-        copy.setImageDrawable(original.drawable)
-        copy.layoutParams = original.layoutParams
-        copy.isActivated = original.isActivated
-        setupKey(copy, Settings.getValues().mColors)
-        pinnedKeys.addView(copy)
+        populatePinnedKeys()
+    }
+
+    private fun populatePinnedKeys() {
+        pinnedKeys.removeAllViews()
+        val pinned = getPinnedToolbarKeys(context.prefs())
+        val colors = Settings.getValues().mColors
+        for (key in pinned) {
+            val button = createToolbarKey(context, key)
+            button.layoutParams = LinearLayout.LayoutParams(40.dpToPx(resources), 40.dpToPx(resources)).apply {
+                marginStart = 2.dpToPx(resources)
+                marginEnd = 2.dpToPx(resources)
+            }
+            val p = 10.dpToPx(resources)
+            button.setPadding(p, p, p, p)
+            button.scaleType = android.widget.ImageView.ScaleType.CENTER_INSIDE
+            button.setBackgroundResource(R.drawable.toolbar_expand_key_background)
+            button.setOnClickListener(this)
+            button.setOnLongClickListener(this)
+            button.imageTintList = android.content.res.ColorStateList.valueOf(colors.get(ColorType.KEY_TEXT))
+            colors.setColor(button.background, ColorType.TOOL_BAR_EXPAND_KEY_BACKGROUND)
+            pinnedKeys.addView(button)
+        }
+    }
+
+    fun updateThemeColors(colors: Colors) {
+        colors.setBackground(this, ColorType.STRIP_BACKGROUND)
+        findViewById<ImageButton>(R.id.access_point_trigger_btn)?.let {
+            it.imageTintList = android.content.res.ColorStateList.valueOf(colors.get(ColorType.KEY_TEXT))
+            colors.setColor(it.background, ColorType.TOOL_BAR_EXPAND_KEY_BACKGROUND)
+        }
+        for (i in 0 until pinnedKeys.childCount) {
+            val child = pinnedKeys.getChildAt(i) as? ImageButton ?: continue
+            child.imageTintList = android.content.res.ColorStateList.valueOf(colors.get(ColorType.KEY_TEXT))
+            colors.setColor(child.background, ColorType.TOOL_BAR_EXPAND_KEY_BACKGROUND)
+        }
+        invalidate()
     }
 
     private fun setupKey(view: ImageButton, colors: Colors) {

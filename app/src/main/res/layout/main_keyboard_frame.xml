@@ -57,6 +57,11 @@
         <include
             android:id="@+id/clipboard_history_view"
             layout="@layout/clipboard_history_view" />
+        <helium314.keyboard.keyboard.AccessPointMenuView
+            android:id="@+id/access_point_menu_view"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:visibility="gone" />
 
         <ImageButton
             android:id="@+id/btn_stop_one_handed_mode"
