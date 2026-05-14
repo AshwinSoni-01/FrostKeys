@@ -5,6 +5,7 @@ import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
 import android.inputmethodservice.InputMethodService
 import android.os.Build
+import android.view.Gravity
 import android.view.View
 import android.view.WindowManager
 import helium314.keyboard.latin.settings.Defaults
@@ -34,6 +35,12 @@ object FrostedGlassHelper {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             if (enable) {
                 service.updateSoftInputWindowLayoutParameters(inputView, true)
+                val params = window.attributes
+                params.width = WindowManager.LayoutParams.MATCH_PARENT
+                params.height = WindowManager.LayoutParams.WRAP_CONTENT
+                params.gravity = Gravity.BOTTOM
+                window.attributes = params
+
                 val blurRadius = service.prefs().getInt(Settings.PREF_FROSTED_BLUR_RADIUS, Defaults.PREF_FROSTED_BLUR_RADIUS)
                 window.setBackgroundBlurRadius(blurRadius)
                 window.attributes.flags = window.attributes.flags or WindowManager.LayoutParams.FLAG_BLUR_BEHIND

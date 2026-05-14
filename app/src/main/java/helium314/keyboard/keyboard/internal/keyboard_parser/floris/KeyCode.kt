@@ -178,6 +178,7 @@ object KeyCode {
     const val META_RIGHT =                -10049
     const val EMOJI_SEARCH =              -10050
     const val INLINE_EMOJI_SEARCH_DONE =  -10051
+    const val ACCESS_POINT =              -10052
 
 
     // Intents

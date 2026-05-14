@@ -17,6 +17,7 @@ import android.view.ContextThemeWrapper;
 import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
+import android.view.ViewGroup;
 import android.view.animation.AnimationUtils;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputMethodSubtype;
@@ -124,11 +125,7 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
         }
     }
 
-    private boolean mIsTransitioning = false;
-    public boolean isTransitioning() { return mIsTransitioning; }
 
-    private boolean mIsInPanel = false;
-    public boolean isInPanel() { return mIsInPanel; }
 
     private boolean updateKeyboardThemeAndContextThemeWrapper(final Context context, final KeyboardTheme keyboardTheme) {
         final Resources res = context.getResources();
@@ -210,8 +207,6 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
     private void setKeyboard(final int keyboardId, @NonNull final KeyboardSwitchState toggleState) {
         // with a hardware keyboard we might get here without ever calling onCreateInputView, so don't crash
         if (mKeyboardView == null) return;
-        mIsTransitioning = true;
-        mIsInPanel = false;
 
         // Make {@link MainKeyboardView} visible and hide {@link EmojiPalettesView}.
         final SettingsValues currentSettingsValues = Settings.getValues();
@@ -234,10 +229,9 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
             EmojiParserKt.loadEmojiDefaultVersionsAndPopupSpecs(mThemeContext);
         }
         updatePersistentEmojiRow();
-        mCurrentInputView.post(() -> {
-            mIsTransitioning = false;
-            if (mCurrentInputView != null) mCurrentInputView.requestLayout();
-        });
+        if (mCurrentInputView != null) {
+            mCurrentInputView.requestLayout();
+        }
     }
 
     public Keyboard getKeyboard() {
@@ -366,31 +360,22 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
         if (DEBUG_ACTION) {
             Log.d(TAG, "setEmojiKeyboard");
         }
-        mIsTransitioning = true;
-        mIsInPanel = true;
-        mMainKeyboardFrame.setVisibility(View.VISIBLE);
         updatePersistentEmojiRow();
-        // Hide alphabet keyboard immediately so it does not remeasure/stretch during the taller expansion pass
-        mKeyboardView.setVisibility(View.INVISIBLE);
+        mMainKeyboardFrame.setVisibility(View.VISIBLE);
+        mKeyboardView.setVisibility(View.GONE);
 
-        // Start emoji palettes and set INVISIBLE first to pre-render/pre-allocate window buffer off-screen
+        // Start emoji palettes
         mEmojiPalettesView.startEmojiPalettes(mKeyboardView.getKeyVisualAttribute(),
                 mLatinIME.getCurrentInputEditorInfo(), mLatinIME.mKeyboardActionListener);
-        mEmojiPalettesView.setVisibility(View.INVISIBLE);
+        mEmojiPalettesView.setVisibility(View.VISIBLE);
         mEmojiTabStripView.setVisibility(View.VISIBLE);
         mStripContainer.setVisibility(getSecondaryStripVisibility());
 
-        // Defer visual reveal until expanded content and window buffer are fully ready
-        mEmojiPalettesView.post(() -> {
-            mEmojiPalettesView.setVisibility(View.VISIBLE);
-            mKeyboardView.setVisibility(View.GONE);
-            mSuggestionStripView.setVisibility(View.GONE);
-            mClipboardStripScrollView.setVisibility(View.GONE);
-            mClipboardHistoryView.setVisibility(View.GONE);
-            updatePersistentEmojiRow();
-            mIsTransitioning = false;
-            if (mCurrentInputView != null) mCurrentInputView.requestLayout();
-        });
+        mSuggestionStripView.setVisibility(View.GONE);
+        mClipboardStripScrollView.setVisibility(View.GONE);
+        mClipboardHistoryView.setVisibility(View.GONE);
+        updatePersistentEmojiRow();
+        if (mCurrentInputView != null) mCurrentInputView.requestLayout();
     }
 
     // Implements {@link KeyboardState.SwitchActions}.
@@ -399,32 +384,23 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
         if (DEBUG_ACTION) {
             Log.d(TAG, "setClipboardKeyboard");
         }
-        mIsTransitioning = true;
-        mIsInPanel = true;
-        mMainKeyboardFrame.setVisibility(View.VISIBLE);
         updatePersistentEmojiRow();
-        // Hide alphabet keyboard immediately
-        mKeyboardView.setVisibility(View.INVISIBLE);
+        mMainKeyboardFrame.setVisibility(View.VISIBLE);
+        mKeyboardView.setVisibility(View.GONE);
 
-        // Start clipboard and set INVISIBLE first
+        // Start clipboard
         mClipboardHistoryView.startClipboardHistory(mLatinIME.getClipboardHistoryManager(), mKeyboardView.getKeyVisualAttribute(),
                 mLatinIME.getCurrentInputEditorInfo(), mLatinIME.mKeyboardActionListener);
-        mClipboardHistoryView.setVisibility(View.INVISIBLE);
+        mClipboardHistoryView.setVisibility(View.VISIBLE);
         mStripContainer.setVisibility(getSecondaryStripVisibility());
         mClipboardStripScrollView.post(() -> mClipboardStripScrollView.fullScroll(HorizontalScrollView.FOCUS_RIGHT));
         mClipboardStripScrollView.setVisibility(View.VISIBLE);
 
-        // Defer visual reveal AFTER buffer reallocation
-        mClipboardHistoryView.post(() -> {
-            mClipboardHistoryView.setVisibility(View.VISIBLE);
-            mKeyboardView.setVisibility(View.GONE);
-            mEmojiTabStripView.setVisibility(View.GONE);
-            mSuggestionStripView.setVisibility(View.GONE);
-            mEmojiPalettesView.setVisibility(View.GONE);
-            updatePersistentEmojiRow();
-            mIsTransitioning = false;
-            if (mCurrentInputView != null) mCurrentInputView.requestLayout();
-        });
+        mEmojiTabStripView.setVisibility(View.GONE);
+        mSuggestionStripView.setVisibility(View.GONE);
+        mEmojiPalettesView.setVisibility(View.GONE);
+        updatePersistentEmojiRow();
+        if (mCurrentInputView != null) mCurrentInputView.requestLayout();
     }
 
     @Override
@@ -493,18 +469,15 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
                 mKeyboardView.setVisibility(View.VISIBLE);
                 setKeyboard(toggleState.mKeyboardId, toggleState);
 
-                // Hide secondary palettes immediately to avoid taller container constraints
-                mEmojiPalettesView.setVisibility(View.INVISIBLE);
-                mClipboardHistoryView.setVisibility(View.INVISIBLE);
+                mEmojiPalettesView.stopEmojiPalettes();
+                mEmojiPalettesView.setVisibility(View.GONE);
 
-                // Defer hiding secondary palettes until alphabet keyboard is fully rendered
-                mKeyboardView.post(() -> {
-                    mEmojiPalettesView.stopEmojiPalettes();
-                    mEmojiPalettesView.setVisibility(View.GONE);
+                mClipboardHistoryView.stopClipboardHistory();
+                mClipboardHistoryView.setVisibility(View.GONE);
 
-                    mClipboardHistoryView.stopClipboardHistory();
-                    mClipboardHistoryView.setVisibility(View.GONE);
-                });
+                if (mCurrentInputView != null) {
+                    mCurrentInputView.requestLayout();
+                }
             }
         }
     }
@@ -726,7 +699,13 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
         return mKeyboardView;
     }
 
+    public MainKeyboardView getKeyboardView() {
+        return mKeyboardView;
+    }
+
     public FrameLayout getStripContainer() { return mStripContainer; }
+
+    public View getClipboardHistoryView() { return mClipboardHistoryView; }
 
     public void deallocateMemory() {
         if (mKeyboardView != null) {
@@ -785,6 +764,16 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
         mPersistentEmojiRowScroll = mCurrentInputView.findViewById(R.id.persistent_emoji_row_scroll);
         mPersistentEmojiRowContainer = mCurrentInputView.findViewById(R.id.persistent_emoji_row_container);
 
+        if (mMainKeyboardFrame instanceof ViewGroup) {
+            ((ViewGroup) mMainKeyboardFrame).setLayoutTransition(null);
+        }
+        if (mCurrentInputView != null) {
+            mCurrentInputView.setLayoutTransition(null);
+        }
+        if (mStripContainer != null) {
+            mStripContainer.setLayoutTransition(null);
+        }
+
         prefs.registerOnSharedPreferenceChangeListener(mSuggestionStripView);
         prefs.registerOnSharedPreferenceChangeListener(mClipboardHistoryView);
         PointerTracker.switchTo(mKeyboardView);
@@ -823,22 +812,19 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
         final boolean enabled = prefs.getBoolean(Settings.PREF_PERSISTENT_EMOJI_ROW, helium314.keyboard.latin.settings.Defaults.PREF_PERSISTENT_EMOJI_ROW);
         final View divider = mMainKeyboardFrame != null ? mMainKeyboardFrame.findViewById(R.id.persistent_emoji_row_divider) : null;
         final KeyboardSwitchState state = getKeyboardSwitchState();
-        final boolean inPanel = mIsInPanel || state == KeyboardSwitchState.EMOJI || state == KeyboardSwitchState.CLIPBOARD || (mEmojiPalettesView != null && mEmojiPalettesView.getVisibility() == View.VISIBLE) || (mClipboardHistoryView != null && mClipboardHistoryView.getVisibility() == View.VISIBLE);
+        final boolean inPanel = state == KeyboardSwitchState.EMOJI || state == KeyboardSwitchState.CLIPBOARD || (mEmojiPalettesView != null && mEmojiPalettesView.getVisibility() == View.VISIBLE) || (mClipboardHistoryView != null && mClipboardHistoryView.getVisibility() == View.VISIBLE);
         if (!enabled || mMainKeyboardFrame == null || mMainKeyboardFrame.getVisibility() != View.VISIBLE) {
             mPersistentEmojiRowScroll.setVisibility(View.GONE);
             if (divider != null) divider.setVisibility(View.GONE);
-            if (mCurrentInputView != null) mCurrentInputView.requestLayout();
             return;
         }
         if (inPanel) {
             mPersistentEmojiRowScroll.setVisibility(View.GONE);
             if (divider != null) divider.setVisibility(View.GONE);
-            if (mCurrentInputView != null) mCurrentInputView.requestLayout();
             return;
         }
         mPersistentEmojiRowScroll.setVisibility(View.VISIBLE);
         if (divider != null) divider.setVisibility(View.VISIBLE);
-        if (mCurrentInputView != null) mCurrentInputView.requestLayout();
 
         final java.util.List<String> rawEmojis = helium314.keyboard.keyboard.emoji.EmojiPalettesView.AdaptiveEmojiEngine.getRankedEmojis(mPersistentEmojiRowContainer.getContext());
         final java.util.List<String> emojis = new java.util.ArrayList<>();
@@ -922,10 +908,9 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
     }
 
     public int getPersistentEmojiRowHeight() {
-        if (mPersistentEmojiRowScroll == null || mPersistentEmojiRowScroll.getVisibility() != View.VISIBLE) return 0;
-        final View divider = mMainKeyboardFrame != null ? mMainKeyboardFrame.findViewById(R.id.persistent_emoji_row_divider) : null;
-        final int divHeight = (divider != null && divider.getVisibility() == View.VISIBLE) ? divider.getHeight() : 0;
-        return mPersistentEmojiRowScroll.getHeight() + divHeight;
+        if (mPersistentEmojiRowScroll == null) return 0;
+        float density = mPersistentEmojiRowScroll.getContext().getResources().getDisplayMetrics().density;
+        return (int) (41 * density);
     }
 
     /** Marks the theme as outdated. The theme will be reloaded next time the keyboard is shown.

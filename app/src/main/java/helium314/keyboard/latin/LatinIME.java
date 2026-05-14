@@ -1235,82 +1235,38 @@ public class LatinIME extends InputMethodService implements
         setSuggestedWords(suggestedWords);
     }
 
-    private int mLastContentTopInsets = 0;
-    private int mLastVisibleTopInsets = 0;
-    private int mLastTouchableInsets = InputMethodService.Insets.TOUCHABLE_INSETS_FRAME;
-    private final android.graphics.Region mLastTouchableRegion = new android.graphics.Region();
-
     @Override
     public void onComputeInsets(final InputMethodService.Insets outInsets) {
         super.onComputeInsets(outInsets);
-        // This method may be called before {@link #setInputView(View)}.
-        if (mInputView == null) {
-            return;
+        if (mInputView == null) return;
+
+        View visibleKeyboardView = mKeyboardSwitcher.getWrapperView();
+        if (visibleKeyboardView == null || visibleKeyboardView.getVisibility() != View.VISIBLE) {
+            if (mKeyboardSwitcher.getEmojiPalettesView() != null && mKeyboardSwitcher.getEmojiPalettesView().getVisibility() == View.VISIBLE) {
+                visibleKeyboardView = mKeyboardSwitcher.getEmojiPalettesView();
+            } else if (mKeyboardSwitcher.getClipboardHistoryView() != null && mKeyboardSwitcher.getClipboardHistoryView().getVisibility() == View.VISIBLE) {
+                visibleKeyboardView = mKeyboardSwitcher.getClipboardHistoryView();
+            }
         }
-        if (mKeyboardSwitcher.isTransitioning() && mLastContentTopInsets > 0) {
-            outInsets.contentTopInsets = mLastContentTopInsets;
-            outInsets.visibleTopInsets = mLastVisibleTopInsets;
-            outInsets.touchableInsets = mLastTouchableInsets;
-            outInsets.touchableRegion.set(mLastTouchableRegion);
-            mInsetsUpdater.setInsets(outInsets);
-            return;
-        }
-        final View visibleKeyboardView = mKeyboardSwitcher.getWrapperView();
-        if (visibleKeyboardView == null) {
-            return;
-        }
+
+        if (visibleKeyboardView == null || visibleKeyboardView.getHeight() == 0) return;
+
         final int inputHeight = mInputView.getHeight();
-        if (isImeSuppressedByHardwareKeyboard() && !visibleKeyboardView.isShown()) {
-            // If there is a hardware keyboard and a visible software keyboard view has been
-            // hidden,
-            // no visual element will be shown on the screen.
-            // for some reason setting contentTopInsets and visibleTopInsets broke somewhere
-            // along the
-            // way from OpenBoard to HeliBoard (GH-702, GH-1455), but not setting anything
-            // seems to work
-            mInsetsUpdater.setInsets(outInsets);
-            return;
-        }
-        final int stripHeight = mKeyboardSwitcher.isShowingStripContainer()
-                ? mKeyboardSwitcher.getStripContainer().getHeight()
-                : 0;
-        final int persistentEmojiRowHeight = mKeyboardSwitcher.isShowingPersistentEmojiRow()
-                ? mKeyboardSwitcher.getPersistentEmojiRowHeight()
-                : 0;
+        final int stripHeight = mKeyboardSwitcher.isShowingStripContainer() ? mKeyboardSwitcher.getStripContainer().getHeight() : 0;
+        final int persistentEmojiRowHeight = mKeyboardSwitcher.isShowingPersistentEmojiRow() ? mKeyboardSwitcher.getPersistentEmojiRowHeight() : 0;
+
         int visibleTopY = inputHeight - visibleKeyboardView.getHeight() - stripHeight - persistentEmojiRowHeight;
-        if (visibleTopY < 0) {
-            visibleTopY = 0;
-        }
-
-        if (hasSuggestionStripView()) {
-            mSuggestionStripView.setMoreSuggestionsHeight(visibleTopY);
-        }
-
-        // Need to set expanded touchable region only if a keyboard view is being shown.
-        if (visibleKeyboardView.isShown()) {
-            final int touchLeft = 0;
-            final int touchTop = mKeyboardSwitcher.isShowingPopupKeysPanel() ? 0 : visibleTopY;
-            final int touchRight = visibleKeyboardView.getWidth();
-            final int touchBottom = inputHeight
-                    // Extend touchable region below the keyboard.
-                    + EXTENDED_TOUCHABLE_REGION_HEIGHT;
-            outInsets.touchableInsets = InputMethodService.Insets.TOUCHABLE_INSETS_REGION;
-            outInsets.touchableRegion.set(touchLeft, touchTop, touchRight, touchBottom);
-        }
-
-        // Has to be subtracted after calculating touchableRegion
         visibleTopY -= getEmojiSearchActivityHeight();
-        if (visibleTopY < 0) {
-            visibleTopY = 0;
-        }
+        if (visibleTopY < 0) visibleTopY = 0;
 
         outInsets.contentTopInsets = visibleTopY;
         outInsets.visibleTopInsets = visibleTopY;
-        mLastContentTopInsets = outInsets.contentTopInsets;
-        mLastVisibleTopInsets = outInsets.visibleTopInsets;
-        mLastTouchableInsets = outInsets.touchableInsets;
-        mLastTouchableRegion.set(outInsets.touchableRegion);
-        mInsetsUpdater.setInsets(outInsets);
+
+        if (visibleKeyboardView.isShown()) {
+            outInsets.touchableInsets = InputMethodService.Insets.TOUCHABLE_INSETS_CONTENT;
+        }
+
+        if (mInsetsUpdater != null) mInsetsUpdater.setInsets(outInsets);
     }
 
     public void startShowingInputView(final boolean needsToLoadKeyboard) {
@@ -1551,7 +1507,7 @@ public class LatinIME extends InputMethodService implements
      * suggestion.
      * <p>
      * This method must be run on the UI Thread.
-     * 
+     *
      * @param suggestedWords suggested words by the IME for the full gesture.
      */
     public void onTailBatchInputResultShown(final SuggestedWords suggestedWords) {
@@ -1725,7 +1681,7 @@ public class LatinIME extends InputMethodService implements
      * finished
      * inputTransaction to find out what is necessary and updates the state
      * accordingly.
-     * 
+     *
      * @param inputTransaction The transaction that has been executed.
      */
     private void updateStateAfterInputTransaction(final InputTransaction inputTransaction) {
