@@ -32,9 +32,22 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.util.EnumMap
 import androidx.core.graphics.toColorInt
+import androidx.core.graphics.ColorUtils
 
+@Serializable
+data class FrostedLiveValues(
+    val blurRadius: Int,
+    val keyTransparency: Int,
+    val bgTransparency: Int,
+    val colorBlend: Int,
+    val saturation: Int,
+    val edgeContrast: Int
+)
+
+@Serializable
 class KeyboardTheme // Note: The themeId should be aligned with "themeId" attribute of Keyboard style in values/themes-<style>.xml.
 private constructor(val themeId: Int, @JvmField val mStyleId: Int) {
+
     override fun equals(other: Any?) = if (other === this) true
         else (other as? KeyboardTheme)?.themeId == themeId
 
@@ -43,6 +56,22 @@ private constructor(val themeId: Int, @JvmField val mStyleId: Int) {
     }
 
     companion object {
+        @Volatile
+        @JvmStatic
+        var themeOverride: String? = null
+        
+        @JvmStatic
+        var livePreviewValues: FrostedLiveValues? = null
+
+        @JvmStatic
+        fun isDarkThemeActive(context: Context): Boolean {
+            if (themeOverride == "dark") return true
+            if (themeOverride == "light") return false
+            
+            // Fallback to standard preference/system checks ONLY if override is null
+            return helium314.keyboard.latin.utils.ResourceUtils.isNight(context.resources)
+        }
+
         // old themes, now called styles
         const val STYLE_MATERIAL = "Material"
         const val STYLE_HOLO = "Holo"
@@ -136,8 +165,8 @@ private constructor(val themeId: Int, @JvmField val mStyleId: Int) {
         @JvmStatic
         fun getColorsForCurrentTheme(context: Context): Colors {
             val prefs = context.prefs()
-            val isNight = SettingsActivity.forceNight
-                ?: (ResourceUtils.isNight(context.resources) && prefs.getBoolean(Settings.PREF_THEME_DAY_NIGHT, Defaults.PREF_THEME_DAY_NIGHT))
+            val isNight = SettingsActivity.forceNight ?: (ResourceUtils.isNight(context.resources) && prefs.getBoolean(Settings.PREF_THEME_DAY_NIGHT, Defaults.PREF_THEME_DAY_NIGHT))
+            
             val themeName = SettingsActivity.forceTheme ?: if (isNight)
                 prefs.getString(Settings.PREF_THEME_COLORS_NIGHT, Defaults.PREF_THEME_COLORS_NIGHT)
             else
@@ -147,7 +176,8 @@ private constructor(val themeId: Int, @JvmField val mStyleId: Int) {
             return getThemeColors(themeName!!, themeStyle!!, context, prefs, isNight)
         }
 
-        private fun getThemeColors(themeName: String, themeStyle: String, context: Context, prefs: SharedPreferences, isNight: Boolean): Colors {
+        private fun getThemeColors(themeName: String, themeStyle: String, context: Context, prefs: SharedPreferences, isNightParam: Boolean): Colors {
+            val isNight = isDarkThemeActive(context)
             val hasBorders = prefs.getBoolean(Settings.PREF_THEME_KEY_BORDERS, Defaults.PREF_THEME_KEY_BORDERS)
             val backgroundImage = Settings.readUserBackgroundImage(context, isNight)
             return when (themeName) {
@@ -157,54 +187,81 @@ private constructor(val themeId: Int, @JvmField val mStyleId: Int) {
                 }
                 THEME_FROSTED_GLASS -> {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                        val keyTransparency = prefs.getInt(Settings.PREF_FROSTED_KEY_TRANSPARENCY, Defaults.PREF_FROSTED_KEY_TRANSPARENCY)
-                        val colorBlendVal = prefs.getInt(Settings.PREF_FROSTED_COLOR_BLEND, Defaults.PREF_FROSTED_COLOR_BLEND) / 100f
-                        val saturationMult = prefs.getInt(Settings.PREF_FROSTED_SATURATION, Defaults.PREF_FROSTED_SATURATION) / 100f
-                        val bgTransparency = prefs.getInt(Settings.PREF_FROSTED_BG_TRANSPARENCY, Defaults.PREF_FROSTED_BG_TRANSPARENCY)
+                        val keyTransparency = livePreviewValues?.keyTransparency
+                            ?: (if (isNight) prefs.getInt(Settings.PREF_FROSTED_KEY_TRANSPARENCY_NIGHT, Defaults.PREF_FROSTED_KEY_TRANSPARENCY_NIGHT)
+                                else prefs.getInt(Settings.PREF_FROSTED_KEY_TRANSPARENCY, Defaults.PREF_FROSTED_KEY_TRANSPARENCY))
+                        val colorBlendVal = (livePreviewValues?.colorBlend
+                            ?: (if (isNight) prefs.getInt(Settings.PREF_FROSTED_COLOR_BLEND_NIGHT, Defaults.PREF_FROSTED_COLOR_BLEND_NIGHT)
+                                else prefs.getInt(Settings.PREF_FROSTED_COLOR_BLEND, Defaults.PREF_FROSTED_COLOR_BLEND))) / 100f
+                        val saturationMult = (livePreviewValues?.saturation
+                            ?: (if (isNight) prefs.getInt(Settings.PREF_FROSTED_SATURATION_NIGHT, Defaults.PREF_FROSTED_SATURATION_NIGHT)
+                                else prefs.getInt(Settings.PREF_FROSTED_SATURATION, Defaults.PREF_FROSTED_SATURATION))) / 100f
+                        val bgTransparency = livePreviewValues?.bgTransparency
+                            ?: (if (isNight) prefs.getInt(Settings.PREF_FROSTED_BG_TRANSPARENCY_NIGHT, Defaults.PREF_FROSTED_BG_TRANSPARENCY_NIGHT)
+                                else prefs.getInt(Settings.PREF_FROSTED_BG_TRANSPARENCY, Defaults.PREF_FROSTED_BG_TRANSPARENCY))
+                        val edgeContrastVal = livePreviewValues?.edgeContrast
+                            ?: (if (isNight) prefs.getInt(Settings.PREF_FROSTED_EDGE_CONTRAST_NIGHT, Defaults.PREF_FROSTED_EDGE_CONTRAST_NIGHT)
+                                else prefs.getInt(Settings.PREF_FROSTED_EDGE_CONTRAST, Defaults.PREF_FROSTED_EDGE_CONTRAST))
 
                         val boostSaturation = { color: Int ->
                             val alpha = android.graphics.Color.alpha(color)
                             val hsl = FloatArray(3)
-                            androidx.core.graphics.ColorUtils.colorToHSL(color, hsl)
+                            ColorUtils.colorToHSL(color, hsl)
                             hsl[1] = (hsl[1] * saturationMult).coerceAtMost(1.0f)
-                            val saturatedColor = androidx.core.graphics.ColorUtils.HSLToColor(hsl)
-                            androidx.core.graphics.ColorUtils.setAlphaComponent(saturatedColor, alpha)
+                            val saturatedColor = ColorUtils.HSLToColor(hsl)
+                            ColorUtils.setAlphaComponent(saturatedColor, alpha)
                         }
                         val actionAlpha = (60 + (keyTransparency / 255f * 140).toInt()).coerceIn(0, 255)
                         val accentBase = boostSaturation(if (isNight) ContextCompat.getColor(context, android.R.color.system_accent1_100)
                             else ContextCompat.getColor(context, android.R.color.system_accent1_200))
-                        val accent = androidx.core.graphics.ColorUtils.setAlphaComponent(accentBase, actionAlpha)
+                        val accent = ColorUtils.setAlphaComponent(accentBase, actionAlpha)
                         val baseBg = if (isNight) {
                             val neutral1 = ContextCompat.getColor(context, android.R.color.system_neutral1_900)
                             val accent1 = ContextCompat.getColor(context, android.R.color.system_accent1_700)
                             val blendRatio = (colorBlendVal - 0.1f).coerceIn(0f, 1f)
-                            androidx.core.graphics.ColorUtils.blendARGB(neutral1, accent1, blendRatio)
+                            ColorUtils.blendARGB(neutral1, accent1, blendRatio)
                         } else {
                             val neutral1 = ContextCompat.getColor(context, android.R.color.system_neutral1_50)
                             val accent1 = ContextCompat.getColor(context, android.R.color.system_accent1_300)
                             val blendRatio = (colorBlendVal + 0.1f).coerceIn(0f, 1f)
-                            androidx.core.graphics.ColorUtils.blendARGB(neutral1, accent1, blendRatio)
+                            ColorUtils.blendARGB(neutral1, accent1, blendRatio)
                         }
                         val bgAlpha = if (isNight) bgTransparency else (bgTransparency * 0.8f).toInt().coerceAtMost(255)
-                        val background = boostSaturation(androidx.core.graphics.ColorUtils.setAlphaComponent(baseBg, bgAlpha))
+                        val background = boostSaturation(ColorUtils.setAlphaComponent(baseBg, bgAlpha))
                         val keyBgBase = if (isNight) {
                             val baseColor = ContextCompat.getColor(context, android.R.color.system_neutral1_800)
                             val accentColor = ContextCompat.getColor(context, android.R.color.system_accent1_200)
-                            androidx.core.graphics.ColorUtils.blendARGB(baseColor, accentColor, (colorBlendVal * 0.7f).coerceIn(0f, 1f))
+                            ColorUtils.blendARGB(baseColor, accentColor, (colorBlendVal * 0.7f).coerceIn(0f, 1f))
                         } else {
                             val baseColor = ContextCompat.getColor(context, android.R.color.system_neutral1_0)
                             val accentColor = ContextCompat.getColor(context, android.R.color.system_accent1_200)
-                            androidx.core.graphics.ColorUtils.blendARGB(baseColor, accentColor, (colorBlendVal * 0.7f).coerceIn(0f, 1f))
+                            ColorUtils.blendARGB(baseColor, accentColor, (colorBlendVal * 0.7f).coerceIn(0f, 1f))
                         }
-                        val keyAlpha = 38 + (keyTransparency / 255f * 140).toInt().coerceIn(0, 140)
-                        val keyBackground = boostSaturation(androidx.core.graphics.ColorUtils.setAlphaComponent(keyBgBase, keyAlpha))
+
+                        // INTERNAL FIX: Separate logic for Key Opacity vs Background Opacity
+                        val keyAlpha = if (isNight) {
+                            // Dark theme keys: 0.2 baseline + slider * 0.4
+                            (51 + (keyTransparency / 255f * 102)).toInt().coerceIn(0, 255)
+                        } else {
+                            // Light theme keys: 0.75 baseline + slider * 0.25
+                            (191 + (keyTransparency / 255f * 64)).toInt().coerceIn(0, 255)
+                        }
+                        val keyBackground = boostSaturation(ColorUtils.setAlphaComponent(keyBgBase, keyAlpha))
                         val functionalBase = boostSaturation(if (isNight) ContextCompat.getColor(context, android.R.color.system_accent2_300)
                             else ContextCompat.getColor(context, android.R.color.system_accent2_100))
-                        val functionalKey = androidx.core.graphics.ColorUtils.setAlphaComponent(functionalBase, actionAlpha)
+                        val functionalKey = ColorUtils.setAlphaComponent(functionalBase, actionAlpha)
                         val keyText = if (isNight) ContextCompat.getColor(context, android.R.color.system_neutral1_50)
                             else ContextCompat.getColor(context, android.R.color.system_accent3_900)
                         val keyHintText = if (isNight) keyText
                             else ContextCompat.getColor(context, android.R.color.system_accent3_700)
+                        
+                        // Calculate border color based on Edge Contrast
+                        val borderColor = if (isNight) {
+                            ColorUtils.setAlphaComponent(Color.WHITE, (edgeContrastVal * 0.5f).toInt())
+                        } else {
+                            ColorUtils.setAlphaComponent(Color.BLACK, (edgeContrastVal * 0.7f).toInt())
+                        }
+
                         DefaultColors(
                             themeStyle,
                             hasBorders,
@@ -216,7 +273,8 @@ private constructor(val themeId: Int, @JvmField val mStyleId: Int) {
                             keyText,
                             keyHintText,
                             keyboardBackground = backgroundImage,
-                            isFrosted = true
+                            isFrosted = true,
+                            keyBorderColor = borderColor
                         )
                     } else {
                         getThemeColors(if (isNight) THEME_DARK else THEME_LIGHT, themeStyle, context, prefs, isNight)

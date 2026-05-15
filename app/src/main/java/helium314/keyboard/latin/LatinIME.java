@@ -12,6 +12,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.SharedPreferences;
 import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.graphics.Color;
@@ -540,6 +541,102 @@ public class LatinIME extends InputMethodService implements
         Log.i(TAG, "Hardware accelerated drawing: " + mIsHardwareAcceleratedDrawingEnabled);
     }
 
+    private final SharedPreferences.OnSharedPreferenceChangeListener mPrefsListener =
+        new SharedPreferences.OnSharedPreferenceChangeListener() {
+            @Override
+            public void onSharedPreferenceChanged(SharedPreferences sharedPreferences, String key) {
+                if (key == null) return;
+                // Loophole Fix: Differentiate between live redraw and hard reset
+                if (helium314.keyboard.latin.settings.Settings.PREF_FROSTED_GLASS_TRIGGER.equals(key)) {
+                    Log.d(TAG, "Hard Reset trigger detected.");
+                    new android.os.Handler(android.os.Looper.getMainLooper()).post(new Runnable() {
+                        @Override
+                        public void run() {
+                            forceHardThemeReset();
+                        }
+                    });
+                } else if (key.startsWith("pref_frosted_")) {
+                    Log.d(TAG, "Live Redraw trigger detected for: " + key);
+                    new android.os.Handler(android.os.Looper.getMainLooper()).post(new Runnable() {
+                        @Override
+                        public void run() {
+                            mKeyboardSwitcher.updateLiveFrostedGlassColors();
+                        }
+                    });
+                }
+            }
+        };
+
+    public void forceHardThemeReset() {
+        // 1. Instantly hide the window to stop user interaction
+        hideWindow();
+
+        // 2. Run on Main UI Thread to prevent ConcurrentModificationExceptions
+        new android.os.Handler(android.os.Looper.getMainLooper()).post(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    // --- PHASE 1: TARGET THE ABSOLUTE BOTTOM WINDOW LAYERS ---
+                    android.view.Window window = getWindow().getWindow();
+                    if (window != null) {
+                        // A. Force the absolute bottom Dialog Window to be 100% Transparent
+                        window.setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT));
+
+                        // B. Strip the DecorView (System wrapper layer)
+                        android.view.View decorView = window.getDecorView();
+                        if (decorView != null) {
+                            decorView.setBackground(null);
+                        }
+
+                        // C. Strip the Content View (IME root layout wrapper layer)
+                        android.view.View contentView = window.findViewById(android.R.id.content);
+                        if (contentView != null) {
+                            contentView.setBackground(null);
+                        }
+                    }
+
+                    // --- PHASE 2: SCORCHED EARTH STRIP & GUT (INPUT FRAME) ---
+                    // Use internal mInputView for backward compatibility (replaces API 33+ getInputView())
+                    if (mInputView != null) {
+                        // Recursively crawl upwards and strip backgrounds from EVERY parent frame
+                        android.view.View traverseView = mInputView;
+                        while (traverseView != null) {
+                            traverseView.setBackground(null);
+                            if (traverseView.getParent() instanceof android.view.View) {
+                                traverseView = (android.view.View) traverseView.getParent();
+                            } else {
+                                break;
+                            }
+                        }
+                        
+                        // Precision removal of the old views from the direct parent container
+                        android.view.ViewParent parent = mInputView.getParent();
+                        if (parent instanceof android.view.ViewGroup) {
+                            android.view.ViewGroup inputContainer = (android.view.ViewGroup) parent;
+                            inputContainer.setBackground(null);
+                            inputContainer.removeAllViews();
+                        }
+                    }
+
+                    // --- PHASE 3: PURGE MEMORY AND MOUNT FRESH THEME ---
+                    // Flush the old colors from the memory cache
+                    helium314.keyboard.keyboard.KeyboardSwitcher.getInstance().forceUpdateKeyboardTheme(LatinIME.this);
+
+                    // Mount the fresh, uncontaminated views
+                    // HeliBoard includes suggestions inside onCreateInputView()
+                    setInputView(onCreateInputView());
+                    updateInputViewShown();
+
+                    // Re-open the keyboard cleanly
+                    showWindow(true);
+
+                } catch (Exception e) {
+                    android.util.Log.e("LatinIME", "Error during hard theme reset", e);
+                }
+            }
+        });
+    }
+
     @Override
     public void onCreate() {
         mSettings.startListener();
@@ -589,6 +686,9 @@ public class LatinIME extends InputMethodService implements
         registerReceiver(mRestartAfterDeviceUnlockReceiver, restartAfterUnlockFilter);
 
         StatsUtils.onCreate(mSettings.getCurrent(), mRichImm);
+
+        // Register the preference change listener
+        KtxKt.prefs(this).registerOnSharedPreferenceChangeListener(mPrefsListener);
     }
 
     private void loadSettings() {
@@ -716,8 +816,10 @@ public class LatinIME extends InputMethodService implements
         unregisterReceiver(mDictionaryDumpBroadcastReceiver);
         unregisterReceiver(mRestartAfterDeviceUnlockReceiver);
         mStatsUtilsManager.onDestroy(this /* context */);
+        KtxKt.prefs(this).unregisterOnSharedPreferenceChangeListener(mPrefsListener);
         super.onDestroy();
         mHandler.removeCallbacksAndMessages(null);
+        helium314.keyboard.keyboard.KeyboardTheme.setThemeOverride(null);
         deallocateMemory();
     }
 
@@ -731,6 +833,8 @@ public class LatinIME extends InputMethodService implements
     public void onConfigurationChanged(final Configuration conf) {
         SettingsValues settingsValues = mSettings.getCurrent();
         Log.i(TAG, "onConfigurationChanged");
+        // Loophole fix: if we are in live preview mode, ignore system configuration changes to avoid flickers or theme fighting
+        if (helium314.keyboard.keyboard.KeyboardTheme.getThemeOverride() != null) return;
         SubtypeSettings.INSTANCE.reloadSystemLocales(this);
         if (settingsValues.mDisplayOrientation != conf.orientation) {
             mHandler.startOrientationChanging();

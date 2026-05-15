@@ -70,6 +70,15 @@ public final class Settings implements SharedPreferences.OnSharedPreferenceChang
     public static final String PREF_FROSTED_COLOR_BLEND = "pref_frosted_color_blend";
     public static final String PREF_FROSTED_SATURATION = "pref_frosted_saturation";
     public static final String PREF_FROSTED_BG_TRANSPARENCY = "pref_frosted_bg_transparency";
+    public static final String PREF_FROSTED_EDGE_CONTRAST = "pref_frosted_edge_contrast";
+
+    public static final String PREF_FROSTED_BLUR_RADIUS_NIGHT = "pref_frosted_blur_radius_night";
+    public static final String PREF_FROSTED_KEY_TRANSPARENCY_NIGHT = "pref_frosted_key_transparency_night";
+    public static final String PREF_FROSTED_COLOR_BLEND_NIGHT = "pref_frosted_color_blend_night";
+    public static final String PREF_FROSTED_SATURATION_NIGHT = "pref_frosted_saturation_night";
+    public static final String PREF_FROSTED_BG_TRANSPARENCY_NIGHT = "pref_frosted_bg_transparency_night";
+    public static final String PREF_FROSTED_EDGE_CONTRAST_NIGHT = "pref_frosted_edge_contrast_night";
+    public static final String PREF_FROSTED_GLASS_TRIGGER = "frosted_glass_trigger";
 
     public static final String PREF_CUSTOM_ICON_NAMES = "custom_icon_names";
     public static final String PREF_TOOLBAR_CUSTOM_KEY_CODES = "toolbar_custom_key_codes";

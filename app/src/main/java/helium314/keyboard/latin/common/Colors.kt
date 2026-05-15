@@ -375,6 +375,7 @@ class DefaultColors (
     private val gesture: Int = accent,
     private var keyboardBackground: Drawable? = null,
     val isFrosted: Boolean = false,
+    private val keyBorderColor: Int? = null,
 ) : Colors {
     private val navBar: Int
     /** brightened or darkened variant of [background], to be used if exact background color would be

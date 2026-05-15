@@ -5,6 +5,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.result.PickVisualMediaRequest
 import android.graphics.BitmapFactory
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -39,6 +40,20 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+private data class FrostedProfileSnapshot(
+    val blurRadius: Int,
+    val keyTransparency: Int,
+    val bgTransparency: Int,
+    val colorBlend: Int,
+    val saturation: Int,
+    val edgeContrast: Int
+)
+
+private data class FrostedSettingsSnapshot(
+    val light: FrostedProfileSnapshot,
+    val dark: FrostedProfileSnapshot
+)
+
 @Composable
 fun FrostedGlassAdjustDialog(
     onDismissRequest: () -> Unit
@@ -47,11 +62,114 @@ fun FrostedGlassAdjustDialog(
     val prefs = context.prefs()
     val coroutineScope = rememberCoroutineScope()
 
-    var blurRadius by remember { mutableStateOf(prefs.getInt(Settings.PREF_FROSTED_BLUR_RADIUS, Defaults.PREF_FROSTED_BLUR_RADIUS)) }
-    var keyTransparency by remember { mutableStateOf(prefs.getInt(Settings.PREF_FROSTED_KEY_TRANSPARENCY, Defaults.PREF_FROSTED_KEY_TRANSPARENCY)) }
-    var bgTransparency by remember { mutableStateOf(prefs.getInt(Settings.PREF_FROSTED_BG_TRANSPARENCY, Defaults.PREF_FROSTED_BG_TRANSPARENCY)) }
-    var colorBlend by remember { mutableStateOf(prefs.getInt(Settings.PREF_FROSTED_COLOR_BLEND, Defaults.PREF_FROSTED_COLOR_BLEND)) }
-    var saturation by remember { mutableStateOf(prefs.getInt(Settings.PREF_FROSTED_SATURATION, Defaults.PREF_FROSTED_SATURATION)) }
+    var activeProfile by remember { mutableStateOf(if (helium314.keyboard.latin.utils.ResourceUtils.isNight(context.resources)) "dark" else "light") }
+
+
+    // 1. Snapshot the initial state when the dialog opens
+    val initialSnapshot = remember {
+        FrostedSettingsSnapshot(
+            light = FrostedProfileSnapshot(
+                blurRadius = prefs.getInt(Settings.PREF_FROSTED_BLUR_RADIUS, Defaults.PREF_FROSTED_BLUR_RADIUS),
+                keyTransparency = prefs.getInt(Settings.PREF_FROSTED_KEY_TRANSPARENCY, Defaults.PREF_FROSTED_KEY_TRANSPARENCY),
+                bgTransparency = prefs.getInt(Settings.PREF_FROSTED_BG_TRANSPARENCY, Defaults.PREF_FROSTED_BG_TRANSPARENCY),
+                colorBlend = prefs.getInt(Settings.PREF_FROSTED_COLOR_BLEND, Defaults.PREF_FROSTED_COLOR_BLEND),
+                saturation = prefs.getInt(Settings.PREF_FROSTED_SATURATION, Defaults.PREF_FROSTED_SATURATION),
+                edgeContrast = prefs.getInt(Settings.PREF_FROSTED_EDGE_CONTRAST, Defaults.PREF_FROSTED_EDGE_CONTRAST)
+            ),
+            dark = FrostedProfileSnapshot(
+                blurRadius = prefs.getInt(Settings.PREF_FROSTED_BLUR_RADIUS_NIGHT, Defaults.PREF_FROSTED_BLUR_RADIUS_NIGHT),
+                keyTransparency = prefs.getInt(Settings.PREF_FROSTED_KEY_TRANSPARENCY_NIGHT, Defaults.PREF_FROSTED_KEY_TRANSPARENCY_NIGHT),
+                bgTransparency = prefs.getInt(Settings.PREF_FROSTED_BG_TRANSPARENCY_NIGHT, Defaults.PREF_FROSTED_BG_TRANSPARENCY_NIGHT),
+                colorBlend = prefs.getInt(Settings.PREF_FROSTED_COLOR_BLEND_NIGHT, Defaults.PREF_FROSTED_COLOR_BLEND_NIGHT),
+                saturation = prefs.getInt(Settings.PREF_FROSTED_SATURATION_NIGHT, Defaults.PREF_FROSTED_SATURATION_NIGHT),
+                edgeContrast = prefs.getInt(Settings.PREF_FROSTED_EDGE_CONTRAST_NIGHT, Defaults.PREF_FROSTED_EDGE_CONTRAST_NIGHT)
+            )
+        )
+    }
+
+    // 2. The temporary live state for the sliders
+    var snapshot by remember { mutableStateOf(initialSnapshot) }
+    var isSaved by remember { mutableStateOf(false) }
+
+    // Helper to update current profile in snapshot AND write to prefs for LIVE feedback
+    fun updateCurrentProfile(update: (FrostedProfileSnapshot) -> FrostedProfileSnapshot) {
+        val oldProfile = if (activeProfile == "light") snapshot.light else snapshot.dark
+        val newProfile = update(oldProfile)
+        
+        snapshot = if (activeProfile == "light") {
+            snapshot.copy(light = newProfile)
+        } else {
+            snapshot.copy(dark = newProfile)
+        }
+
+        // Live update: Write the changed values to SharedPreferences immediately.
+        // This triggers the "Live Redraw" (mKeyboardSwitcher.updateLiveFrostedGlassColors()) in LatinIME.
+        if (activeProfile == "light") {
+            prefs.edit()
+                .putInt(Settings.PREF_FROSTED_BLUR_RADIUS, newProfile.blurRadius)
+                .putInt(Settings.PREF_FROSTED_KEY_TRANSPARENCY, newProfile.keyTransparency)
+                .putInt(Settings.PREF_FROSTED_BG_TRANSPARENCY, newProfile.bgTransparency)
+                .putInt(Settings.PREF_FROSTED_COLOR_BLEND, newProfile.colorBlend)
+                .putInt(Settings.PREF_FROSTED_SATURATION, newProfile.saturation)
+                .putInt(Settings.PREF_FROSTED_EDGE_CONTRAST, newProfile.edgeContrast)
+                .apply()
+        } else {
+            prefs.edit()
+                .putInt(Settings.PREF_FROSTED_BLUR_RADIUS_NIGHT, newProfile.blurRadius)
+                .putInt(Settings.PREF_FROSTED_KEY_TRANSPARENCY_NIGHT, newProfile.keyTransparency)
+                .putInt(Settings.PREF_FROSTED_BG_TRANSPARENCY_NIGHT, newProfile.bgTransparency)
+                .putInt(Settings.PREF_FROSTED_COLOR_BLEND_NIGHT, newProfile.colorBlend)
+                .putInt(Settings.PREF_FROSTED_SATURATION_NIGHT, newProfile.saturation)
+                .putInt(Settings.PREF_FROSTED_EDGE_CONTRAST_NIGHT, newProfile.edgeContrast)
+                .apply()
+        }
+
+        // Also update the static staging variable so the redraw can use the latest values
+        helium314.keyboard.keyboard.KeyboardTheme.livePreviewValues = helium314.keyboard.keyboard.FrostedLiveValues(
+            blurRadius = newProfile.blurRadius,
+            keyTransparency = newProfile.keyTransparency,
+            bgTransparency = newProfile.bgTransparency,
+            colorBlend = newProfile.colorBlend,
+            saturation = newProfile.saturation,
+            edgeContrast = newProfile.edgeContrast
+        )
+    }
+
+    // Current profile view for easier slider binding
+    val currentValues = if (activeProfile == "light") snapshot.light else snapshot.dark
+
+    // 3. The Tab Switch Effect is now handled explicitly in the Tab onClick to prevent "redraw floods"
+    // during the unmounting process.
+
+    // 4. The Rollback Mechanism
+    DisposableEffect(Unit) {
+        onDispose {
+            if (!isSaved) {
+                // User cancelled or dismissed! Roll back preferences to the snapshot
+                prefs.edit()
+                    .putInt(Settings.PREF_FROSTED_BLUR_RADIUS, initialSnapshot.light.blurRadius)
+                    .putInt(Settings.PREF_FROSTED_KEY_TRANSPARENCY, initialSnapshot.light.keyTransparency)
+                    .putInt(Settings.PREF_FROSTED_BG_TRANSPARENCY, initialSnapshot.light.bgTransparency)
+                    .putInt(Settings.PREF_FROSTED_COLOR_BLEND, initialSnapshot.light.colorBlend)
+                    .putInt(Settings.PREF_FROSTED_SATURATION, initialSnapshot.light.saturation)
+                    .putInt(Settings.PREF_FROSTED_EDGE_CONTRAST, initialSnapshot.light.edgeContrast)
+                    .putInt(Settings.PREF_FROSTED_BLUR_RADIUS_NIGHT, initialSnapshot.dark.blurRadius)
+                    .putInt(Settings.PREF_FROSTED_KEY_TRANSPARENCY_NIGHT, initialSnapshot.dark.keyTransparency)
+                    .putInt(Settings.PREF_FROSTED_BG_TRANSPARENCY_NIGHT, initialSnapshot.dark.bgTransparency)
+                    .putInt(Settings.PREF_FROSTED_COLOR_BLEND_NIGHT, initialSnapshot.dark.colorBlend)
+                    .putInt(Settings.PREF_FROSTED_SATURATION_NIGHT, initialSnapshot.dark.saturation)
+                    .putInt(Settings.PREF_FROSTED_EDGE_CONTRAST_NIGHT, initialSnapshot.dark.edgeContrast)
+                    .apply()
+            }
+            
+            // Clear spoofing state
+            helium314.keyboard.keyboard.KeyboardTheme.themeOverride = null
+            helium314.keyboard.keyboard.KeyboardTheme.livePreviewValues = null
+            
+            // Final catch-up refresh to sync keyboard with restored/final state
+            prefs.edit().putLong(Settings.PREF_FROSTED_GLASS_TRIGGER, System.currentTimeMillis()).apply()
+        }
+    }
 
     val testFieldState = rememberTextFieldState("", TextRange(0))
 
@@ -164,6 +282,39 @@ fun FrostedGlassAdjustDialog(
                             modifier = Modifier.padding(bottom = 12.dp)
                         )
 
+                        // Theme Profile Selector
+                        TabRow(
+                            selectedTabIndex = if (activeProfile == "light") 0 else 1,
+                            modifier = Modifier.padding(bottom = 16.dp),
+                            containerColor = Color.Transparent,
+                            divider = {}
+                        ) {
+                            Tab(
+                                selected = activeProfile == "light",
+                                onClick = { 
+                                    if (activeProfile != "light") {
+                                        activeProfile = "light"
+                                        helium314.keyboard.keyboard.KeyboardTheme.themeOverride = "light"
+                                        // Trigger the true physical bulldozer reset
+                                        prefs.edit().putLong(Settings.PREF_FROSTED_GLASS_TRIGGER, System.currentTimeMillis()).apply()
+                                    }
+                                },
+                                text = { Text("Light Profile") }
+                            )
+                            Tab(
+                                selected = activeProfile == "dark",
+                                onClick = { 
+                                    if (activeProfile != "dark") {
+                                        activeProfile = "dark"
+                                        helium314.keyboard.keyboard.KeyboardTheme.themeOverride = "dark"
+                                        // Trigger the true physical bulldozer reset
+                                        prefs.edit().putLong(Settings.PREF_FROSTED_GLASS_TRIGGER, System.currentTimeMillis()).apply()
+                                    }
+                                },
+                                text = { Text("Dark Profile") }
+                            )
+                        }
+
                         val focusRequester = remember { FocusRequester() }
                         OutlinedTextField(
                             state = testFieldState,
@@ -245,15 +396,13 @@ fun FrostedGlassAdjustDialog(
                         // Slider 1: Blur Radius
                         Column(modifier = Modifier.padding(vertical = 8.dp)) {
                             Text(
-                                text = "${stringResource(R.string.pref_frosted_blur_radius_title)}: $blurRadius px",
+                                text = "${stringResource(R.string.pref_frosted_blur_radius_title)}: ${currentValues.blurRadius} px",
                                 style = MaterialTheme.typography.bodyMedium
                             )
                             Slider(
-                                value = blurRadius.toFloat(),
+                                value = currentValues.blurRadius.toFloat(),
                                 onValueChange = { newValue ->
-                                    blurRadius = newValue.toInt()
-                                    prefs.edit().putInt(Settings.PREF_FROSTED_BLUR_RADIUS, newValue.toInt()).commit()
-                                    KeyboardSwitcher.getInstance().updateLiveFrostedGlassColors()
+                                    updateCurrentProfile { it.copy(blurRadius = newValue.toInt()) }
                                 },
                                 valueRange = 10f..150f
                             )
@@ -262,15 +411,13 @@ fun FrostedGlassAdjustDialog(
                         // Slider 2: Key Transparency
                         Column(modifier = Modifier.padding(vertical = 8.dp)) {
                             Text(
-                                text = "${stringResource(R.string.pref_frosted_key_transparency_title)}: ${(100 * keyTransparency / 255)}%",
+                                text = "${stringResource(R.string.pref_frosted_key_transparency_title)}: ${(100 * currentValues.keyTransparency / 255)}%",
                                 style = MaterialTheme.typography.bodyMedium
                             )
                             Slider(
-                                value = keyTransparency.toFloat(),
+                                value = currentValues.keyTransparency.toFloat(),
                                 onValueChange = { newValue ->
-                                    keyTransparency = newValue.toInt()
-                                    prefs.edit().putInt(Settings.PREF_FROSTED_KEY_TRANSPARENCY, newValue.toInt()).commit()
-                                    KeyboardSwitcher.getInstance().updateLiveFrostedGlassColors()
+                                    updateCurrentProfile { it.copy(keyTransparency = newValue.toInt()) }
                                 },
                                 valueRange = 0f..255f
                             )
@@ -279,15 +426,13 @@ fun FrostedGlassAdjustDialog(
                         // Slider 3: Background Transparency
                         Column(modifier = Modifier.padding(vertical = 8.dp)) {
                             Text(
-                                text = "${stringResource(R.string.pref_frosted_bg_transparency_title)}: ${(100 * bgTransparency / 255)}%",
+                                text = "${stringResource(R.string.pref_frosted_bg_transparency_title)}: ${(100 * currentValues.bgTransparency / 255)}%",
                                 style = MaterialTheme.typography.bodyMedium
                             )
                             Slider(
-                                value = bgTransparency.toFloat(),
+                                value = currentValues.bgTransparency.toFloat(),
                                 onValueChange = { newValue ->
-                                    bgTransparency = newValue.toInt()
-                                    prefs.edit().putInt(Settings.PREF_FROSTED_BG_TRANSPARENCY, newValue.toInt()).commit()
-                                    KeyboardSwitcher.getInstance().updateLiveFrostedGlassColors()
+                                    updateCurrentProfile { it.copy(bgTransparency = newValue.toInt()) }
                                 },
                                 valueRange = 0f..255f
                             )
@@ -296,15 +441,13 @@ fun FrostedGlassAdjustDialog(
                         // Slider 4: Wallpaper Color Blend
                         Column(modifier = Modifier.padding(vertical = 8.dp)) {
                             Text(
-                                text = "${stringResource(R.string.pref_frosted_color_blend_title)}: $colorBlend%",
+                                text = "${stringResource(R.string.pref_frosted_color_blend_title)}: ${currentValues.colorBlend}%",
                                 style = MaterialTheme.typography.bodyMedium
                             )
                             Slider(
-                                value = colorBlend.toFloat(),
+                                value = currentValues.colorBlend.toFloat(),
                                 onValueChange = { newValue ->
-                                    colorBlend = newValue.toInt()
-                                    prefs.edit().putInt(Settings.PREF_FROSTED_COLOR_BLEND, newValue.toInt()).commit()
-                                    KeyboardSwitcher.getInstance().updateLiveFrostedGlassColors()
+                                    updateCurrentProfile { it.copy(colorBlend = newValue.toInt()) }
                                 },
                                 valueRange = 0f..100f
                             )
@@ -313,17 +456,30 @@ fun FrostedGlassAdjustDialog(
                         // Slider 5: Saturation Boost
                         Column(modifier = Modifier.padding(vertical = 8.dp)) {
                             Text(
-                                text = "${stringResource(R.string.pref_frosted_saturation_title)}: $saturation%",
+                                text = "${stringResource(R.string.pref_frosted_saturation_title)}: ${currentValues.saturation}%",
                                 style = MaterialTheme.typography.bodyMedium
                             )
                             Slider(
-                                value = saturation.toFloat(),
+                                value = currentValues.saturation.toFloat(),
                                 onValueChange = { newValue ->
-                                    saturation = newValue.toInt()
-                                    prefs.edit().putInt(Settings.PREF_FROSTED_SATURATION, newValue.toInt()).commit()
-                                    KeyboardSwitcher.getInstance().updateLiveFrostedGlassColors()
+                                    updateCurrentProfile { it.copy(saturation = newValue.toInt()) }
                                 },
                                 valueRange = 50f..250f
+                            )
+                        }
+
+                        // Slider 6: Edge Contrast
+                        Column(modifier = Modifier.padding(vertical = 8.dp)) {
+                            Text(
+                                text = "Edge Contrast: ${(100 * currentValues.edgeContrast / 255)}%",
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                            Slider(
+                                value = currentValues.edgeContrast.toFloat(),
+                                onValueChange = { newValue ->
+                                    updateCurrentProfile { it.copy(edgeContrast = newValue.toInt()) }
+                                },
+                                valueRange = 0f..255f
                             )
                         }
 
@@ -336,30 +492,48 @@ fun FrostedGlassAdjustDialog(
                         ) {
                             OutlinedButton(
                                 onClick = {
-                                    blurRadius = Defaults.PREF_FROSTED_BLUR_RADIUS
-                                    keyTransparency = Defaults.PREF_FROSTED_KEY_TRANSPARENCY
-                                    bgTransparency = Defaults.PREF_FROSTED_BG_TRANSPARENCY
-                                    colorBlend = Defaults.PREF_FROSTED_COLOR_BLEND
-                                    saturation = Defaults.PREF_FROSTED_SATURATION
-
-                                    prefs.edit()
-                                        .putInt(Settings.PREF_FROSTED_BLUR_RADIUS, Defaults.PREF_FROSTED_BLUR_RADIUS)
-                                        .putInt(Settings.PREF_FROSTED_KEY_TRANSPARENCY, Defaults.PREF_FROSTED_KEY_TRANSPARENCY)
-                                        .putInt(Settings.PREF_FROSTED_BG_TRANSPARENCY, Defaults.PREF_FROSTED_BG_TRANSPARENCY)
-                                        .putInt(Settings.PREF_FROSTED_COLOR_BLEND, Defaults.PREF_FROSTED_COLOR_BLEND)
-                                        .putInt(Settings.PREF_FROSTED_SATURATION, Defaults.PREF_FROSTED_SATURATION)
-                                        .commit()
-
-                                    KeyboardSwitcher.getInstance().updateLiveFrostedGlassColors()
+                                    updateCurrentProfile { 
+                                        if (activeProfile == "light") {
+                                            it.copy(
+                                                blurRadius = Defaults.PREF_FROSTED_BLUR_RADIUS,
+                                                keyTransparency = Defaults.PREF_FROSTED_KEY_TRANSPARENCY,
+                                                bgTransparency = Defaults.PREF_FROSTED_BG_TRANSPARENCY,
+                                                colorBlend = Defaults.PREF_FROSTED_COLOR_BLEND,
+                                                saturation = Defaults.PREF_FROSTED_SATURATION,
+                                                edgeContrast = Defaults.PREF_FROSTED_EDGE_CONTRAST
+                                            )
+                                        } else {
+                                            it.copy(
+                                                blurRadius = Defaults.PREF_FROSTED_BLUR_RADIUS_NIGHT,
+                                                keyTransparency = Defaults.PREF_FROSTED_KEY_TRANSPARENCY_NIGHT,
+                                                bgTransparency = Defaults.PREF_FROSTED_BG_TRANSPARENCY_NIGHT,
+                                                colorBlend = Defaults.PREF_FROSTED_COLOR_BLEND_NIGHT,
+                                                saturation = Defaults.PREF_FROSTED_SATURATION_NIGHT,
+                                                edgeContrast = Defaults.PREF_FROSTED_EDGE_CONTRAST_NIGHT
+                                            )
+                                        }
+                                    }
                                 }
                             ) {
                                 Text(stringResource(R.string.button_reset))
                             }
 
-                            Button(
+                            TextButton(
                                 onClick = onDismissRequest
                             ) {
-                                Text(stringResource(android.R.string.ok))
+                                Text(stringResource(android.R.string.cancel))
+                            }
+
+                                Button(
+                                onClick = {
+                                    isSaved = true
+                                    // Everything is already in SharedPreferences due to live updates.
+                                    // Just ensure the trigger key is touched one last time.
+                                    prefs.edit().putLong(Settings.PREF_FROSTED_GLASS_TRIGGER, System.currentTimeMillis()).apply()
+                                    onDismissRequest()
+                                }
+                            ) {
+                                Text(stringResource(R.string.save))
                             }
                         }
 

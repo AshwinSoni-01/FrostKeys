@@ -20,8 +20,12 @@ object FrostedGlassHelper {
     @JvmStatic
     fun isFrostedTheme(context: Context): Boolean {
         val prefs = context.prefs()
-        val isNight = SettingsActivity.forceNight
+        var isNight = SettingsActivity.forceNight
             ?: (ResourceUtils.isNight(context.resources) && prefs.getBoolean(Settings.PREF_THEME_DAY_NIGHT, Defaults.PREF_THEME_DAY_NIGHT))
+        
+        // Respect theme override for live preview
+        if (helium314.keyboard.keyboard.KeyboardTheme.themeOverride == "light") isNight = false
+        else if (helium314.keyboard.keyboard.KeyboardTheme.themeOverride == "dark") isNight = true
         val themeName = SettingsActivity.forceTheme ?: if (isNight)
             prefs.getString(Settings.PREF_THEME_COLORS_NIGHT, Defaults.PREF_THEME_COLORS_NIGHT)
         else
@@ -41,7 +45,13 @@ object FrostedGlassHelper {
                 params.gravity = Gravity.BOTTOM
                 window.attributes = params
 
-                val blurRadius = service.prefs().getInt(Settings.PREF_FROSTED_BLUR_RADIUS, Defaults.PREF_FROSTED_BLUR_RADIUS)
+                var isNight = ResourceUtils.isNight(service.resources)
+                if (helium314.keyboard.keyboard.KeyboardTheme.themeOverride == "light") isNight = false
+                else if (helium314.keyboard.keyboard.KeyboardTheme.themeOverride == "dark") isNight = true
+
+                val blurRadius = helium314.keyboard.keyboard.KeyboardTheme.livePreviewValues?.blurRadius
+                    ?: (if (isNight) service.prefs().getInt(Settings.PREF_FROSTED_BLUR_RADIUS_NIGHT, Defaults.PREF_FROSTED_BLUR_RADIUS_NIGHT)
+                        else service.prefs().getInt(Settings.PREF_FROSTED_BLUR_RADIUS, Defaults.PREF_FROSTED_BLUR_RADIUS))
                 window.setBackgroundBlurRadius(blurRadius)
                 window.attributes.flags = window.attributes.flags or WindowManager.LayoutParams.FLAG_BLUR_BEHIND
                 window.attributes = window.attributes

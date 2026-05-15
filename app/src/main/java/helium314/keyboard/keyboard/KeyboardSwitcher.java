@@ -1106,4 +1106,10 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
             helium314.keyboard.latin.FrostedGlassHelper.configureFrostedGlass(mLatinIME, mCurrentInputView, helium314.keyboard.latin.FrostedGlassHelper.isFrostedTheme(mLatinIME));
         }
     }
+
+    public void forceUpdateKeyboardTheme(Context context) {
+        mThemeNeedsReload = true;
+        mKeyboardTheme = null;
+        mThemeContext = null;
+    }
 }
