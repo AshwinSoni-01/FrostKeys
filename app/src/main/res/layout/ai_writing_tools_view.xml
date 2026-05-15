@@ -28,6 +28,7 @@
             android:contentDescription="Back"
             android:tint="?android:attr/textColorPrimary" />
         <TextView
+            android:id="@+id/tv_ai_title"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"

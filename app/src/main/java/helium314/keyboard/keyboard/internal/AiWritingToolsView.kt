@@ -97,12 +97,22 @@ class AiWritingToolsView @JvmOverloads constructor(
             val isPlaceholder = text.contains("Please write something first") || 
                                text.contains("Select a tool above")
             
-            // Dynamic theme-aware coloring using attribute resolution
-            val colorAttr = if (isPlaceholder || isThinking) android.R.attr.textColorSecondary else android.R.attr.textColorPrimary
-            val typedValue = TypedValue()
-            context.theme.resolveAttribute(colorAttr, typedValue, true)
-            holder.textView.setTextColor(typedValue.data)
+            // Dynamic theme-aware coloring using attribute resolution with explicit dark mode fallback
+            val isNight = ResourceUtils.isNight(context.resources)
+            if (isNight) {
+                val color = if (isPlaceholder || isThinking) Color.parseColor("#B0FFFFFF") else Color.WHITE
+                holder.textView.setTextColor(color)
+            } else {
+                val colorAttr = if (isPlaceholder || isThinking) android.R.attr.textColorSecondary else android.R.attr.textColorPrimary
+                val typedValue = TypedValue()
+                context.theme.resolveAttribute(colorAttr, typedValue, true)
+                holder.textView.setTextColor(typedValue.data)
+            }
             holder.textView.setTypeface(null, if (isPlaceholder) android.graphics.Typeface.ITALIC else android.graphics.Typeface.NORMAL)
+            
+            if (isNight) {
+                holder.useButton.setTextColor(Color.WHITE)
+            }
 
             holder.useButton.visibility = if (!isThinking && !isError && !isPlaceholder && text.isNotBlank()) View.VISIBLE else View.GONE
             holder.useButton.setOnClickListener { view ->
@@ -185,6 +195,9 @@ class AiWritingToolsView @JvmOverloads constructor(
         val extractedText = connection?.getExtractedText(android.view.inputmethod.ExtractedTextRequest(), 0)?.text?.toString()
         val hasText = !extractedText.isNullOrBlank()
 
+        val isNight = ResourceUtils.isNight(context.resources)
+        val disabledAlpha = if (isNight) 0.8f else 0.5f
+
         val toolButtonIds = listOf(
             R.id.btn_tool_proofread, 
             R.id.btn_tool_rewrite, 
@@ -195,10 +208,19 @@ class AiWritingToolsView @JvmOverloads constructor(
         for (id in toolButtonIds) {
             findViewById<View>(id)?.apply {
                 isEnabled = hasText
-                alpha = if (hasText) 1.0f else 0.5f
+                alpha = if (hasText) 1.0f else disabledAlpha
                 isClickable = hasText
                 isFocusable = hasText
             }
+        }
+
+        findViewById<View>(R.id.btn_delete_ai)?.apply {
+            isEnabled = hasText
+            alpha = if (hasText) 1.0f else disabledAlpha
+        }
+
+        copyButton.apply {
+            alpha = if (isEnabled) 1.0f else disabledAlpha
         }
     }
 
@@ -213,8 +235,30 @@ class AiWritingToolsView @JvmOverloads constructor(
 
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
+        applyThemeFixes()
         updateButtonStates()
         viewPager.adapter?.notifyDataSetChanged()
+    }
+
+    private fun applyThemeFixes() {
+        val isNight = ResourceUtils.isNight(context.resources)
+        if (!isNight) return
+
+        // Force white text/tints in dark mode if theme attributes fail
+        findViewById<TextView>(R.id.tv_ai_title)?.setTextColor(Color.WHITE)
+        findViewById<ImageButton>(R.id.btn_back_ai)?.setColorFilter(Color.WHITE)
+        
+        val buttonsToFix = listOf(
+            R.id.btn_tool_proofread,
+            R.id.btn_tool_rewrite,
+            R.id.btn_tone_professional,
+            R.id.btn_tone_friendly,
+            R.id.btn_copy_text
+        )
+        for (id in buttonsToFix) {
+            findViewById<Button>(id)?.setTextColor(Color.WHITE)
+        }
+        findViewById<ImageButton>(R.id.btn_delete_ai)?.setColorFilter(Color.WHITE)
     }
 
     override fun onDetachedFromWindow() {
