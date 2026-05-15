@@ -1,5 +1,27 @@
 import com.android.build.api.variant.ApplicationVariant
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import java.io.File
+import java.io.ByteArrayOutputStream
+import javax.inject.Inject
+
+abstract class GitCommitCountValueSource : ValueSource<Int, ValueSourceParameters.None> {
+    @get:Inject
+    abstract val execOperations: ExecOperations
+
+    override fun obtain(): Int {
+        val output = ByteArrayOutputStream()
+        return try {
+            execOperations.exec {
+                commandLine("git", "rev-list", "--count", "HEAD")
+                standardOutput = output
+                isIgnoreExitValue = true
+            }
+            output.toString().trim().toIntOrNull() ?: 1
+        } catch (e: Exception) {
+            1
+        }
+    }
+}
 
 plugins {
     id("com.android.application")
@@ -15,8 +37,8 @@ android {
         applicationId = "com.orion.kboard"
         minSdk = 21
         targetSdk = 36
-        versionCode = 3901
-        versionName = "3.9"
+        versionCode = providers.of(GitCommitCountValueSource::class.java) {}.get()
+        versionName = "1.0.1"
         ndk {
             abiFilters.clear()
             abiFilters.addAll(listOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64"))
@@ -67,7 +89,7 @@ android {
             }
             variant.outputs.forEach { output ->
                 if (output is com.android.build.api.variant.impl.VariantOutputImpl) {
-                    output.outputFileName = "HeliBoard_${defaultConfig.versionName}-${variant.buildType}.apk"
+                    output.outputFileName = "KBoard_${defaultConfig.versionName}-${variant.buildType}.apk"
                 }
             }
         }
