@@ -4,7 +4,7 @@
 
 KBoard takes the privacy-focused foundation of HeliBoard and adds modern, high-performance features for users who want more from their keyboard without sacrificing their data.
 
-[<img src="https://user-images.githubusercontent.com/663460/26973090-f8fdc986-4d14-11e7-995a-e7c5e79ed925.png" alt="Get APK from GitHub" height="80">](https://github.com/com.orion.kboard/KBoard/releases/latest)
+[<img src="https://user-images.githubusercontent.com/663460/26973090-f8fdc986-4d14-11e7-995a-e7c5e79ed925.png" alt="Get APK from GitHub" height="80">](https://github.com/AshwinSoni-01/KBoard/releases/tag/v1.0.0)
 
 ---
 
