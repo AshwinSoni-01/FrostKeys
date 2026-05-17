@@ -7,8 +7,14 @@
     android:width="24dp"
     android:viewportHeight="24"
     android:viewportWidth="24" >
-    <path android:fillColor="#FFF"
-        android:pathData="M17.59,18l1.41,-1.41l-4.58,-4.59l4.58,-4.59l-1.41,-1.41l-6,6z"/>
-    <path android:fillColor="#FFF"
-        android:pathData="M11,18l1.41,-1.41l-4.58,-4.59l4.58,-4.59l-1.41,-1.41l-6,6z"/>
+    <group
+        android:scaleX="0.85"
+        android:scaleY="0.85"
+        android:translateX="1.8"
+        android:translateY="1.8">
+        <path android:fillColor="#FFF"
+            android:pathData="M17.59,18l1.41,-1.41l-4.58,-4.59l4.58,-4.59l-1.41,-1.41l-6,6z"/>
+        <path android:fillColor="#FFF"
+            android:pathData="M11,18l1.41,-1.41l-4.58,-4.59l4.58,-4.59l-1.41,-1.41l-6,6z"/>
+    </group>
 </vector>

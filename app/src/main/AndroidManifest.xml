@@ -92,7 +92,7 @@ SPDX-License-Identifier: Apache-2.0 AND GPL-3.0-only
             android:theme="@style/TransparentActivityTheme" android:excludeFromRecents="true" android:noHistory="true"
             android:windowSoftInputMode="adjustResize|stateAlwaysVisible" android:configChanges="orientation|screenSize"/>
 
-        <activity android:name="helium314.keyboard.keyboard.KlipyPanelActivity" android:exported="false"
+        <activity android:name="helium314.keyboard.keyboard.KlipyPanelActivity" android:exported="true"
             android:theme="@style/TransparentActivityTheme" android:excludeFromRecents="true" android:noHistory="true"
             android:windowSoftInputMode="adjustResize" android:configChanges="orientation|screenSize"/>
 
@@ -115,7 +115,7 @@ SPDX-License-Identifier: Apache-2.0 AND GPL-3.0-only
 
         <!-- necessary for sending mail attachments, remove when data gathering phase is done (end of 2026 latest) -->
         <provider android:name="helium314.keyboard.settings.screens.gesturedata.GestureFileProvider"
-            android:authorities="com.orion.kboard.provider"
+            android:authorities="${applicationId}.gestureprovider"
             android:enabled="true"
             android:grantUriPermissions="true"
             android:exported="false">
@@ -126,12 +126,24 @@ SPDX-License-Identifier: Apache-2.0 AND GPL-3.0-only
 
         <provider
             android:name="androidx.core.content.FileProvider"
-            android:authorities="${applicationId}.provider"
+            android:authorities="${applicationId}.fileprovider"
             android:exported="false"
             android:grantUriPermissions="true">
             <meta-data
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths" />
+        </provider>
+
+        <provider
+            android:name="helium314.keyboard.latin.stickers.StickerContentProvider"
+            android:authorities="${stickerProviderAuthority}"
+            android:enabled="true"
+            android:exported="true"
+            android:grantUriPermissions="true"
+            android:readPermission="com.whatsapp.sticker.READ">
+            <intent-filter>
+                <action android:name="com.whatsapp.intent.action.ENABLE_STICKER_PACK" />
+            </intent-filter>
         </provider>
     </application>
 

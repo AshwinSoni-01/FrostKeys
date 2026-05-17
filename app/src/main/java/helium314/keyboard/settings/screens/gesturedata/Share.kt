@@ -163,7 +163,7 @@ private fun Intent.filterIntentToOnlyIncludeEmailApps(context: Context, intentTo
 private fun getZipFileUri(context: Context) : Uri =
     FileProvider.getUriForFile(
         context,
-        context.getString(R.string.gesture_data_provider_authority),
+        "${context.packageName}.gestureprovider",
         getGestureZipFile(context))
 
 @Composable

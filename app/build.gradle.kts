@@ -39,6 +39,9 @@ android {
         targetSdk = 36
         versionCode = providers.of(GitCommitCountValueSource::class.java) {}.get()
         versionName = "1.0.1"
+        buildConfigField("String", "CONTENT_PROVIDER_AUTHORITY", "\"${applicationId}.stickercontentprovider\"")
+        manifestPlaceholders["stickerAuthority"] = "${applicationId}.stickercontentprovider"
+        manifestPlaceholders["stickerProviderAuthority"] = "${applicationId}.stickercontentprovider"
         ndk {
             abiFilters.clear()
             abiFilters.addAll(listOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64"))
@@ -65,6 +68,7 @@ android {
             isMinifyEnabled = false
             isJniDebuggable = false
             applicationIdSuffix = ".debug"
+            manifestPlaceholders["stickerProviderAuthority"] = "${defaultConfig.applicationId}.debug.stickercontentprovider"
         }
         create("runTests") { // build variant for running tests on CI that skips tests known to fail
             isMinifyEnabled = false
@@ -76,6 +80,7 @@ android {
             isJniDebuggable = false
             signingConfig = signingConfigs.getByName("debug")
             applicationIdSuffix = ".debug"
+            manifestPlaceholders["stickerProviderAuthority"] = "${defaultConfig.applicationId}.debug.stickercontentprovider"
         }
 
         androidComponents.onVariants { variant: ApplicationVariant ->
@@ -149,6 +154,7 @@ android {
 dependencies {
     // androidx
     implementation("androidx.core:core-ktx:1.17.0") // 1.18.0 requires minSdk 23
+    implementation("androidx.appcompat:appcompat:1.7.0")
     implementation("androidx.recyclerview:recyclerview:1.4.0")
     implementation("androidx.autofill:autofill:1.3.0")
     implementation("androidx.viewpager2:viewpager2:1.1.0")
@@ -171,6 +177,7 @@ dependencies {
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("io.coil-kt:coil:2.7.0")
     implementation("io.coil-kt:coil-gif:2.7.0")
+    implementation("com.aureusapps.android:webp-android:1.1.2")
     implementation("com.google.android.material:material:1.12.0")
 
     // test

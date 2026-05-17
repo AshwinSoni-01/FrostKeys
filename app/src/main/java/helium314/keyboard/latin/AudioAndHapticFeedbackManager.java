@@ -43,6 +43,9 @@ public final class AudioAndHapticFeedbackManager {
     }
 
     public static void init(final Context context) {
+        if (sInstance.mAudioManager != null) {
+            return;
+        }
         sInstance.initInternal(context);
     }
 

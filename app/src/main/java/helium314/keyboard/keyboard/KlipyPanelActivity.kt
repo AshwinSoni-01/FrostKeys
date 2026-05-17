@@ -5,6 +5,7 @@ import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.text.Editable
@@ -21,8 +22,8 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.core.content.ContextCompat
-import androidx.core.content.FileProvider
 import androidx.core.content.edit
+import androidx.core.net.toUri
 import androidx.core.os.ConfigurationCompat
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.GridLayoutManager
@@ -38,6 +39,7 @@ import helium314.keyboard.latin.database.KlipyHistoryDao
 import helium314.keyboard.latin.database.KlipyHistoryDao.KlipyItem
 import helium314.keyboard.latin.settings.Defaults
 import helium314.keyboard.latin.settings.Settings
+import helium314.keyboard.latin.stickers.AnimatedStickerProcessor
 import helium314.keyboard.latin.utils.Log
 import helium314.keyboard.latin.utils.ResourceUtils
 import helium314.keyboard.latin.utils.prefs
@@ -51,6 +53,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
 import java.io.FileOutputStream
+import java.security.MessageDigest
 import java.util.UUID
 
 class KlipyPanelActivity : ComponentActivity() {
@@ -70,7 +73,13 @@ class KlipyPanelActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.klipy_panel)
+        try {
+            setContentView(R.layout.klipy_panel)
+        } catch (e: Exception) {
+            Log.e("KlipyPanel", "Failed to inflate layout", e)
+            setContentView(R.layout.klipy_panel_fallback)
+            return
+        }
 
         historyDao = KlipyHistoryDao.getInstance(this)
         gifsRecyclerView = findViewById(R.id.gifsRecyclerView)
@@ -119,36 +128,54 @@ class KlipyPanelActivity : ComponentActivity() {
 
         // Share content
         lifecycleScope.launch {
-            val isSticker = currentTab == KlipyHistoryDao.TYPE_STICKER
-            val file = withContext(Dispatchers.IO) {
-                downloadAndPrepareFile(item.url, item.id, isSticker)
-            }
-            if (file != null) {
-                val mimeType = if (isSticker) "image/webp.wasticker" else "image/gif"
-                val label = if (isSticker) "Sticker" else "GIF"
-
-                try {
-                    val contentUri = FileProvider.getUriForFile(
-                        this@KlipyPanelActivity,
-                        "${packageName}.provider",
-                        file
-                    )
-
-                    // Send intent to LatinIME to commit content
-                    val intent = Intent(this@KlipyPanelActivity, LatinIME::class.java).apply {
-                        action = KLIPY_DONE_ACTION
-                        putExtra(KLIPY_URI_KEY, contentUri)
-                        putExtra(KLIPY_MIME_KEY, mimeType)
-                        putExtra(KLIPY_LABEL_KEY, label)
-                    }
-                    startService(intent)
-                    finish()
-                } catch (e: Exception) {
-                    Log.e("KlipyPanel", "Failed to get URI for file", e)
-                    Toast.makeText(this@KlipyPanelActivity, "Error sharing file", Toast.LENGTH_SHORT).show()
+            loadingIndicator.visibility = View.VISIBLE
+            try {
+                val isSticker = currentTab == KlipyHistoryDao.TYPE_STICKER
+                val rawFile = withContext(Dispatchers.IO) {
+                    downloadAndPrepareFile(item.url, item.id, isSticker)
                 }
-            } else {
-                Toast.makeText(this@KlipyPanelActivity, "Download failed", Toast.LENGTH_SHORT).show()
+
+                if (rawFile != null) {
+                    val processedFile = withContext(Dispatchers.Default) {
+                        val processor = AnimatedStickerProcessor(this@KlipyPanelActivity)
+                        processor.createWhatsAppAnimatedSticker(rawFile)
+                    }
+
+                    if (processedFile != null) {
+                        val mimeType = "image/webp.wasticker"
+                        val label = if (isSticker) "Sticker" else "GIF"
+
+                        try {
+                            val contentUri = "content://${packageName}.stickercontentprovider/stickers/klipy/${processedFile.name}".toUri()
+
+                            val intent = Intent(applicationContext, LatinIME::class.java).apply {
+                                action = KLIPY_DONE_ACTION
+                                putExtra(KLIPY_URI_KEY, contentUri)
+                                putExtra(KLIPY_MIME_KEY, mimeType)
+                                putExtra(KLIPY_LABEL_KEY, label)
+                            }
+
+                            // 1. Close the activity immediately to trigger focus return to WhatsApp
+                            finish()
+
+                            // 2. Fire the intent with a slight delay using the Application context.
+                            // 350ms gives Android enough time to re-establish the InputConnection.
+                            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                                applicationContext.startService(intent)
+                            }, 1000)
+
+                        } catch (e: Exception) {
+                            Log.e("KlipyPanel", "Failed to get URI for file", e)
+                            Toast.makeText(applicationContext, "Error sharing file", Toast.LENGTH_SHORT).show()
+                        }
+                    } else {
+                        Toast.makeText(this@KlipyPanelActivity, "Processing failed", Toast.LENGTH_SHORT).show()
+                    }
+                } else {
+                    Toast.makeText(this@KlipyPanelActivity, "Download failed", Toast.LENGTH_SHORT).show()
+                }
+            } finally {
+                loadingIndicator.visibility = View.GONE
             }
         }
     }
@@ -160,51 +187,45 @@ class KlipyPanelActivity : ComponentActivity() {
             val response = client.newCall(request).execute()
             if (!response.isSuccessful) return null
 
-            val cacheDir = File(cacheDir, "klipy").apply { mkdirs() }
-            val suffix = if (isSticker) ".webp" else ".gif"
-            val file = File(cacheDir, "klipy_${id}${suffix}")
-
-            if (isSticker) {
-                val bytes = response.body?.bytes() ?: return null
-                val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: return null
-
-                // Resize to 512x512
-                val scaledBitmap = if (bitmap.width != 512 || bitmap.height != 512) {
-                    Bitmap.createScaledBitmap(bitmap, 512, 512, true)
-                } else {
-                    bitmap
-                }
-
-                // Try to keep file size under 100KB as required by WhatsApp
-                var quality = 100
-                var currentFileSize: Long
-                do {
-                    FileOutputStream(file).use { output ->
-                        val format = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                            if (quality == 100) Bitmap.CompressFormat.WEBP_LOSSLESS else Bitmap.CompressFormat.WEBP_LOSSY
-                        } else {
-                            @Suppress("DEPRECATION")
-                            Bitmap.CompressFormat.WEBP
-                        }
-                        scaledBitmap.compress(format, quality, output)
-                    }
-                    currentFileSize = file.length()
-                    quality -= 10
-                } while (currentFileSize > 100 * 1024 && quality > 0)
-
-                if (scaledBitmap != bitmap) scaledBitmap.recycle()
-                bitmap.recycle()
+            val storageDir = if (isSticker) {
+                File(filesDir, "stickers/klipy").apply { mkdirs() }
             } else {
-                response.body?.byteStream()?.use { input ->
-                    FileOutputStream(file).use { output ->
-                        input.copyTo(output)
-                    }
+                File(cacheDir, "klipy").apply { mkdirs() }
+            }
+            val suffix = if (isSticker) ".webp" else ".gif"
+            val file = File(storageDir, "klipy_${id}${suffix}")
+
+            response.body?.byteStream()?.use { input ->
+                FileOutputStream(file).use { output ->
+                    input.copyTo(output)
                 }
             }
+
+            // Verify binary integrity
+            val sha256 = sha256Hex(file)
+            Log.d("KlipyPanel", "Downloaded ${if (isSticker) "sticker" else "GIF"} to ${file.absolutePath}, SHA-256: $sha256")
+
             file
         } catch (e: Exception) {
             Log.e("KlipyPanel", "Failed to download/prepare Klipy item", e)
             null
+        }
+    }
+
+    private fun sha256Hex(file: File): String {
+        return try {
+            val digest = MessageDigest.getInstance("SHA-256")
+            file.inputStream().use { input ->
+                val buffer = ByteArray(8192)
+                var bytesRead = input.read(buffer)
+                while (bytesRead != -1) {
+                    digest.update(buffer, 0, bytesRead)
+                    bytesRead = input.read(buffer)
+                }
+            }
+            digest.digest().joinToString("") { "%02x".format(it) }
+        } catch (e: Exception) {
+            "error"
         }
     }
 
@@ -341,7 +362,7 @@ class KlipyPanelActivity : ComponentActivity() {
             ?.addQueryParameter("customer_id", customerId)
             ?.addQueryParameter("locale", locale)
             ?.addQueryParameter("content_filter", "medium")
-            ?.addQueryParameter("format_filter", if (currentTab == KlipyHistoryDao.TYPE_GIF) "gif" else "webp,png")
+            ?.addQueryParameter("format_filter", "webp,gif,png")
             ?.build() ?: return emptyList()
 
         val request = Request.Builder()
@@ -381,14 +402,24 @@ class KlipyPanelActivity : ComponentActivity() {
                 return emptyList()
             }
 
-            apiResponse.data.data.map { item ->
-                KlipyItem(
-                    id = item.id.toString(),
-                    url = item.file.hd.gif.url,
-                    width = item.width ?: 200,
-                    height = item.height ?: 200
-                )
+        // Map the API items to our KlipyItem, STRICTLY requiring WebP
+        apiResponse.data.data.mapNotNull { item ->
+            val webpUrl = item.file.hd.webp?.url
+
+            // If the WebP URL doesn't exist, we skip this sticker entirely.
+            // mapNotNull will automatically drop these nulls from the final list.
+            if (webpUrl == null) {
+                Log.d("KlipyPanel", "Skipped item ${item.id} - No WebP available")
+                return@mapNotNull null
             }
+
+            KlipyItem(
+                id = item.id.toString(),
+                url = webpUrl,
+                width = item.width ?: 200,
+                height = item.height ?: 200
+            )
+        }
         } catch (e: Exception) {
             Log.e("KlipyPanel", "Search request failed: ${e.message}", e)
             emptyList()
@@ -415,7 +446,7 @@ class KlipyPanelActivity : ComponentActivity() {
     private data class KlipyFileInfo(val hd: KlipyHdInfo)
 
     @Serializable
-    private data class KlipyHdInfo(val gif: KlipyUrlInfo)
+    private data class KlipyHdInfo(val gif: KlipyUrlInfo, val webp: KlipyUrlInfo? = null)
 
     @Serializable
     private data class KlipyUrlInfo(val url: String)
@@ -444,6 +475,9 @@ class KlipyPanelActivity : ComponentActivity() {
         }
         findViewById<MaterialButton>(R.id.tabStickers)?.setOnClickListener {
             selectStickersTab()
+        }
+        findViewById<View>(R.id.klipyBackButton)?.setOnClickListener {
+            finish()
         }
     }
 

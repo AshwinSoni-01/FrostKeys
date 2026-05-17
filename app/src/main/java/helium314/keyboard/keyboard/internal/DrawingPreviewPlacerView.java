@@ -16,12 +16,12 @@ import android.widget.RelativeLayout;
 
 import helium314.keyboard.latin.common.CoordinateUtils;
 
-import java.util.ArrayList;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 public final class DrawingPreviewPlacerView extends RelativeLayout {
     private final int[] mKeyboardViewOrigin = CoordinateUtils.newInstance();
 
-    private final ArrayList<AbstractDrawingPreview> mPreviews = new ArrayList<>();
+    private final CopyOnWriteArrayList<AbstractDrawingPreview> mPreviews = new CopyOnWriteArrayList<>();
 
     public DrawingPreviewPlacerView(final Context context, final AttributeSet attrs) {
         super(context, attrs);
@@ -44,16 +44,14 @@ public final class DrawingPreviewPlacerView extends RelativeLayout {
     public void setKeyboardViewGeometry(final int[] originCoords, final int width,
             final int height) {
         CoordinateUtils.copy(mKeyboardViewOrigin, originCoords);
-        final int count = mPreviews.size();
-        for (int i = 0; i < count; i++) {
-            mPreviews.get(i).setKeyboardViewGeometry(originCoords, width, height);
+        for (AbstractDrawingPreview preview : mPreviews) {
+            preview.setKeyboardViewGeometry(originCoords, width, height);
         }
     }
 
     public void deallocateMemory() {
-        final int count = mPreviews.size();
-        for (int i = 0; i < count; i++) {
-            mPreviews.get(i).onDeallocateMemory();
+        for (AbstractDrawingPreview preview : mPreviews) {
+            preview.onDeallocateMemory();
         }
     }
 
@@ -69,9 +67,8 @@ public final class DrawingPreviewPlacerView extends RelativeLayout {
         final int originX = CoordinateUtils.x(mKeyboardViewOrigin);
         final int originY = CoordinateUtils.y(mKeyboardViewOrigin);
         canvas.translate(originX, originY);
-        final int count = mPreviews.size();
-        for (int i = 0; i < count; i++) {
-            mPreviews.get(i).drawPreview(canvas);
+        for (AbstractDrawingPreview preview : mPreviews) {
+            preview.drawPreview(canvas);
         }
         canvas.translate(-originX, -originY);
     }
