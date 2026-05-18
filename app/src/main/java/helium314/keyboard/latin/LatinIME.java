@@ -990,6 +990,9 @@ public class LatinIME extends InputMethodService implements
 
     @Override
     public void onFinishInputView(final boolean finishingInput) {
+        if (isEmojiSearchActive) {
+            return;
+        }
         StatsUtils.onFinishInputView();
         mHandler.onFinishInputView(finishingInput);
         mStatsUtilsManager.onFinishInputView();
@@ -1239,6 +1242,9 @@ public class LatinIME extends InputMethodService implements
 
     @Override
     public void onWindowHidden() {
+        if (isEmojiSearchActive) {
+            return;
+        }
         super.onWindowHidden();
         Log.i(TAG, "onWindowHidden");
         final MainKeyboardView mainKeyboardView = mKeyboardSwitcher.getMainKeyboardView();
@@ -1433,24 +1439,43 @@ public class LatinIME extends InputMethodService implements
             }
         }
 
-        if (visibleKeyboardView == null || visibleKeyboardView.getHeight() == 0) return;
-
         final int inputHeight = mInputView.getHeight();
         final int stripHeight = mKeyboardSwitcher.isShowingStripContainer() ? mKeyboardSwitcher.getStripContainer().getHeight() : 0;
         final int persistentEmojiRowHeight = mKeyboardSwitcher.isShowingPersistentEmojiRow() ? mKeyboardSwitcher.getPersistentEmojiRowHeight() : 0;
 
-        int visibleTopY = inputHeight - visibleKeyboardView.getHeight() - stripHeight - persistentEmojiRowHeight;
-        visibleTopY -= getEmojiSearchActivityHeight();
+        final int emojiSearchHeight = getEmojiSearchActivityHeight();
+        // When emoji search is active, don't subtract the persistent emoji row — the search
+        // activity's own height signal already accounts for the full keyboard area.
+        final int effectivePersistentEmojiRowHeight = (isEmojiSearchActive || emojiSearchHeight > 0)
+            ? 0 : persistentEmojiRowHeight;
+
+        int keyboardHeight = 0;
+        if (visibleKeyboardView != null && visibleKeyboardView.getHeight() > 0) {
+            keyboardHeight = visibleKeyboardView.getHeight();
+        } else if (isEmojiSearchActive || emojiSearchHeight > 0) {
+            // Fallback to last known height to prevent the gap from closing during transitions
+            keyboardHeight = mLastKeyboardHeight - stripHeight - effectivePersistentEmojiRowHeight;
+            if (keyboardHeight < 0) keyboardHeight = 0;
+        }
+
+        if (keyboardHeight == 0 && visibleKeyboardView == null) return;
+
+        int visibleTopY = inputHeight - keyboardHeight - stripHeight - effectivePersistentEmojiRowHeight;
+        visibleTopY -= emojiSearchHeight;
         if (visibleTopY < 0) visibleTopY = 0;
 
         outInsets.contentTopInsets = visibleTopY;
         outInsets.visibleTopInsets = visibleTopY;
 
-        if (visibleKeyboardView.isShown()) {
+        if (visibleKeyboardView != null && visibleKeyboardView.isShown()) {
             outInsets.touchableInsets = InputMethodService.Insets.TOUCHABLE_INSETS_CONTENT;
         }
 
         if (mInsetsUpdater != null) mInsetsUpdater.setInsets(outInsets);
+
+        if (keyboardHeight > 0) {
+            mLastKeyboardHeight = keyboardHeight + stripHeight + effectivePersistentEmojiRowHeight;
+        }
     }
 
     public void startShowingInputView(final boolean needsToLoadKeyboard) {
@@ -2004,8 +2029,16 @@ public class LatinIME extends InputMethodService implements
         startActivity(intent);
     }
 
+    private boolean isEmojiSearchActive = false;
+    private int mLastKeyboardHeight = 0;
+
+    public void setEmojiSearchActive(boolean active) {
+        isEmojiSearchActive = active;
+    }
+
     public void launchEmojiSearch() {
         Log.d("emoji-search", "before activity launch");
+        setEmojiSearchActive(true);
         startActivity(new Intent().setClass(this, EmojiSearchActivity.class)
                 .setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_MULTIPLE_TASK));
     }
@@ -2014,6 +2047,7 @@ public class LatinIME extends InputMethodService implements
     public int onStartCommand(Intent intent, int flags, int startId) {
         if (intent != null && EmojiSearchActivity.EMOJI_SEARCH_DONE_ACTION.equals(intent.getAction())
                 && !isEmojiSearch()) {
+            setEmojiSearchActive(false);
             if (intent.getBooleanExtra(EmojiSearchActivity.IME_CLOSED_KEY, false)) {
                 requestHideSelf(0);
             } else {

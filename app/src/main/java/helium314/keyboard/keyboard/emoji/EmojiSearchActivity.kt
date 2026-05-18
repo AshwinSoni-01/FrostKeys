@@ -11,7 +11,7 @@ import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
+import androidx.core.view.WindowCompat
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -21,7 +21,6 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.exclude
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -44,7 +43,6 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -58,7 +56,6 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextRange
@@ -140,17 +137,24 @@ class EmojiSearchActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         init()
-        enableEdgeToEdge()
+        // Note: enableEdgeToEdge() is intentionally NOT called here.
+        // It overrides adjustResize on API 30+ which breaks the IME visibility detection logic.
+        WindowCompat.setDecorFitsSystemWindows(window, false)
         setContent {
             LocalContext.current.setTheme(KeyboardTheme.getKeyboardTheme(this).mStyleId)
+            // Compute a stable initial height estimate so the IME gets a non-zero inset.
+            // Using this constant prevents the InputConnection from restarting in an infinite loop.
+            val estimatedSearchHeightPx = remember {
+                EmojiLayoutParams(resources).emojiKeyboardHeight +
+                    resources.getDimensionPixelSize(R.dimen.config_suggestions_strip_height)
+            }
             Surface(modifier = Modifier.fillMaxSize(), color = Color(0x80000000)) {
-                var heightDp by remember { mutableStateOf(0.dp) }
+                // Fix: Removed .exclude(WindowInsets(bottom = heightDp)) so the safeDrawing applies the FULL 
+                // keyboard height as padding. This firmly stacks the search panel on top of the keyboard.
                 Column(modifier = Modifier.fillMaxSize().clickable(onClick = { cancel() })
-                    .windowInsetsPadding(WindowInsets.safeDrawing.exclude(WindowInsets(bottom = heightDp))),
+                    .windowInsetsPadding(WindowInsets.safeDrawing),
                     verticalArrangement = Arrangement.Bottom
                 ) {
-                    val localDensity = LocalDensity.current
-                    var heightPx by remember { mutableIntStateOf(0) }
                     Column(modifier = Modifier.wrapContentHeight().background(Color(colors.get(ColorType.MAIN_BACKGROUND)))
                         .clickable(false) {}.onGloballyPositioned {
                             val bottom = it.localToScreen(Offset(0f, it.size.height.toFloat())).y.toInt()
@@ -169,8 +173,8 @@ class EmojiSearchActivity : ComponentActivity() {
                                 imeOpened = true
                                 Handler(this@EmojiSearchActivity.mainLooper).removeCallbacks(closer)
                             }
-                            heightPx = it.size.height
-                            heightDp = with(localDensity) { it.size.height.toDp() }
+                            // Fix: dynamic heightPx updates removed. They caused constant KeyboardOptions recomposition
+                            // and resulted in the InputConnection tearing down repeatedly.
                         }) {
                         val fontFamily = remember { KeyboardTypeface.customFontFamily() }
                         Row(modifier = Modifier.fillMaxWidth().height(30.dp)) {
@@ -210,9 +214,11 @@ class EmojiSearchActivity : ComponentActivity() {
                                     search(it.text)
                                 },
                                 enabled = true,
+                                // Fix: use a constant estimatedSearchHeightPx for the PlatformImeOptions
+                                // so the IME connection does not get continually restarted mid-session
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text, imeAction = ImeAction.Done,
                                     hintLocales = hintLocales,
-                                    platformImeOptions = PlatformImeOptions(encodePrivateImeOptions(PrivateImeOptions(heightPx)))),
+                                    platformImeOptions = PlatformImeOptions(encodePrivateImeOptions(PrivateImeOptions(estimatedSearchHeightPx)))),
                                 keyboardActions = KeyboardActions(onDone = {
                                     if (Settings.getValues().mAutoCorrectEnabled) pressedKey = firstKey
                                     finish()

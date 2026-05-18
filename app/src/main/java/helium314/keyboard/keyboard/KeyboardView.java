@@ -376,7 +376,7 @@ public class KeyboardView extends View {
         final int bgY;
 
         if (KeyboardTheme.STYLE_MATERIAL.equals(themeStyle) || KeyboardTheme.STYLE_ROUNDED.equals(themeStyle)) {
-            int heightReduction = (int) (rawBgHeight * 0.12f);
+            int heightReduction = (int) (rawBgHeight * 0.03f);
             bgHeight = rawBgHeight - heightReduction;
             bgY = -padding.top + (heightReduction / 2);
         } else {
