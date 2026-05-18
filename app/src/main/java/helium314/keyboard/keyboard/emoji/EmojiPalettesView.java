@@ -10,6 +10,8 @@ import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.res.Resources;
 import android.content.res.TypedArray;
+import android.graphics.Canvas;
+import android.graphics.Paint;
 import android.util.AttributeSet;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -112,10 +114,12 @@ public final class EmojiPalettesView extends LinearLayout
     }
 
     private void addTab(final LinearLayout host, final int categoryId) {
-        final ImageView iconView = new ImageView(getContext());
+        final TabImageView iconView = new TabImageView(getContext());
         mColors.setBackground(iconView, ColorType.STRIP_BACKGROUND);
         mColors.setColor(iconView, ColorType.EMOJI_CATEGORY);
-        iconView.setScaleType(ImageView.ScaleType.CENTER);
+        iconView.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        final int iconPadding = (int) (10 * getContext().getResources().getDisplayMetrics().density);
+        iconView.setPadding(iconPadding, iconPadding, iconPadding, iconPadding);
         iconView.setImageResource(mEmojiCategory.getCategoryTabIcon(categoryId));
         iconView.setContentDescription(mEmojiCategory.getAccessibilityDescription(categoryId));
         iconView.setTag((long) categoryId); // use long for simple difference to int used for key codes
@@ -502,10 +506,21 @@ public final class EmojiPalettesView extends LinearLayout
                 final View old = mTabStrip.findViewWithTag((long) oldCategoryId);
                 final View current = mTabStrip.findViewWithTag((long) categoryId);
 
-                if (old instanceof ImageView)
+                if (old instanceof TabImageView) {
+                    ((TabImageView) old).setSelectedCategory(false, 0);
                     Settings.getValues().mColors.setColor((ImageView) old, ColorType.EMOJI_CATEGORY);
-                if (current instanceof ImageView)
-                    Settings.getValues().mColors.setColor((ImageView) current, ColorType.EMOJI_CATEGORY_SELECTED);
+                }
+                if (current instanceof TabImageView) {
+                    android.util.TypedValue typedValue = new android.util.TypedValue();
+                    getContext().getTheme().resolveAttribute(android.R.attr.colorAccent, typedValue, true);
+                    int accentColor = typedValue.data;
+                    ((TabImageView) current).setSelectedCategory(true, accentColor);
+                    
+                    // Set contrasting color for the icon so it's visible on the accent circle
+                    double y = (299 * android.graphics.Color.red(accentColor) + 587 * android.graphics.Color.green(accentColor) + 114 * android.graphics.Color.blue(accentColor)) / 1000.0;
+                    int contrastColor = y >= 128 ? android.graphics.Color.BLACK : android.graphics.Color.WHITE;
+                    ((TabImageView) current).setColorFilter(contrastColor, android.graphics.PorterDuff.Mode.SRC_IN);
+                }
             }
         }
     }
@@ -545,6 +560,39 @@ public final class EmojiPalettesView extends LinearLayout
         if (sDictionaryFacilitator != null) {
             sDictionaryFacilitator.closeDictionaries();
             sDictionaryFacilitator = null;
+        }
+    }
+
+    private static class TabImageView extends ImageView {
+        private final Paint mCirclePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private boolean mIsSelectedCategory = false;
+
+        public TabImageView(Context context) {
+            super(context);
+            // Start faded by default
+            setAlpha(0.45f);
+        }
+
+        public void setSelectedCategory(boolean selected, int accentColor) {
+            mIsSelectedCategory = selected;
+            mCirclePaint.setColor(accentColor);
+            if (selected) {
+                setAlpha(1.0f);
+            } else {
+                setAlpha(0.45f);
+                // restore normal unselected tint via clearColorFilter
+                clearColorFilter();
+            }
+            invalidate();
+        }
+
+        @Override
+        protected void onDraw(Canvas canvas) {
+            if (mIsSelectedCategory) {
+                float radius = Math.min(getWidth(), getHeight()) * 0.48f;
+                canvas.drawCircle(getWidth() / 2f, getHeight() / 2f, radius, mCirclePaint);
+            }
+            super.onDraw(canvas);
         }
     }
 }

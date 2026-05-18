@@ -68,9 +68,29 @@ class AccessPointMenuView @JvmOverloads constructor(
             try {
                 tile.setBackgroundResource(android.R.color.transparent)
                 val iconView = tile.findViewById<ImageButton>(R.id.menu_tile_icon)
-                val keyboardViewAttr = context.obtainStyledAttributes(null, R.styleable.KeyboardView, R.attr.keyboardViewStyle, R.style.KeyboardView)
-                iconView.background = Settings.getValues().mColors.selectAndColorDrawable(keyboardViewAttr, helium314.keyboard.latin.common.ColorType.KEY_BACKGROUND)
-                keyboardViewAttr.recycle()
+                val colors = Settings.getValues().mColors
+                if (colors.themeStyle == helium314.keyboard.keyboard.KeyboardTheme.STYLE_ROUNDED || colors.themeStyle == helium314.keyboard.keyboard.KeyboardTheme.STYLE_CIRCLE) {
+                    val drawable = android.graphics.drawable.GradientDrawable()
+                    if (colors.themeStyle == helium314.keyboard.keyboard.KeyboardTheme.STYLE_CIRCLE) {
+                        drawable.shape = android.graphics.drawable.GradientDrawable.OVAL
+                        val lp = iconView.layoutParams
+                        lp.width = lp.height
+                        iconView.layoutParams = lp
+                    } else {
+                        drawable.shape = android.graphics.drawable.GradientDrawable.RECTANGLE
+                        drawable.cornerRadius = 1000f
+                        val lp = iconView.layoutParams
+                        lp.width = android.view.ViewGroup.LayoutParams.MATCH_PARENT
+                        iconView.layoutParams = lp
+                    }
+                    drawable.setColor(android.graphics.Color.WHITE)
+                    colors.setColor(drawable, helium314.keyboard.latin.common.ColorType.KEY_BACKGROUND)
+                    iconView.background = drawable
+                } else {
+                    val keyboardViewAttr = context.obtainStyledAttributes(null, R.styleable.KeyboardView, R.attr.keyboardViewStyle, R.style.KeyboardView)
+                    iconView.background = colors.selectAndColorDrawable(keyboardViewAttr, helium314.keyboard.latin.common.ColorType.KEY_BACKGROUND)
+                    keyboardViewAttr.recycle()
+                }
                 val labelView = tile.findViewById<TextView>(R.id.menu_tile_label)
 
                 var drawable: android.graphics.drawable.Drawable? = null
@@ -228,7 +248,29 @@ class AccessPointMenuView @JvmOverloads constructor(
         for (i in 0 until grid.childCount) {
             val tile = grid.getChildAt(i)
             val iconView = tile.findViewById<ImageButton>(R.id.menu_tile_icon)
-            iconView.background = colors.selectAndColorDrawable(keyboardViewAttr, helium314.keyboard.latin.common.ColorType.KEY_BACKGROUND)
+            if (colors.themeStyle == helium314.keyboard.keyboard.KeyboardTheme.STYLE_ROUNDED || colors.themeStyle == helium314.keyboard.keyboard.KeyboardTheme.STYLE_CIRCLE) {
+                val drawable = android.graphics.drawable.GradientDrawable()
+                if (colors.themeStyle == helium314.keyboard.keyboard.KeyboardTheme.STYLE_CIRCLE) {
+                    drawable.shape = android.graphics.drawable.GradientDrawable.OVAL
+                    val lp = iconView.layoutParams
+                    lp.width = lp.height
+                    iconView.layoutParams = lp
+                } else {
+                    drawable.shape = android.graphics.drawable.GradientDrawable.RECTANGLE
+                    drawable.cornerRadius = 1000f
+                    val lp = iconView.layoutParams
+                    lp.width = android.view.ViewGroup.LayoutParams.MATCH_PARENT
+                    iconView.layoutParams = lp
+                }
+                drawable.setColor(android.graphics.Color.WHITE)
+                colors.setColor(drawable, helium314.keyboard.latin.common.ColorType.KEY_BACKGROUND)
+                iconView.background = drawable
+            } else {
+                val lp = iconView.layoutParams
+                lp.width = android.view.ViewGroup.LayoutParams.MATCH_PARENT
+                iconView.layoutParams = lp
+                iconView.background = colors.selectAndColorDrawable(keyboardViewAttr, helium314.keyboard.latin.common.ColorType.KEY_BACKGROUND)
+            }
             
             val labelView = tile.findViewById<TextView>(R.id.menu_tile_label)
             val keyboardTextColor = colors.get(helium314.keyboard.latin.common.ColorType.KEY_TEXT)
