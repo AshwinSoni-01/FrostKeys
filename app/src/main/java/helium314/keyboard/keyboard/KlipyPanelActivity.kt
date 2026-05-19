@@ -22,6 +22,7 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import androidx.core.content.edit
 import androidx.core.net.toUri
 import androidx.core.os.ConfigurationCompat
@@ -131,45 +132,51 @@ class KlipyPanelActivity : ComponentActivity() {
             loadingIndicator.visibility = View.VISIBLE
             try {
                 val isSticker = currentTab == KlipyHistoryDao.TYPE_STICKER
+                val sendGifAsSticker = currentTab == KlipyHistoryDao.TYPE_GIF && shouldSendGifsAsStickers()
+                val sendAsSticker = isSticker || sendGifAsSticker
                 val rawFile = withContext(Dispatchers.IO) {
                     downloadAndPrepareFile(item.url, item.id, isSticker)
                 }
 
                 if (rawFile != null) {
-                    val processedFile = withContext(Dispatchers.Default) {
-                        val processor = AnimatedStickerProcessor(this@KlipyPanelActivity)
-                        processor.createWhatsAppAnimatedSticker(rawFile)
-                    }
+                    if (sendAsSticker) {
+                        val processedFile = withContext(Dispatchers.Default) {
+                            val processor = AnimatedStickerProcessor(this@KlipyPanelActivity)
+                            processor.createWhatsAppAnimatedSticker(rawFile)
+                        }
 
-                    if (processedFile != null) {
-                        val mimeType = "image/webp.wasticker"
-                        val label = if (isSticker) "Sticker" else "GIF"
+                        if (processedFile != null) {
+                            val mimeType = "image/webp.wasticker"
+                            val label = if (isSticker) "Sticker" else "GIF"
 
-                        try {
-                            val contentUri = "content://${packageName}.stickercontentprovider/stickers/klipy/${processedFile.name}".toUri()
+                            try {
+                                val contentUri = "content://${packageName}.stickercontentprovider/stickers/klipy/${processedFile.name}".toUri()
 
-                            val intent = Intent(applicationContext, LatinIME::class.java).apply {
-                                action = KLIPY_DONE_ACTION
-                                putExtra(KLIPY_URI_KEY, contentUri)
-                                putExtra(KLIPY_MIME_KEY, mimeType)
-                                putExtra(KLIPY_LABEL_KEY, label)
+                                val intent = Intent(applicationContext, LatinIME::class.java).apply {
+                                    action = KLIPY_DONE_ACTION
+                                    putExtra(KLIPY_URI_KEY, contentUri)
+                                    putExtra(KLIPY_MIME_KEY, mimeType)
+                                    putExtra(KLIPY_LABEL_KEY, label)
+                                }
+
+                                // 1. Close the activity immediately to trigger focus return to WhatsApp
+                                finish()
+
+                                // 2. Fire the intent with a slight delay using the Application context.
+                                // 350ms gives Android enough time to re-establish the InputConnection.
+                                android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                                    applicationContext.startService(intent)
+                                }, 1000) // reduce the delay later
+
+                            } catch (e: Exception) {
+                                Log.e("KlipyPanel", "Failed to get URI for file", e)
+                                Toast.makeText(applicationContext, "Error sharing file", Toast.LENGTH_SHORT).show()
                             }
-
-                            // 1. Close the activity immediately to trigger focus return to WhatsApp
-                            finish()
-
-                            // 2. Fire the intent with a slight delay using the Application context.
-                            // 350ms gives Android enough time to re-establish the InputConnection.
-                            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
-                                applicationContext.startService(intent)
-                            }, 1000) // reduce the delay later
-
-                        } catch (e: Exception) {
-                            Log.e("KlipyPanel", "Failed to get URI for file", e)
-                            Toast.makeText(applicationContext, "Error sharing file", Toast.LENGTH_SHORT).show()
+                        } else {
+                            Toast.makeText(this@KlipyPanelActivity, "Processing failed", Toast.LENGTH_SHORT).show()
                         }
                     } else {
-                        Toast.makeText(this@KlipyPanelActivity, "Processing failed", Toast.LENGTH_SHORT).show()
+                        sendNormalGif(rawFile)
                     }
                 } else {
                     Toast.makeText(this@KlipyPanelActivity, "Download failed", Toast.LENGTH_SHORT).show()
@@ -177,6 +184,27 @@ class KlipyPanelActivity : ComponentActivity() {
             } finally {
                 loadingIndicator.visibility = View.GONE
             }
+        }
+    }
+
+    private fun sendNormalGif(gifFile: File) {
+        try {
+            val contentUri = FileProvider.getUriForFile(this, "${packageName}.fileprovider", gifFile)
+            val intent = Intent(applicationContext, LatinIME::class.java).apply {
+                action = KLIPY_DONE_ACTION
+                putExtra(KLIPY_URI_KEY, contentUri)
+                putExtra(KLIPY_MIME_KEY, "image/gif")
+                putExtra(KLIPY_LABEL_KEY, "GIF")
+            }
+
+            finish()
+
+            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                applicationContext.startService(intent)
+            }, 1000)
+        } catch (e: Exception) {
+            Log.e("KlipyPanel", "Failed to share GIF normally", e)
+            Toast.makeText(applicationContext, "Error sharing GIF", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -402,20 +430,23 @@ class KlipyPanelActivity : ComponentActivity() {
                 return emptyList()
             }
 
-        // Map the API items to our KlipyItem, STRICTLY requiring WebP
-        apiResponse.data.data.mapNotNull { item ->
-            val webpUrl = item.file.hd.webp?.url
+        val useGifUrl = currentTab == KlipyHistoryDao.TYPE_GIF && !shouldSendGifsAsStickers()
 
-            // If the WebP URL doesn't exist, we skip this sticker entirely.
-            // mapNotNull will automatically drop these nulls from the final list.
-            if (webpUrl == null) {
-                Log.d("KlipyPanel", "Skipped item ${item.id} - No WebP available")
+        apiResponse.data.data.mapNotNull { item ->
+            val mediaUrl = if (useGifUrl) {
+                item.file.hd.gif.url
+            } else {
+                item.file.hd.webp?.url
+            }
+
+            if (mediaUrl == null) {
+                Log.d("KlipyPanel", "Skipped item ${item.id} - No WebP available for sticker send mode")
                 return@mapNotNull null
             }
 
             KlipyItem(
                 id = item.id.toString(),
-                url = webpUrl,
+                url = mediaUrl,
                 width = item.width ?: 200,
                 height = item.height ?: 200
             )
@@ -424,6 +455,10 @@ class KlipyPanelActivity : ComponentActivity() {
             Log.e("KlipyPanel", "Search request failed: ${e.message}", e)
             emptyList()
         }
+    }
+
+    private fun shouldSendGifsAsStickers(): Boolean {
+        return prefs().getBoolean(Settings.PREF_SEND_GIFS_AS_STICKERS, Defaults.PREF_SEND_GIFS_AS_STICKERS)
     }
 
     @Serializable

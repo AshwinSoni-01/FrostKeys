@@ -56,6 +56,8 @@
     <string name="gemini_api_key_summary">Enter your personal Google Gemini API key.</string>
     <string name="klipy_api_key">Klipy API Key</string>
     <string name="klipy_api_key_summary">Enter your personal Klipy API key. Leave blank to use the default.</string>
+    <string name="send_gifs_as_stickers">Send GIFs as Stickers</string>
+    <string name="send_gifs_as_stickers_summary">When enabled, GIF tab results use the animated sticker pipeline. Turn off to send GIFs as normal GIF images.</string>
     <!-- Settings screen title for keyboard theme settings -->
     <string name="settings_screen_theme">Theme</string>
     <!-- Settings category title for Preference/Input settings -->

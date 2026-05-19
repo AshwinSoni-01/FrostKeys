@@ -9,6 +9,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
 import helium314.keyboard.latin.R
 import helium314.keyboard.latin.cloud.CloudManager
+import helium314.keyboard.latin.settings.Defaults
+import helium314.keyboard.latin.settings.Settings
 import helium314.keyboard.settings.SearchSettingsScreen
 import helium314.keyboard.settings.Setting
 import helium314.keyboard.settings.preferences.Preference
@@ -25,6 +27,7 @@ fun CloudScreen(onClickBack: () -> Unit) {
             CloudManager.PREF_ENABLE_CLOUD_FEATURES,
             CloudManager.PREF_GEMINI_API_KEY,
             CloudManager.PREF_KLIPY_API_KEY,
+            Settings.PREF_SEND_GIFS_AS_STICKERS,
             CloudManager.PREF_TEST_CONNECTION
         ),
     )
@@ -54,6 +57,14 @@ fun createCloudSettings(context: Context) = listOf(
         R.string.klipy_api_key_summary,
     ) {
         TextInputPreference(it, "", isPassword = true)
+    },
+    Setting(
+        context,
+        Settings.PREF_SEND_GIFS_AS_STICKERS,
+        R.string.send_gifs_as_stickers,
+        R.string.send_gifs_as_stickers_summary,
+    ) {
+        SwitchPreference(it, Defaults.PREF_SEND_GIFS_AS_STICKERS)
     },
     Setting(
         context,
