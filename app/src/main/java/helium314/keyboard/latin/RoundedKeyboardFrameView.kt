@@ -8,8 +8,8 @@ import android.graphics.Path
 import android.graphics.RectF
 import android.util.AttributeSet
 import android.widget.LinearLayout
-import helium314.keyboard.latin.settings.Defaults
 import helium314.keyboard.latin.settings.Settings
+import helium314.keyboard.latin.utils.prefs
 
 class RoundedKeyboardFrameView @JvmOverloads constructor(
     context: Context,
@@ -38,8 +38,7 @@ class RoundedKeyboardFrameView @JvmOverloads constructor(
     }
 
     private fun keyboardCornerRadiusPx(): Float {
-        val radiusDp = (Settings.getValues()?.mKeyboardCornerRadiusDp
-            ?: Defaults.PREF_KEYBOARD_CORNER_RADIUS).coerceIn(
+        val radiusDp = Settings.readKeyboardCornerRadius(context.prefs()).coerceIn(
                 Settings.KEYBOARD_CORNER_RADIUS_MIN_DP,
                 Settings.KEYBOARD_CORNER_RADIUS_MAX_DP
             )
