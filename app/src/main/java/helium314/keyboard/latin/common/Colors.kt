@@ -41,6 +41,7 @@ interface Colors {
     val themeStyle: String
     /** used in parser to decide background of ZWNJ key */
     val hasKeyBorders: Boolean
+    val isFrosted: Boolean get() = false
 
     /** use to check whether colors have changed, for colors (in)directly derived from context,
      *  e.g. night mode or potentially changing system colors */
@@ -273,7 +274,7 @@ class DynamicColors(context: Context, override val themeStyle: String, override 
 
     override fun get(color: ColorType): Int = when (color) {
         TOOL_BAR_KEY_ENABLED_BACKGROUND, EMOJI_CATEGORY_SELECTED, ACTION_KEY_BACKGROUND,
-        CLIPBOARD_PIN, SHIFT_KEY_ICON -> accent
+        CLIPBOARD_PIN, SHIFT_KEY_ICON, ENTER_KEY_BACKGROUND -> accent
         AUTOFILL_BACKGROUND_CHIP, GESTURE_PREVIEW, POPUP_KEYS_BACKGROUND, MORE_SUGGESTIONS_BACKGROUND, KEY_PREVIEW_BACKGROUND -> adjustedBackground
         TOOL_BAR_EXPAND_KEY_BACKGROUND -> if (!isNight) accent else doubleAdjustedBackground
         GESTURE_TRAIL -> gesture
@@ -281,7 +282,7 @@ class DynamicColors(context: Context, override val themeStyle: String, override 
             KEY_ICON, POPUP_KEY_ICON, ONE_HANDED_MODE_BUTTON, EMOJI_CATEGORY, TOOL_BAR_KEY, FUNCTIONAL_KEY_TEXT -> keyText
         KEY_HINT_TEXT -> keyHintText
         SPACE_BAR_TEXT -> spaceBarText
-        FUNCTIONAL_KEY_BACKGROUND -> if (!isNight) functionalKey else doubleAdjustedKeyBackground
+        FUNCTIONAL_KEY_BACKGROUND, SPECIAL_KEY_BACKGROUND -> if (!isNight) functionalKey else doubleAdjustedKeyBackground
         SPACE_BAR_BACKGROUND -> spaceBar
         MORE_SUGGESTIONS_WORD_BACKGROUND, MAIN_BACKGROUND -> background
         KEY_BACKGROUND -> keyBackground
@@ -297,8 +298,8 @@ class DynamicColors(context: Context, override val themeStyle: String, override 
         val colorStateList = when (color) {
             MORE_SUGGESTIONS_WORD_BACKGROUND -> backgroundStateList
             KEY_BACKGROUND -> keyStateList
-            FUNCTIONAL_KEY_BACKGROUND -> functionalKeyStateList
-            ACTION_KEY_BACKGROUND -> actionKeyStateList
+            FUNCTIONAL_KEY_BACKGROUND, SPECIAL_KEY_BACKGROUND -> functionalKeyStateList
+            ACTION_KEY_BACKGROUND, ENTER_KEY_BACKGROUND -> actionKeyStateList
             SPACE_BAR_BACKGROUND -> spaceBarStateList
             POPUP_KEYS_BACKGROUND -> adjustedBackgroundStateList
             STRIP_BACKGROUND -> stripBackgroundList
@@ -374,8 +375,10 @@ class DefaultColors (
     private val spaceBarText: Int = keyHintText,
     private val gesture: Int = accent,
     private var keyboardBackground: Drawable? = null,
-    val isFrosted: Boolean = false,
+    override val isFrosted: Boolean = false,
     private val keyBorderColor: Int? = null,
+    private val specialKeyBackground: Int = functionalKey,
+    private val enterKeyBackground: Int = functionalKey,
 ) : Colors {
     private val navBar: Int
     /** brightened or darkened variant of [background], to be used if exact background color would be
@@ -399,6 +402,8 @@ class DefaultColors (
     private val functionalKeyStateList: ColorStateList
     private val actionKeyStateList: ColorStateList
     private val spaceBarStateList: ColorStateList
+    private val specialKeyStateList: ColorStateList
+    private val enterKeyStateList: ColorStateList
     private val adjustedBackgroundStateList: ColorStateList
     private val stripBackgroundList: ColorStateList
     private val toolbarKeyStateList = activatedStateList(
@@ -456,6 +461,8 @@ class DefaultColors (
                 else pressedStateList(brightenOrDarken(accent, true), accent)
             spaceBarStateList = if (themeStyle == STYLE_HOLO) pressedStateList(spaceBar, spaceBar)
                 else pressedStateList(brightenOrDarken(spaceBar, true), spaceBar)
+            specialKeyStateList = pressedStateList(brightenOrDarken(specialKeyBackground, true), specialKeyBackground)
+            enterKeyStateList = pressedStateList(brightenOrDarken(enterKeyBackground, true), enterKeyBackground)
         } else {
             // need to set color to background if key borders are disabled, or there will be ugly keys
             backgroundStateList = pressedStateList(brightenOrDarken(background, true), background)
@@ -464,6 +471,8 @@ class DefaultColors (
             actionKeyStateList = if (themeStyle == STYLE_HOLO) functionalKeyStateList
                 else pressedStateList(brightenOrDarken(accent, true), accent)
             spaceBarStateList = pressedStateList(brightenOrDarken(spaceBar, true), spaceBar)
+            specialKeyStateList = pressedStateList(brightenOrDarken(specialKeyBackground, true), specialKeyBackground)
+            enterKeyStateList = pressedStateList(brightenOrDarken(enterKeyBackground, true), enterKeyBackground)
         }
         keyTextFilter = colorFilter(keyText)
         actionKeyIconColorFilter = when {
@@ -477,6 +486,8 @@ class DefaultColors (
     override fun get(color: ColorType): Int = when (color) {
         TOOL_BAR_KEY_ENABLED_BACKGROUND, EMOJI_CATEGORY_SELECTED, ACTION_KEY_BACKGROUND,
             CLIPBOARD_PIN, SHIFT_KEY_ICON -> accent
+        SPECIAL_KEY_BACKGROUND -> specialKeyBackground
+        ENTER_KEY_BACKGROUND -> enterKeyBackground
         AUTOFILL_BACKGROUND_CHIP -> if (themeStyle == STYLE_MATERIAL && !hasKeyBorders) background else adjustedBackground
         GESTURE_PREVIEW, POPUP_KEYS_BACKGROUND, MORE_SUGGESTIONS_BACKGROUND, KEY_PREVIEW_BACKGROUND -> adjustedBackground
         TOOL_BAR_EXPAND_KEY_BACKGROUND, CLIPBOARD_SUGGESTION_BACKGROUND -> doubleAdjustedBackground
@@ -502,7 +513,9 @@ class DefaultColors (
             MORE_SUGGESTIONS_WORD_BACKGROUND -> backgroundStateList
             KEY_BACKGROUND -> keyStateList
             FUNCTIONAL_KEY_BACKGROUND -> functionalKeyStateList
+            SPECIAL_KEY_BACKGROUND -> specialKeyStateList
             ACTION_KEY_BACKGROUND -> actionKeyStateList
+            ENTER_KEY_BACKGROUND -> enterKeyStateList
             SPACE_BAR_BACKGROUND -> spaceBarStateList
             POPUP_KEYS_BACKGROUND -> adjustedBackgroundStateList
             STRIP_BACKGROUND -> stripBackgroundList
@@ -661,6 +674,8 @@ enum class ColorType {
     TOOL_BAR_KEY,
     TOOL_BAR_KEY_ENABLED_BACKGROUND,
     MAIN_BACKGROUND,
+    SPECIAL_KEY_BACKGROUND,
+    ENTER_KEY_BACKGROUND,
 }
 
 // this is not used any more, but we keep in case a colorMap does not get filled for whatever reason

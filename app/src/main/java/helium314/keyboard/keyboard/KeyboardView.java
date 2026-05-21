@@ -362,6 +362,21 @@ public class KeyboardView extends View {
     // Draw key background.
     protected void onDrawKeyBackground(@NonNull final Key key, @NonNull final Canvas canvas,
             @NonNull final Drawable background) {
+        final ColorType frostedColorType;
+        if (mColors.isFrosted()) {
+            if (key.getCode() == Constants.CODE_SPACE) {
+                frostedColorType = ColorType.SPACE_BAR_BACKGROUND;
+            } else if (key.hasActionKeyBackground()) {
+                frostedColorType = ColorType.ENTER_KEY_BACKGROUND;
+            } else if (isSpecialKey(key)) {
+                frostedColorType = ColorType.SPECIAL_KEY_BACKGROUND;
+            } else {
+                frostedColorType = ColorType.KEY_BACKGROUND;
+            }
+        } else {
+            frostedColorType = null;
+        }
+
         final int keyWidth = key.getDrawWidth();
         final int keyHeight = key.getHeight();
 
@@ -393,7 +408,9 @@ public class KeyboardView extends View {
 
             if (isSpaceBar || isRoundableKey) {
                 ColorType colorType;
-                if (isSpaceBar) {
+                if (mColors.isFrosted()) {
+                    colorType = frostedColorType;
+                } else if (isSpaceBar) {
                     colorType = ColorType.SPACE_BAR_BACKGROUND;
                 } else if (key.hasActionKeyBackground()) {
                     colorType = ColorType.ACTION_KEY_BACKGROUND;
@@ -435,6 +452,10 @@ public class KeyboardView extends View {
                 canvas.translate(-bgX, -bgY);
                 return;
             }
+        }
+
+        if (mColors.isFrosted()) {
+            mColors.setColor(background, frostedColorType);
         }
 
         if (key.needsToKeepBackgroundAspectRatio(mDefaultKeyLabelFlags)
@@ -569,6 +590,8 @@ public class KeyboardView extends View {
                     paint.setColor(key.selectTextColor(params) | 0xFF000000); // ignore alpha for emojis (though
                                                                               // actually color isn't applied anyway and
                                                                               // we could just set white)
+                else if (mColors.isFrosted() && (key.hasActionKeyBackground() || isSpecialKey(key)))
+                    paint.setColor(mColors.get(ColorType.KEY_TEXT));
                 else if (key.hasActionKeyBackground())
                     paint.setColor(mColors.get(ColorType.ACTION_KEY_ICON));
                 else if (this instanceof EmojiPageKeyboardView)
@@ -795,8 +818,23 @@ public class KeyboardView extends View {
         freeOffscreenBuffer();
     }
 
+    private boolean isSpecialKey(@NonNull final Key key) {
+        if (key.isShift()) return true;
+        final int code = key.getCode();
+        return code == KeyCode.SYMBOL
+                || code == KeyCode.ALPHA
+                || code == KeyCode.SYMBOL_ALPHA
+                || code == KeyCode.NUMPAD
+                || code == Constants.CODE_COMMA
+                || code == KeyCode.EMOJI
+                || code == Constants.CODE_PERIOD
+                || code == KeyCode.DELETE;
+    }
+
     private void setKeyIconColor(Key key, Drawable icon, Keyboard keyboard) {
-        if (key.hasActionKeyBackground()) {
+        if (mColors.isFrosted() && (key.hasActionKeyBackground() || isSpecialKey(key))) {
+            mColors.setColor(icon, ColorType.KEY_ICON);
+        } else if (key.hasActionKeyBackground()) {
             mColors.setColor(icon, ColorType.ACTION_KEY_ICON);
         } else if (key.isShift() && keyboard != null) {
             if (keyboard.mId.mElementId == KeyboardId.ELEMENT_ALPHABET_MANUAL_SHIFTED

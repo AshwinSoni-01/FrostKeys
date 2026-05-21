@@ -40,13 +40,17 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+
+
 private data class FrostedProfileSnapshot(
     val blurRadius: Int,
     val keyTransparency: Int,
     val bgTransparency: Int,
     val colorBlend: Int,
     val saturation: Int,
-    val edgeContrast: Int
+    val edgeContrast: Int,
+    val specialVibrancy: Int,
+    val alphabetVibrancy: Int
 )
 
 private data class FrostedSettingsSnapshot(
@@ -74,7 +78,9 @@ fun FrostedGlassAdjustDialog(
                 bgTransparency = prefs.getInt(Settings.PREF_FROSTED_BG_TRANSPARENCY, Defaults.PREF_FROSTED_BG_TRANSPARENCY),
                 colorBlend = prefs.getInt(Settings.PREF_FROSTED_COLOR_BLEND, Defaults.PREF_FROSTED_COLOR_BLEND),
                 saturation = prefs.getInt(Settings.PREF_FROSTED_SATURATION, Defaults.PREF_FROSTED_SATURATION),
-                edgeContrast = prefs.getInt(Settings.PREF_FROSTED_EDGE_CONTRAST, Defaults.PREF_FROSTED_EDGE_CONTRAST)
+                edgeContrast = prefs.getInt(Settings.PREF_FROSTED_EDGE_CONTRAST, Defaults.PREF_FROSTED_EDGE_CONTRAST),
+                specialVibrancy = prefs.getInt(Settings.PREF_FROSTED_SPECIAL_VIBRANCY, Defaults.PREF_FROSTED_SPECIAL_VIBRANCY),
+                alphabetVibrancy = prefs.getInt(Settings.PREF_FROSTED_ALPHABET_VIBRANCY, Defaults.PREF_FROSTED_ALPHABET_VIBRANCY)
             ),
             dark = FrostedProfileSnapshot(
                 blurRadius = prefs.getInt(Settings.PREF_FROSTED_BLUR_RADIUS_NIGHT, Defaults.PREF_FROSTED_BLUR_RADIUS_NIGHT),
@@ -82,7 +88,9 @@ fun FrostedGlassAdjustDialog(
                 bgTransparency = prefs.getInt(Settings.PREF_FROSTED_BG_TRANSPARENCY_NIGHT, Defaults.PREF_FROSTED_BG_TRANSPARENCY_NIGHT),
                 colorBlend = prefs.getInt(Settings.PREF_FROSTED_COLOR_BLEND_NIGHT, Defaults.PREF_FROSTED_COLOR_BLEND_NIGHT),
                 saturation = prefs.getInt(Settings.PREF_FROSTED_SATURATION_NIGHT, Defaults.PREF_FROSTED_SATURATION_NIGHT),
-                edgeContrast = prefs.getInt(Settings.PREF_FROSTED_EDGE_CONTRAST_NIGHT, Defaults.PREF_FROSTED_EDGE_CONTRAST_NIGHT)
+                edgeContrast = prefs.getInt(Settings.PREF_FROSTED_EDGE_CONTRAST_NIGHT, Defaults.PREF_FROSTED_EDGE_CONTRAST_NIGHT),
+                specialVibrancy = prefs.getInt(Settings.PREF_FROSTED_SPECIAL_VIBRANCY_NIGHT, Defaults.PREF_FROSTED_SPECIAL_VIBRANCY_NIGHT),
+                alphabetVibrancy = prefs.getInt(Settings.PREF_FROSTED_ALPHABET_VIBRANCY_NIGHT, Defaults.PREF_FROSTED_ALPHABET_VIBRANCY_NIGHT)
             )
         )
     }
@@ -112,6 +120,8 @@ fun FrostedGlassAdjustDialog(
                 .putInt(Settings.PREF_FROSTED_COLOR_BLEND, newProfile.colorBlend)
                 .putInt(Settings.PREF_FROSTED_SATURATION, newProfile.saturation)
                 .putInt(Settings.PREF_FROSTED_EDGE_CONTRAST, newProfile.edgeContrast)
+                .putInt(Settings.PREF_FROSTED_SPECIAL_VIBRANCY, newProfile.specialVibrancy)
+                .putInt(Settings.PREF_FROSTED_ALPHABET_VIBRANCY, newProfile.alphabetVibrancy)
                 .apply()
         } else {
             prefs.edit()
@@ -121,6 +131,8 @@ fun FrostedGlassAdjustDialog(
                 .putInt(Settings.PREF_FROSTED_COLOR_BLEND_NIGHT, newProfile.colorBlend)
                 .putInt(Settings.PREF_FROSTED_SATURATION_NIGHT, newProfile.saturation)
                 .putInt(Settings.PREF_FROSTED_EDGE_CONTRAST_NIGHT, newProfile.edgeContrast)
+                .putInt(Settings.PREF_FROSTED_SPECIAL_VIBRANCY_NIGHT, newProfile.specialVibrancy)
+                .putInt(Settings.PREF_FROSTED_ALPHABET_VIBRANCY_NIGHT, newProfile.alphabetVibrancy)
                 .apply()
         }
 
@@ -131,7 +143,9 @@ fun FrostedGlassAdjustDialog(
             bgTransparency = newProfile.bgTransparency,
             colorBlend = newProfile.colorBlend,
             saturation = newProfile.saturation,
-            edgeContrast = newProfile.edgeContrast
+            edgeContrast = newProfile.edgeContrast,
+            specialVibrancy = newProfile.specialVibrancy,
+            alphabetVibrancy = newProfile.alphabetVibrancy
         )
     }
 
@@ -153,12 +167,16 @@ fun FrostedGlassAdjustDialog(
                     .putInt(Settings.PREF_FROSTED_COLOR_BLEND, initialSnapshot.light.colorBlend)
                     .putInt(Settings.PREF_FROSTED_SATURATION, initialSnapshot.light.saturation)
                     .putInt(Settings.PREF_FROSTED_EDGE_CONTRAST, initialSnapshot.light.edgeContrast)
+                    .putInt(Settings.PREF_FROSTED_SPECIAL_VIBRANCY, initialSnapshot.light.specialVibrancy)
+                    .putInt(Settings.PREF_FROSTED_ALPHABET_VIBRANCY, initialSnapshot.light.alphabetVibrancy)
                     .putInt(Settings.PREF_FROSTED_BLUR_RADIUS_NIGHT, initialSnapshot.dark.blurRadius)
                     .putInt(Settings.PREF_FROSTED_KEY_TRANSPARENCY_NIGHT, initialSnapshot.dark.keyTransparency)
                     .putInt(Settings.PREF_FROSTED_BG_TRANSPARENCY_NIGHT, initialSnapshot.dark.bgTransparency)
                     .putInt(Settings.PREF_FROSTED_COLOR_BLEND_NIGHT, initialSnapshot.dark.colorBlend)
                     .putInt(Settings.PREF_FROSTED_SATURATION_NIGHT, initialSnapshot.dark.saturation)
                     .putInt(Settings.PREF_FROSTED_EDGE_CONTRAST_NIGHT, initialSnapshot.dark.edgeContrast)
+                    .putInt(Settings.PREF_FROSTED_SPECIAL_VIBRANCY_NIGHT, initialSnapshot.dark.specialVibrancy)
+                    .putInt(Settings.PREF_FROSTED_ALPHABET_VIBRANCY_NIGHT, initialSnapshot.dark.alphabetVibrancy)
                     .apply()
             }
             
@@ -468,18 +486,33 @@ fun FrostedGlassAdjustDialog(
                             )
                         }
 
-                        // Slider 6: Edge Contrast
+                        // Slider 6: Special Key Vibrance
                         Column(modifier = Modifier.padding(vertical = 8.dp)) {
                             Text(
-                                text = "Edge Contrast: ${(100 * currentValues.edgeContrast / 255)}%",
+                                text = "${stringResource(R.string.pref_frosted_special_vibrancy_title)}: ${currentValues.specialVibrancy}%",
                                 style = MaterialTheme.typography.bodyMedium
                             )
                             Slider(
-                                value = currentValues.edgeContrast.toFloat(),
+                                value = currentValues.specialVibrancy.toFloat(),
                                 onValueChange = { newValue ->
-                                    updateCurrentProfile { it.copy(edgeContrast = newValue.toInt()) }
+                                    updateCurrentProfile { it.copy(specialVibrancy = newValue.toInt()) }
                                 },
-                                valueRange = 0f..255f
+                                valueRange = 0f..500f
+                            )
+                        }
+
+                        // Slider 7: Alphabet Key Vibrance
+                        Column(modifier = Modifier.padding(vertical = 8.dp)) {
+                            Text(
+                                text = "${stringResource(R.string.pref_frosted_alphabet_vibrancy_title)}: ${currentValues.alphabetVibrancy}%",
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                            Slider(
+                                value = currentValues.alphabetVibrancy.toFloat(),
+                                onValueChange = { newValue ->
+                                    updateCurrentProfile { it.copy(alphabetVibrancy = newValue.toInt()) }
+                                },
+                                valueRange = 0f..500f
                             )
                         }
 
@@ -500,7 +533,9 @@ fun FrostedGlassAdjustDialog(
                                                 bgTransparency = Defaults.PREF_FROSTED_BG_TRANSPARENCY,
                                                 colorBlend = Defaults.PREF_FROSTED_COLOR_BLEND,
                                                 saturation = Defaults.PREF_FROSTED_SATURATION,
-                                                edgeContrast = Defaults.PREF_FROSTED_EDGE_CONTRAST
+                                                edgeContrast = Defaults.PREF_FROSTED_EDGE_CONTRAST,
+                                                specialVibrancy = Defaults.PREF_FROSTED_SPECIAL_VIBRANCY,
+                                                alphabetVibrancy = Defaults.PREF_FROSTED_ALPHABET_VIBRANCY
                                             )
                                         } else {
                                             it.copy(
@@ -509,7 +544,9 @@ fun FrostedGlassAdjustDialog(
                                                 bgTransparency = Defaults.PREF_FROSTED_BG_TRANSPARENCY_NIGHT,
                                                 colorBlend = Defaults.PREF_FROSTED_COLOR_BLEND_NIGHT,
                                                 saturation = Defaults.PREF_FROSTED_SATURATION_NIGHT,
-                                                edgeContrast = Defaults.PREF_FROSTED_EDGE_CONTRAST_NIGHT
+                                                edgeContrast = Defaults.PREF_FROSTED_EDGE_CONTRAST_NIGHT,
+                                                specialVibrancy = Defaults.PREF_FROSTED_SPECIAL_VIBRANCY_NIGHT,
+                                                alphabetVibrancy = Defaults.PREF_FROSTED_ALPHABET_VIBRANCY_NIGHT
                                             )
                                         }
                                     }
@@ -524,7 +561,7 @@ fun FrostedGlassAdjustDialog(
                                 Text(stringResource(android.R.string.cancel))
                             }
 
-                                Button(
+                            Button(
                                 onClick = {
                                     isSaved = true
                                     // Everything is already in SharedPreferences due to live updates.
@@ -546,3 +583,4 @@ fun FrostedGlassAdjustDialog(
         }
     }
 }
+
