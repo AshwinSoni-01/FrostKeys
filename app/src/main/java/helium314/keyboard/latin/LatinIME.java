@@ -58,6 +58,7 @@ import helium314.keyboard.keyboard.Keyboard;
 import helium314.keyboard.keyboard.KeyboardId;
 import helium314.keyboard.keyboard.KeyboardLayoutSet;
 import helium314.keyboard.keyboard.KeyboardSwitcher;
+import helium314.keyboard.keyboard.KlipyPalettesView;
 import helium314.keyboard.keyboard.KlipyPanelActivity;
 import helium314.keyboard.keyboard.MainKeyboardView;
 import helium314.keyboard.latin.SuggestedWords.SuggestedWordInfo;
@@ -1663,17 +1664,17 @@ public class LatinIME extends InputMethodService implements
             return;
         }
         if (event.getKeyCode() == KeyCode.GIFS) {
-            Intent intent = new Intent(this, KlipyPanelActivity.class);
-            intent.putExtra("defaultTab", "GIFS");
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_MULTIPLE_TASK);
-            startActivity(intent);
+            KeyboardSwitcher.getInstance().onToggleKeyboard(KeyboardSwitcher.KeyboardSwitchState.KLIPY);
+            if (KeyboardSwitcher.getInstance().isShowingKlipyPalettes()) {
+                KeyboardSwitcher.getInstance().getKlipyPalettesView().selectTab("GIFS");
+            }
             return;
         }
         if (event.getKeyCode() == KeyCode.STICKERS) {
-            Intent intent = new Intent(this, KlipyPanelActivity.class);
-            intent.putExtra("defaultTab", "STICKERS");
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_MULTIPLE_TASK);
-            startActivity(intent);
+            KeyboardSwitcher.getInstance().onToggleKeyboard(KeyboardSwitcher.KeyboardSwitchState.KLIPY);
+            if (KeyboardSwitcher.getInstance().isShowingKlipyPalettes()) {
+                KeyboardSwitcher.getInstance().getKlipyPalettesView().selectTab("STICKERS");
+            }
             return;
         }
         final InputTransaction completeInputTransaction = mInputLogic.onCodeInput(mSettings.getCurrent(), event,

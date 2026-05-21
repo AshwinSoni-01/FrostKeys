@@ -1,0 +1,176 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    SPDX-License-Identifier: GPL-3.0-only
+-->
+<helium314.keyboard.keyboard.KlipyPalettesView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_gravity="bottom"
+    android:orientation="vertical"
+    android:visibility="gone"
+    android:background="@android:color/transparent">
+
+    <!-- Search Bar Row -->
+    <LinearLayout
+        android:id="@+id/searchBarContainer"
+        android:layout_width="match_parent"
+        android:layout_height="44dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingHorizontal="8dp"
+        android:paddingTop="4dp"
+        android:paddingBottom="4dp">
+
+        <FrameLayout
+            android:id="@+id/dummySearchBox"
+            android:layout_width="0dp"
+            android:layout_height="36dp"
+            android:layout_weight="1"
+            android:paddingHorizontal="12dp"
+            android:background="@drawable/search_bar_bg"
+            android:clickable="true"
+            android:focusable="true">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <ImageView
+                    android:id="@+id/searchIcon"
+                    android:layout_width="18dp"
+                    android:layout_height="18dp"
+                    android:src="@drawable/sym_keyboard_search_lxx"
+                    android:layout_marginEnd="8dp" />
+
+                <TextView
+                    android:id="@+id/dummySearchTextView"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:hint="@string/klipy_search_hint"
+                    android:textColor="@color/textColorPrimary"
+                    android:textColorHint="@color/foreground_weak"
+                    android:gravity="center_vertical"
+                    android:textSize="14sp"
+                    android:singleLine="true" />
+
+                <ImageButton
+                    android:id="@+id/clearSearchButton"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:background="?android:attr/selectableItemBackgroundBorderless"
+                    android:src="@drawable/ic_close"
+                    android:visibility="gone"
+                    android:padding="4dp"
+                    android:scaleType="fitCenter" />
+            </LinearLayout>
+        </FrameLayout>
+    </LinearLayout>
+
+    <!-- Header containing Back button and Tabs -->
+    <LinearLayout
+        android:id="@+id/klipyHeader"
+        android:layout_width="match_parent"
+        android:layout_height="40dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingHorizontal="4dp">
+
+        <ImageButton
+            android:id="@+id/klipyBackButton"
+            android:layout_width="48dp"
+            android:layout_height="match_parent"
+            android:padding="12dp"
+            android:scaleType="fitCenter"
+            android:background="?android:attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/ic_arrow_back"
+            android:contentDescription="@string/abc_action_bar_up_description"
+            android:layout_marginEnd="4dp" />
+
+        <LinearLayout
+            android:id="@+id/klipyTabs"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:orientation="horizontal"
+            android:gravity="center">
+
+            <TextView
+                android:id="@+id/tabGifs"
+                android:layout_width="0dp"
+                android:layout_height="32dp"
+                android:layout_weight="1"
+                android:text="@string/tab_gifs"
+                android:textColor="@color/textColorPrimary"
+                android:layout_marginHorizontal="4dp"
+                android:background="@drawable/tab_background_selector"
+                android:gravity="center"
+                android:padding="0dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:drawableStart="@drawable/ic_tab_gif"
+                android:drawablePadding="4dp"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp" />
+
+            <TextView
+                android:id="@+id/tabStickers"
+                android:layout_width="0dp"
+                android:layout_height="32dp"
+                android:layout_weight="1"
+                android:text="@string/tab_stickers"
+                android:textColor="@color/textColorPrimary"
+                android:layout_marginHorizontal="4dp"
+                android:background="@drawable/tab_background_selector"
+                android:gravity="center"
+                android:padding="0dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:drawableStart="@drawable/ic_tab_stickers"
+                android:drawablePadding="4dp"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- Main Content Frame -->
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <androidx.viewpager2.widget.ViewPager2
+            android:id="@+id/klipyViewPager"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+
+        <TextView
+            android:id="@+id/emptyState"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:text="@string/no_recent_items"
+            android:textColor="@color/textColorPrimary"
+            android:visibility="gone" />
+
+        <ProgressBar
+            android:id="@+id/loadingIndicator"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:layout_gravity="center"
+            android:indeterminate="true"
+            android:visibility="gone" />
+    </FrameLayout>
+
+    <!-- Bottom keyboard row switchers -->
+    <helium314.keyboard.keyboard.MainKeyboardView
+        android:id="@+id/bottom_row_keyboard"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content" />
+
+</helium314.keyboard.keyboard.KlipyPalettesView>

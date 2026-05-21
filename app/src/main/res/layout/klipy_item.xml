@@ -5,12 +5,11 @@
     android:layout_height="wrap_content"
     android:layout_margin="4dp">
 
-    <com.google.android.material.imageview.ShapeableImageView
+    <ImageView
         android:id="@+id/klipyImage"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:scaleType="centerCrop"
-        android:contentDescription="@null"
-        app:shapeAppearanceOverlay="@style/RoundedCornerImageView" />
+        android:contentDescription="@null" />
 
 </FrameLayout>

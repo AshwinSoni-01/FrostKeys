@@ -149,6 +149,20 @@ class StickerContentProvider : ContentProvider() {
         }
     }
 
+    override fun openFile(uri: Uri, mode: String): ParcelFileDescriptor? {
+        val match = matcher.match(uri)
+        if (match == STICKERS_ASSET || match == STICKERS_FILE) {
+            val segments = uri.pathSegments
+            val identifier = segments[segments.size - 2]
+            val fileName = segments.last()
+            val file = File(context!!.filesDir, "stickers/$identifier/$fileName")
+            if (file.exists()) {
+                return ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
+            }
+        }
+        return super.openFile(uri, mode)
+    }
+
     override fun openAssetFile(uri: Uri, mode: String): AssetFileDescriptor {
         val match = matcher.match(uri)
         if (match == STICKERS_ASSET || match == STICKERS_FILE) {

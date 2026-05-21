@@ -121,22 +121,15 @@ class AccessPointMenuView @JvmOverloads constructor(
             tile.setOnClickListener {
                 AudioAndHapticFeedbackManager.getInstance().performHapticAndAudioFeedback(helium314.keyboard.keyboard.internal.keyboard_parser.floris.KeyCode.NOT_SPECIFIED, tile, HapticEvent.KEY_PRESS)
                 val code = getCodeForToolbarKey(key)
-                if (code == helium314.keyboard.keyboard.internal.keyboard_parser.floris.KeyCode.GIFS ||
-                    code == helium314.keyboard.keyboard.internal.keyboard_parser.floris.KeyCode.STICKERS) {
-                    val intent = Intent(context, KlipyPanelActivity::class.java).apply {
-                        putExtra("defaultTab", if (code == helium314.keyboard.keyboard.internal.keyboard_parser.floris.KeyCode.GIFS) "GIFS" else "STICKERS")
-                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_MULTIPLE_TASK)
-                    }
-                    context.startActivity(intent)
-                    return@setOnClickListener
-                }
                 if (code != helium314.keyboard.keyboard.internal.keyboard_parser.floris.KeyCode.UNSPECIFIED) {
                     keyboardActionListener.onCodeInput(code, Constants.SUGGESTION_STRIP_COORDINATE, Constants.SUGGESTION_STRIP_COORDINATE, false)
                 }
                 if (code != helium314.keyboard.keyboard.internal.keyboard_parser.floris.KeyCode.CLIPBOARD &&
                     code != helium314.keyboard.keyboard.internal.keyboard_parser.floris.KeyCode.AI_TOOLS &&
                     code != helium314.keyboard.keyboard.internal.keyboard_parser.floris.KeyCode.EMOJI &&
-                    code != helium314.keyboard.keyboard.internal.keyboard_parser.floris.KeyCode.NUMPAD) {
+                    code != helium314.keyboard.keyboard.internal.keyboard_parser.floris.KeyCode.NUMPAD &&
+                    code != helium314.keyboard.keyboard.internal.keyboard_parser.floris.KeyCode.GIFS &&
+                    code != helium314.keyboard.keyboard.internal.keyboard_parser.floris.KeyCode.STICKERS) {
                     KeyboardSwitcher.getInstance().setAlphabetKeyboard()
                 }
             }

@@ -14,7 +14,8 @@ import android.graphics.Rect
 import android.graphics.RectF
 import android.graphics.drawable.Animatable
 import android.graphics.drawable.Drawable
-import com.google.android.material.imageview.ShapeableImageView
+import android.view.ViewOutlineProvider
+import android.widget.ImageView
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -43,8 +44,18 @@ class KlipyAdapter(
     }
 
     class ViewHolder(view: View, val parent: ViewGroup) : RecyclerView.ViewHolder(view) {
-        val imageView: ShapeableImageView = view.findViewById(R.id.klipyImage)
+        val imageView: ImageView = view.findViewById(R.id.klipyImage)
         var pendingLoadRunnable: Runnable? = null
+
+        init {
+            imageView.clipToOutline = true
+            imageView.outlineProvider = object : ViewOutlineProvider() {
+                override fun getOutline(view: View, outline: android.graphics.Outline) {
+                    val radius = 8f * view.context.resources.displayMetrics.density
+                    outline.setRoundRect(0, 0, view.width, view.height, radius)
+                }
+            }
+        }
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
@@ -54,6 +65,8 @@ class KlipyAdapter(
 
     private var imageLoader: ImageLoader? = null
     private var areAnimationsRunning = true
+    private var isImageLoadingEnabled = true
+    private var needsReloadAfterRelease = false
     private val activeViews = mutableSetOf<ViewHolder>()
 
     fun setAnimationsRunning(running: Boolean) {
@@ -68,6 +81,41 @@ class KlipyAdapter(
                     drawable.stop()
                 }
             }
+        }
+    }
+
+    fun releaseVisibleResources() {
+        areAnimationsRunning = false
+        isImageLoadingEnabled = false
+        needsReloadAfterRelease = items.isNotEmpty()
+        for (holder in activeViews.toList()) {
+            releaseHolder(holder, clearImage = true)
+        }
+    }
+
+    fun resumeVisibleResources() {
+        isImageLoadingEnabled = true
+        if (needsReloadAfterRelease) {
+            needsReloadAfterRelease = false
+            areAnimationsRunning = true
+            for (holder in activeViews.toList()) {
+                val position = holder.bindingAdapterPosition
+                if (position != RecyclerView.NO_POSITION) {
+                    notifyItemChanged(position)
+                }
+            }
+        } else {
+            setAnimationsRunning(true)
+        }
+    }
+
+    private fun releaseHolder(holder: ViewHolder, clearImage: Boolean) {
+        holder.pendingLoadRunnable?.let { holder.itemView.removeCallbacks(it) }
+        holder.pendingLoadRunnable = null
+        (holder.imageView.drawable as? Animatable)?.stop()
+        holder.imageView.dispose()
+        if (clearImage) {
+            holder.imageView.setImageDrawable(null)
         }
     }
 
@@ -92,9 +140,6 @@ class KlipyAdapter(
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         val item = items[position]
-
-        // Keep track of this active view holder
-        activeViews.add(holder)
 
         // Prevent StaggeredGridLayoutManager from making items full-span
         val lp = holder.itemView.layoutParams
@@ -146,14 +191,22 @@ class KlipyAdapter(
 
         // Setup our custom SubtleCircularProgressDrawable as a premium, lightweight placeholder
         val placeholder = SubtleCircularProgressDrawable().apply {
-            start()
+            if (areAnimationsRunning) start()
         }
         holder.imageView.setImageDrawable(placeholder)
+
+        if (!isImageLoadingEnabled) {
+            holder.itemView.setOnClickListener {
+                onItemClick(item)
+            }
+            return
+        }
 
         val loader = getImageLoader(holder.itemView.context)
         val imageUrl = item.previewUrl ?: item.url
 
         val runnable = Runnable {
+            holder.pendingLoadRunnable = null
             if (holder.bindingAdapterPosition == position) {
                 holder.imageView.load(imageUrl, loader) {
                     crossfade(150)
@@ -194,13 +247,32 @@ class KlipyAdapter(
 
     override fun getItemCount() = items.size
 
+    override fun onViewAttachedToWindow(holder: ViewHolder) {
+        super.onViewAttachedToWindow(holder)
+        activeViews.add(holder)
+        val drawable = holder.imageView.drawable
+        if (drawable == null && isImageLoadingEnabled) {
+            holder.itemView.post {
+                val position = holder.bindingAdapterPosition
+                if (position != RecyclerView.NO_POSITION) {
+                    notifyItemChanged(position)
+                }
+            }
+        } else if (areAnimationsRunning && drawable is Animatable) {
+            drawable.start()
+        }
+    }
+
+    override fun onViewDetachedFromWindow(holder: ViewHolder) {
+        super.onViewDetachedFromWindow(holder)
+        activeViews.remove(holder)
+        releaseHolder(holder, clearImage = true)
+    }
+
     override fun onViewRecycled(holder: ViewHolder) {
         super.onViewRecycled(holder)
         activeViews.remove(holder)
-        holder.pendingLoadRunnable?.let { holder.itemView.removeCallbacks(it) }
-        holder.pendingLoadRunnable = null
-        holder.imageView.dispose()
-        holder.imageView.setImageDrawable(null)
+        releaseHolder(holder, clearImage = true)
     }
 
     fun updateItems(newItems: List<KlipyHistoryDao.KlipyItem>) {
