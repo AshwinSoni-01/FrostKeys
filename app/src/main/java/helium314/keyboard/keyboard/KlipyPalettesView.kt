@@ -4,6 +4,11 @@ package helium314.keyboard.keyboard
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.ContextWrapper
+import android.content.res.ColorStateList
+import android.graphics.Color
+import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.InsetDrawable
+import android.graphics.drawable.RippleDrawable
 import android.util.AttributeSet
 import android.util.TypedValue
 import android.view.View
@@ -30,6 +35,7 @@ import helium314.keyboard.latin.LatinIME
 import helium314.keyboard.latin.R
 import helium314.keyboard.latin.cloud.CloudManager
 import helium314.keyboard.latin.common.ColorType
+import helium314.keyboard.latin.common.Colors
 import helium314.keyboard.latin.common.Constants
 import helium314.keyboard.latin.database.KlipyHistoryDao
 import helium314.keyboard.latin.database.KlipyHistoryDao.KlipyItem
@@ -37,7 +43,7 @@ import helium314.keyboard.latin.settings.Defaults
 import helium314.keyboard.latin.settings.Settings
 import helium314.keyboard.latin.stickers.AnimatedStickerProcessor
 import helium314.keyboard.latin.utils.Log
-import helium314.keyboard.latin.utils.ResourceUtils
+import helium314.keyboard.latin.utils.dpToPx
 import helium314.keyboard.latin.utils.prefs
 import kotlinx.coroutines.*
 import kotlinx.serialization.Serializable
@@ -49,6 +55,7 @@ import java.io.FileOutputStream
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
 import java.util.UUID
+import androidx.core.graphics.ColorUtils
 
 @SuppressLint("CustomViewStyleable")
 class KlipyPalettesView @JvmOverloads constructor(
@@ -62,6 +69,9 @@ class KlipyPalettesView @JvmOverloads constructor(
     private lateinit var viewPager: ViewPager2
     private lateinit var emptyState: TextView
     private lateinit var loadingIndicator: ProgressBar
+    private lateinit var clearHistoryButton: TextView
+    private lateinit var clearHistoryConfirmOverlay: View
+    private lateinit var clearHistoryConfirmTitle: TextView
     private lateinit var gifsAdapter: KlipyAdapter
     private lateinit var stickersAdapter: KlipyAdapter
     private lateinit var historyDao: KlipyHistoryDao
@@ -103,6 +113,7 @@ class KlipyPalettesView @JvmOverloads constructor(
     companion object {
         private val json = Json { ignoreUnknownKeys = true }
         private const val MAX_STICKER_FILE_BYTES = 500 * 1024
+        private const val INLINE_PANEL_HEIGHT_DP = 500f
 
         private fun createStickerProcessorDispatcher(): ExecutorCoroutineDispatcher {
             return Executors.newSingleThreadExecutor { runnable ->
@@ -112,11 +123,16 @@ class KlipyPalettesView @JvmOverloads constructor(
     }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-        val settings = Settings.getValues()
-        val abcHeight = ResourceUtils.getKeyboardHeight(resources, settings)
-        val persistentEmojiEnabled = context.prefs().getBoolean(Settings.PREF_PERSISTENT_EMOJI_ROW, Defaults.PREF_PERSISTENT_EMOJI_ROW)
-        val emojiRowHeight = if (persistentEmojiEnabled) (41 * resources.displayMetrics.density).toInt() else 0
-        val finalHeight = abcHeight + emojiRowHeight + paddingTop + paddingBottom
+        val requestedHeight = TypedValue.applyDimension(
+            TypedValue.COMPLEX_UNIT_DIP,
+            INLINE_PANEL_HEIGHT_DP,
+            resources.displayMetrics
+        ).toInt()
+        val availableHeight = when (MeasureSpec.getMode(heightMeasureSpec)) {
+            MeasureSpec.AT_MOST, MeasureSpec.EXACTLY -> MeasureSpec.getSize(heightMeasureSpec)
+            else -> Int.MAX_VALUE
+        }
+        val finalHeight = requestedHeight.coerceAtMost(availableHeight)
         super.onMeasure(widthMeasureSpec, MeasureSpec.makeMeasureSpec(finalHeight, MeasureSpec.EXACTLY))
         setMeasuredDimension(MeasureSpec.getSize(widthMeasureSpec), finalHeight)
     }
@@ -145,6 +161,7 @@ class KlipyPalettesView @JvmOverloads constructor(
         this.keyboardActionListener = keyboardActionListener
         this.mainEditorInfo = editorInfo
         this.mainListener = keyboardActionListener
+        this.keyboardLayoutSet = null
         initialize()
 
         // Reset search states when opening
@@ -154,13 +171,14 @@ class KlipyPalettesView @JvmOverloads constructor(
         lastGifSearch.clear()
         lastStickerSearch.clear()
         updateSearchQueryUI()
+        hideClearHistoryConfirmation()
 
         findViewById<View>(R.id.klipyHeader)?.visibility = View.VISIBLE
         viewPager.visibility = View.VISIBLE
         gifsAdapter.resumeVisibleResources()
         stickersAdapter.resumeVisibleResources()
+        showClearHistoryButton()
 
-        setupBottomRowKeyboard(editorInfo, keyboardActionListener)
         loadHistory()
     }
 
@@ -174,6 +192,7 @@ class KlipyPalettesView @JvmOverloads constructor(
         activeSendJobs = 0
         if (isInitialized) {
             loadingIndicator.visibility = View.GONE
+            hideClearHistoryConfirmation()
             gifsAdapter.releaseVisibleResources()
             stickersAdapter.releaseVisibleResources()
         }
@@ -199,6 +218,9 @@ class KlipyPalettesView @JvmOverloads constructor(
         viewPager = findViewById(R.id.klipyViewPager)
         emptyState = findViewById(R.id.emptyState)
         loadingIndicator = findViewById(R.id.loadingIndicator)
+        clearHistoryButton = findViewById(R.id.clearKlipyHistoryButton)
+        clearHistoryConfirmOverlay = findViewById(R.id.clearHistoryConfirmOverlay)
+        clearHistoryConfirmTitle = findViewById(R.id.clearHistoryConfirmTitle)
 
         val padding = TypedValue.applyDimension(
             TypedValue.COMPLEX_UNIT_DIP, 4f, resources.displayMetrics
@@ -493,9 +515,11 @@ class KlipyPalettesView @JvmOverloads constructor(
 
     private fun onTabSelected(tab: String) {
         if (currentTab != tab || gifsAdapter.itemCount == 0 || stickersAdapter.itemCount == 0) {
+            hideClearHistoryConfirmation()
             currentTab = tab
             findViewById<TextView>(R.id.tabGifs)?.isSelected = (tab == KlipyHistoryDao.TYPE_GIF)
             findViewById<TextView>(R.id.tabStickers)?.isSelected = (tab == KlipyHistoryDao.TYPE_STICKER)
+            updateClearHistoryButton()
             loadHistory()
         }
     }
@@ -702,6 +726,19 @@ class KlipyPalettesView @JvmOverloads constructor(
                 performSearch("")
             }
         }
+        findViewById<View>(R.id.clearKlipyHistoryButton)?.setOnClickListener {
+            showClearHistoryConfirmation()
+        }
+        findViewById<View>(R.id.clearHistoryConfirmOverlay)?.setOnClickListener {
+            hideClearHistoryConfirmation()
+        }
+        findViewById<View>(R.id.cancelClearHistoryButton)?.setOnClickListener {
+            hideClearHistoryConfirmation()
+        }
+        findViewById<View>(R.id.confirmClearHistoryButton)?.setOnClickListener {
+            hideClearHistoryConfirmation()
+            clearCurrentHistory()
+        }
         findViewById<View>(R.id.klipyBackButton)?.setOnClickListener {
             if (isSearchMode) {
                 exitSearchMode(triggerSearch = false)
@@ -724,7 +761,8 @@ class KlipyPalettesView @JvmOverloads constructor(
             }
             val backButton = findViewById<ImageButton>(R.id.klipyBackButton)
             if (backButton != null) {
-                colors.setColor(backButton, ColorType.TOOL_BAR_KEY)
+                colors.setColor(backButton, ColorType.FUNCTIONAL_KEY_TEXT)
+                backButton.background = createBackButtonBackground(colors)
             }
             val tabGifs = findViewById<TextView>(R.id.tabGifs)
             if (tabGifs != null) {
@@ -760,19 +798,91 @@ class KlipyPalettesView @JvmOverloads constructor(
             if (clearSearchButton != null) {
                 colors.setColor(clearSearchButton, ColorType.TOOL_BAR_KEY)
             }
+            val clearHistoryButton = findViewById<TextView>(R.id.clearKlipyHistoryButton)
+            if (clearHistoryButton != null) {
+                clearHistoryButton.setTextColor(colors.get(ColorType.TOOL_BAR_KEY))
+            }
+            val clearHistoryConfirmTitle = findViewById<TextView>(R.id.clearHistoryConfirmTitle)
+            if (clearHistoryConfirmTitle != null) {
+                clearHistoryConfirmTitle.setTextColor(colors.get(ColorType.TOOL_BAR_KEY))
+            }
+            val confirmClearHistoryButton = findViewById<TextView>(R.id.confirmClearHistoryButton)
+            if (confirmClearHistoryButton != null) {
+                confirmClearHistoryButton.setTextColor(colors.get(ColorType.TOOL_BAR_KEY))
+            }
+            val cancelClearHistoryButton = findViewById<TextView>(R.id.cancelClearHistoryButton)
+            if (cancelClearHistoryButton != null) {
+                cancelClearHistoryButton.setTextColor(colors.get(ColorType.TOOL_BAR_KEY))
+            }
         } catch (e: Exception) {
             Log.e("KlipyPalettesView", "Failed to apply theme", e)
         }
     }
 
-    private fun setupBottomRowKeyboard(editorInfo: EditorInfo, listener: KeyboardActionListener) {
-        val keyboardView = findViewById<MainKeyboardView>(R.id.bottom_row_keyboard)
-        keyboardView.setKeyboardActionListener(listener)
-        PointerTracker.switchTo(keyboardView)
-        val kls = KeyboardLayoutSet.Builder.buildEmojiClipBottomRow(context, editorInfo)
-        this.keyboardLayoutSet = kls
-        val keyboard = kls.getKeyboard(KeyboardId.ELEMENT_EMOJI_BOTTOM_ROW)
-        keyboardView.setKeyboard(keyboard)
+    private fun createBackButtonBackground(colors: Colors): RippleDrawable {
+        val circle = GradientDrawable().apply {
+            shape = GradientDrawable.OVAL
+            setColor(Color.WHITE)
+            colors.setColor(this, ColorType.SPECIAL_KEY_BACKGROUND)
+        }
+        val rippleColor = ColorStateList.valueOf(
+            ColorUtils.setAlphaComponent(colors.get(ColorType.FUNCTIONAL_KEY_TEXT), 0x33)
+        )
+        val inset = 4.dpToPx(resources)
+        val content = InsetDrawable(circle, inset, 0, inset, 0)
+        return RippleDrawable(rippleColor, content, content.constantState?.newDrawable()?.mutate())
+    }
+
+    private fun showClearHistoryButton() {
+        if (!::clearHistoryButton.isInitialized) return
+        updateClearHistoryButton()
+        clearHistoryButton.visibility = View.VISIBLE
+        findViewById<MainKeyboardView>(R.id.bottom_row_keyboard)?.visibility = View.GONE
+    }
+
+    private fun updateClearHistoryButton() {
+        if (!::clearHistoryButton.isInitialized) return
+        clearHistoryButton.text = context.getString(
+            if (currentTab == KlipyHistoryDao.TYPE_GIF) {
+                R.string.klipy_clear_gif_history
+            } else {
+                R.string.klipy_clear_sticker_history
+            }
+        )
+    }
+
+    private fun showClearHistoryConfirmation() {
+        if (!::clearHistoryConfirmOverlay.isInitialized) return
+        clearHistoryConfirmTitle.text = context.getString(
+            if (currentTab == KlipyHistoryDao.TYPE_GIF) {
+                R.string.klipy_clear_history_confirm_title_gif
+            } else {
+                R.string.klipy_clear_history_confirm_title_sticker
+            }
+        )
+        clearHistoryConfirmOverlay.visibility = View.VISIBLE
+        clearHistoryButton.isEnabled = false
+    }
+
+    private fun hideClearHistoryConfirmation() {
+        if (!::clearHistoryConfirmOverlay.isInitialized) return
+        clearHistoryConfirmOverlay.visibility = View.GONE
+        if (::clearHistoryButton.isInitialized) {
+            clearHistoryButton.isEnabled = true
+        }
+    }
+
+    private fun clearCurrentHistory() {
+        historyDao.clearHistory(currentTab)
+        isSearchActive = false
+        searchQuery = ""
+        if (currentTab == KlipyHistoryDao.TYPE_GIF) {
+            lastGifSearch.clear()
+        } else {
+            lastStickerSearch.clear()
+        }
+        updateSearchQueryUI()
+        loadHistory()
     }
 
     private fun enterSearchMode() {
@@ -782,6 +892,9 @@ class KlipyPalettesView @JvmOverloads constructor(
         findViewById<View>(R.id.klipyHeader)?.visibility = View.GONE
         viewPager.visibility = View.GONE
         emptyState.visibility = View.GONE
+        hideClearHistoryConfirmation()
+        clearHistoryButton.visibility = View.GONE
+        findViewById<MainKeyboardView>(R.id.bottom_row_keyboard)?.visibility = View.VISIBLE
         currentSearchKeyboardElementId = KeyboardId.ELEMENT_ALPHABET
         updateSearchKeyboard()
     }
@@ -792,14 +905,7 @@ class KlipyPalettesView @JvmOverloads constructor(
         viewPager.visibility = View.VISIBLE
         gifsAdapter.setAnimationsRunning(true)
         stickersAdapter.setAnimationsRunning(true)
-        
-        val keyboardView = findViewById<MainKeyboardView>(R.id.bottom_row_keyboard)
-        val listener = mainListener ?: keyboardActionListener
-        keyboardView.setKeyboardActionListener(listener)
-        PointerTracker.switchTo(keyboardView)
-        val kls = keyboardLayoutSet ?: KeyboardLayoutSet.Builder.buildEmojiClipBottomRow(context, mainEditorInfo)
-        val keyboard = kls.getKeyboard(KeyboardId.ELEMENT_EMOJI_BOTTOM_ROW)
-        keyboardView.setKeyboard(keyboard)
+        showClearHistoryButton()
 
         if (triggerSearch) {
             performSearch(searchQuery)
@@ -812,7 +918,9 @@ class KlipyPalettesView @JvmOverloads constructor(
         val keyboardView = findViewById<MainKeyboardView>(R.id.bottom_row_keyboard)
         keyboardView.setKeyboardActionListener(searchKeyboardListener)
         PointerTracker.switchTo(keyboardView)
-        val kls = keyboardLayoutSet ?: KeyboardLayoutSet.Builder.buildEmojiClipBottomRow(context, mainEditorInfo)
+        val kls = keyboardLayoutSet ?: KeyboardLayoutSet.Builder.buildEmojiClipBottomRow(context, mainEditorInfo).also {
+            keyboardLayoutSet = it
+        }
         val keyboard = kls.getKeyboard(currentSearchKeyboardElementId)
         keyboardView.setKeyboard(keyboard)
     }

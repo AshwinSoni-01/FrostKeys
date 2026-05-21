@@ -984,6 +984,14 @@ New dictionary:
     <string name="tab_stickers">Stickers</string>
     <string name="gifs">GIFs</string>
     <string name="stickers">Stickers</string>
+    <string name="klipy_clear_gif_history">Clear all GIF history</string>
+    <string name="klipy_clear_sticker_history">Clear all Sticker history</string>
+    <string name="klipy_clear_history_confirm_title_gif">Clear all GIF history?</string>
+    <string name="klipy_clear_history_confirm_title_sticker">Clear all Sticker history?</string>
+    <string name="klipy_clear_history_confirm_message">This only removes recent items from the current Klipy tab.</string>
+    <string name="klipy_clear_history_confirm_action">Clear</string>
+    <string name="klipy_powered_by">Powered by Klipy</string>
+    <string name="cancel">Cancel</string>
 
     <!-- gesture data gathering, new strings for normal use should go above -->
 

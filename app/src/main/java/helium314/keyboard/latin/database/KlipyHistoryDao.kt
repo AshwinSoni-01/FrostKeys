@@ -61,6 +61,11 @@ class KlipyHistoryDao private constructor(context: Context) {
         return list
     }
 
+    fun clearHistory(type: String) {
+        val db = dbHelper.writableDatabase
+        db.delete(TABLE_NAME, "$COLUMN_TYPE = ?", arrayOf(type))
+    }
+
     companion object {
         const val TABLE_NAME = "KLIPY_HISTORY"
         const val COLUMN_ID = "ID"

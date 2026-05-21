@@ -30,7 +30,7 @@
             android:layout_height="36dp"
             android:layout_weight="1"
             android:paddingHorizontal="12dp"
-            android:background="@drawable/search_bar_bg"
+            android:background="@drawable/klipy_search_bar_ripple_bg"
             android:clickable="true"
             android:focusable="true">
 
@@ -87,7 +87,6 @@
             android:layout_height="match_parent"
             android:padding="12dp"
             android:scaleType="fitCenter"
-            android:background="?android:attr/selectableItemBackgroundBorderless"
             android:src="@drawable/ic_arrow_back"
             android:contentDescription="@string/abc_action_bar_up_description"
             android:layout_marginEnd="4dp" />
@@ -108,7 +107,7 @@
                 android:text="@string/tab_gifs"
                 android:textColor="@color/textColorPrimary"
                 android:layout_marginHorizontal="4dp"
-                android:background="@drawable/tab_background_selector"
+                android:background="@drawable/klipy_tab_background_ripple"
                 android:gravity="center"
                 android:padding="0dp"
                 android:clickable="true"
@@ -126,7 +125,7 @@
                 android:text="@string/tab_stickers"
                 android:textColor="@color/textColorPrimary"
                 android:layout_marginHorizontal="4dp"
-                android:background="@drawable/tab_background_selector"
+                android:background="@drawable/klipy_tab_background_ripple"
                 android:gravity="center"
                 android:padding="0dp"
                 android:clickable="true"
@@ -137,6 +136,17 @@
                 android:paddingEnd="12dp" />
         </LinearLayout>
     </LinearLayout>
+
+    <TextView
+        android:id="@+id/klipyPoweredByText"
+        android:layout_width="match_parent"
+        android:layout_height="18dp"
+        android:gravity="end|center_vertical"
+        android:paddingEnd="14dp"
+        android:text="@string/klipy_powered_by"
+        android:textColor="@color/foreground_weak"
+        android:textSize="11sp"
+        android:alpha="0.72" />
 
     <!-- Main Content Frame -->
     <FrameLayout
@@ -165,12 +175,108 @@
             android:layout_gravity="center"
             android:indeterminate="true"
             android:visibility="gone" />
+
+        <FrameLayout
+            android:id="@+id/clearHistoryConfirmOverlay"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="#66000000"
+            android:clickable="true"
+            android:focusable="true"
+            android:padding="20dp"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:background="@drawable/klipy_confirm_panel_bg"
+                android:clickable="true"
+                android:focusable="true"
+                android:orientation="vertical"
+                android:padding="18dp">
+
+                <TextView
+                    android:id="@+id/clearHistoryConfirmTitle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center"
+                    android:text="@string/klipy_clear_history_confirm_title_gif"
+                    android:textColor="@color/textColorPrimary"
+                    android:textSize="16sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/clearHistoryConfirmMessage"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:gravity="center"
+                    android:text="@string/klipy_clear_history_confirm_message"
+                    android:textColor="@color/foreground_weak"
+                    android:textSize="14sp" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="44dp"
+                    android:layout_marginTop="16dp"
+                    android:gravity="center"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/cancelClearHistoryButton"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_marginEnd="6dp"
+                        android:layout_weight="1"
+                        android:background="@drawable/klipy_confirm_secondary_bg"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:gravity="center"
+                        android:text="@string/cancel"
+                        android:textColor="@color/textColorPrimary"
+                        android:textSize="14sp" />
+
+                    <TextView
+                        android:id="@+id/confirmClearHistoryButton"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_marginStart="6dp"
+                        android:layout_weight="1"
+                        android:background="@drawable/klipy_confirm_primary_bg"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:gravity="center"
+                        android:text="@string/klipy_clear_history_confirm_action"
+                        android:textColor="@color/textColorPrimary"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+            </LinearLayout>
+        </FrameLayout>
     </FrameLayout>
 
-    <!-- Bottom keyboard row switchers -->
+    <TextView
+        android:id="@+id/clearKlipyHistoryButton"
+        android:layout_width="match_parent"
+        android:layout_height="46dp"
+        android:layout_marginHorizontal="14dp"
+        android:layout_marginTop="6dp"
+        android:layout_marginBottom="10dp"
+        android:background="@drawable/klipy_clear_history_button_bg"
+        android:clickable="true"
+        android:focusable="true"
+        android:gravity="center"
+        android:paddingHorizontal="18dp"
+        android:text="@string/klipy_clear_gif_history"
+        android:textColor="@color/textColorPrimary"
+        android:textSize="14sp"
+        android:textStyle="bold" />
+
     <helium314.keyboard.keyboard.MainKeyboardView
         android:id="@+id/bottom_row_keyboard"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content" />
+        android:layout_height="wrap_content"
+        android:visibility="gone" />
 
 </helium314.keyboard.keyboard.KlipyPalettesView>
