@@ -84,7 +84,8 @@ As a derivative work, KBoard is licensed under the **GNU General Public License 
 ---
 
 ## Credits
-- **Ashwin Soni (Orion):** Fork maintainer; creator of the Frosted Glass UI, Klipy media pipeline, and AI implementation.
+- **Ashwin Soni (Orion):** Fork maintainer; creator of the Frosted Glass UI, Klipy media pipeline, and AI implementation. [@AshwinSoni1](https://t.me/AshwinSoni1)
+- **Syntrop (Telegram):** UI/UX design contributions and official app icon. [@Syntrop2k2](https://t.me/Syntrop2k2)
 - **HeliBoard Team:** For the industry-leading open-source foundation.
 - **NGI Mobifree Fund:** Funding provided to the original HeliBoard project through [NLnet](https://nlnet.nl).
 - **AOSP / OpenBoard:** The ancestors of this project.
