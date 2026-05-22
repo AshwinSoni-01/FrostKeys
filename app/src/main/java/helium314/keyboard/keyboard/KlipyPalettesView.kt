@@ -195,7 +195,19 @@ class KlipyPalettesView @JvmOverloads constructor(
             hideClearHistoryConfirmation()
             gifsAdapter.releaseVisibleResources()
             stickersAdapter.releaseVisibleResources()
+            if (isSearchMode) {
+                exitSearchMode(triggerSearch = false)
+            }
         }
+        mainListener?.let {
+            PointerTracker.setKeyboardActionListener(it)
+        }
+    }
+
+    fun isSearchMode(): Boolean = isSearchMode
+
+    fun exitSearchMode() {
+        exitSearchMode(triggerSearch = false)
     }
 
     private fun ensureViewScopeActive() {
@@ -514,7 +526,8 @@ class KlipyPalettesView @JvmOverloads constructor(
     }
 
     private fun onTabSelected(tab: String) {
-        if (currentTab != tab || gifsAdapter.itemCount == 0 || stickersAdapter.itemCount == 0) {
+        val activeAdapter = if (tab == KlipyHistoryDao.TYPE_GIF) gifsAdapter else stickersAdapter
+        if (currentTab != tab || activeAdapter.itemCount == 0) {
             hideClearHistoryConfirmation()
             currentTab = tab
             findViewById<TextView>(R.id.tabGifs)?.isSelected = (tab == KlipyHistoryDao.TYPE_GIF)
@@ -828,8 +841,9 @@ class KlipyPalettesView @JvmOverloads constructor(
         val rippleColor = ColorStateList.valueOf(
             ColorUtils.setAlphaComponent(colors.get(ColorType.FUNCTIONAL_KEY_TEXT), 0x33)
         )
-        val inset = 4.dpToPx(resources)
-        val content = InsetDrawable(circle, inset, 0, inset, 0)
+        val horizontalInset = 3.dpToPx(resources)
+        val verticalInset = 3.dpToPx(resources)
+        val content = InsetDrawable(circle, horizontalInset, verticalInset, horizontalInset, verticalInset)
         return RippleDrawable(rippleColor, content, content.constantState?.newDrawable()?.mutate())
     }
 
@@ -906,6 +920,10 @@ class KlipyPalettesView @JvmOverloads constructor(
         gifsAdapter.setAnimationsRunning(true)
         stickersAdapter.setAnimationsRunning(true)
         showClearHistoryButton()
+
+        mainListener?.let {
+            PointerTracker.setKeyboardActionListener(it)
+        }
 
         if (triggerSearch) {
             performSearch(searchQuery)

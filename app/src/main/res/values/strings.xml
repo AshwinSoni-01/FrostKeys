@@ -55,7 +55,7 @@
     <string name="gemini_api_key">Gemini API Key</string>
     <string name="gemini_api_key_summary">Enter your personal Google Gemini API key.</string>
     <string name="klipy_api_key">Klipy API Key</string>
-    <string name="klipy_api_key_summary">Enter your personal Klipy API key. Leave blank to use the default.</string>
+    <string name="klipy_api_key_summary">Enter your personal Klipy API key.</string>
     <string name="send_gifs_as_stickers">Send GIFs as Stickers</string>
     <string name="send_gifs_as_stickers_summary">When enabled, GIF tab results use the animated sticker pipeline. Turn off to send GIFs as normal GIF images.</string>
     <!-- Settings screen title for keyboard theme settings -->
@@ -259,6 +259,32 @@
     <string name="load_gesture_library_button_load">Load library</string>
     <!-- Button text for deleting gesture library -->
     <string name="load_gesture_library_button_delete">Delete library</string>
+
+    <!-- KBoard custom guides and progressive onboarding strings -->
+    <string name="gesture_not_loaded_summary">Proprietary library required. Tap to set up.</string>
+    <string name="gesture_guide_title">Gesture Typing Setup</string>
+    <string name="gesture_guide_desc">KBoard remains 100% offline and respects your privacy. Because of licensing restrictions, the gesture (swipe) typing library cannot be bundled with the open-source app by default. You must manually download and import it.</string>
+    <string name="gesture_guide_step1">1. Click below to download the gesture library for your device architecture (%s) from the OpenBoard repository.</string>
+    <string name="gesture_guide_step2">2. Click the import button and select the downloaded file to enable swipe typing. KBoard will restart automatically.</string>
+    <string name="gesture_guide_download_btn">Download Gesture Library (GitHub)</string>
+    <string name="gesture_guide_import_btn">Select &amp; Import Library File</string>
+    
+    <string name="cloud_intro_desc">Enable smart internet-connected features. Your API keys are stored securely on your device and are never shared.\n\nTo generate your Gemini API key:\n1. Click the button below to open Google AI Studio (aistudio.google.com).\n2. Sign in with your Google account.\n3. Click the prominent \'Create API Key\' (or \'Get API Key\') button at the top left.\n4. Select \'Create API Key in new project\', or choose an existing project.\n5. Wait for the key to be generated, then click \'Copy\' (starts with AIzaSy...).\n6. Paste the copied key into the Gemini API Key field below.</string>
+    <string name="gemini_get_key_btn">Get Gemini API Key 🔑</string>
+    <string name="klipy_get_key_btn">Get Klipy API Key 🔑</string>
+    
+    <string name="dict_guide_title">Offline Word Suggestions</string>
+    <string name="dict_guide_desc">KBoard uses offline dictionary files to suggest words as you type.\n\nTo download a dictionary (or emoji dictionary):\n1. Click the button below to open the dictionary page on Codeberg.\n2. Open the relevant folder: \'dictionaries\' for standard languages, or \'emoji_cldr_signal_dictionaries\' for emojis.\n3. Locate and select the dictionary file for your language.\n4. Click the tiny download button (small icon on the right) or click the \'View raw\' / \'Raw\' button to download the file.\n\n💡 Tip: Tap directly on any language in the list below to get a direct download link for that specific language\'s dictionary!</string>
+    <string name="dict_download_btn">Download Dictionaries (Codeberg)</string>
+
+    <string name="quick_setup_title">KBoard Quick Setup</string>
+    <string name="quick_setup_desc">Configure these essential settings to unlock the full power of KBoard:</string>
+    <string name="quick_setup_gesture_title">1. Setup Swipe (Gesture) Typing</string>
+    <string name="quick_setup_gesture_desc">Import the gesture library for your CPU architecture</string>
+    <string name="quick_setup_dict_title">2. Add Offline Dictionaries</string>
+    <string name="quick_setup_dict_desc">Download word and emoji suggestion dictionaries</string>
+    <string name="quick_setup_cloud_title">3. Configure Gemini &amp; Klipy Keys</string>
+    <string name="quick_setup_cloud_desc">Get personal API keys for smart tools &amp; GIF searches</string>
     <!-- Preferences item for inserting space after punctuation -->
     <string name="autospace_after_punctuation">Autospace after punctuation</string>
     <!-- Description for "autospace_after_punctuation" setting -->

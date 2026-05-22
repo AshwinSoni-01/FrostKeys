@@ -12,7 +12,6 @@ object CloudManager {
     const val PREF_TEST_CONNECTION = "pref_test_connection"
     const val PREF_GEMINI_API_KEY = "pref_gemini_api_key"
     const val PREF_KLIPY_API_KEY = "pref_klipy_api_key"
-    const val DEFAULT_KLIPY_API_KEY = "HqOVhiqs0nN1rYey6vHhc80Tdov5PZgpzw8bKfeCC2GS34OS2UMnnRvWE8J6Mely"
     const val PREF_CACHED_GEMINI_MODELS = "pref_cached_gemini_models"
     const val PREF_GEMINI_MODELS_LAST_FETCH = "pref_gemini_models_last_fetch"
 
@@ -28,8 +27,7 @@ object CloudManager {
     }
 
     fun getKlipyApiKey(context: Context): String {
-        val userKey = context.prefs().getString(PREF_KLIPY_API_KEY, "")
-        return if (userKey.isNullOrBlank()) DEFAULT_KLIPY_API_KEY else userKey
+        return context.prefs().getString(PREF_KLIPY_API_KEY, "") ?: ""
     }
 
     fun executeRequest(context: Context, feature: CloudFeature, request: Request): Response? {

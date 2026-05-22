@@ -20,8 +20,8 @@
         android:layout_marginBottom="4dp">
         <ImageButton
             android:id="@+id/btn_back_ai"
-            android:layout_width="32dp"
-            android:layout_height="32dp"
+            android:layout_width="38dp"
+            android:layout_height="38dp"
             android:src="@drawable/ic_arrow_back"
             android:background="?android:attr/selectableItemBackgroundBorderless"
             android:foreground="?android:attr/selectableItemBackground"
@@ -35,7 +35,7 @@
             android:text="AI Writing Tools"
             android:textColor="?android:attr/textColorPrimary"
             android:textStyle="bold"
-            android:textSize="18sp"
+            android:textSize="20sp"
             android:paddingStart="8dp"/>
     </LinearLayout>
 
@@ -84,7 +84,7 @@
     <androidx.viewpager2.widget.ViewPager2
         android:id="@+id/vp_ai_carousel"
         android:layout_width="match_parent"
-        android:layout_height="220dp"
+        android:layout_height="200dp"
         android:orientation="horizontal"
         android:layout_marginBottom="0dp" />
 
@@ -94,7 +94,7 @@
         android:layout_height="wrap_content"
         android:layout_gravity="center_horizontal"
         android:orientation="horizontal"
-        android:layout_marginTop="-8dp"
+        android:layout_marginTop="0dp"
         android:layout_marginBottom="0dp" />
 
     <LinearLayout

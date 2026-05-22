@@ -17,11 +17,11 @@
     <LinearLayout
         android:id="@+id/searchBarContainer"
         android:layout_width="match_parent"
-        android:layout_height="44dp"
+        android:layout_height="48dp"
         android:orientation="horizontal"
         android:gravity="center_vertical"
         android:paddingHorizontal="8dp"
-        android:paddingTop="4dp"
+        android:paddingTop="8dp"
         android:paddingBottom="4dp">
 
         <FrameLayout
@@ -83,9 +83,9 @@
 
         <ImageButton
             android:id="@+id/klipyBackButton"
-            android:layout_width="48dp"
+            android:layout_width="40dp"
             android:layout_height="match_parent"
-            android:padding="12dp"
+            android:padding="11dp"
             android:scaleType="fitCenter"
             android:src="@drawable/ic_arrow_back"
             android:contentDescription="@string/abc_action_bar_up_description"
@@ -102,7 +102,7 @@
             <TextView
                 android:id="@+id/tabGifs"
                 android:layout_width="0dp"
-                android:layout_height="32dp"
+                android:layout_height="36dp"
                 android:layout_weight="1"
                 android:text="@string/tab_gifs"
                 android:textColor="@color/textColorPrimary"
@@ -120,7 +120,7 @@
             <TextView
                 android:id="@+id/tabStickers"
                 android:layout_width="0dp"
-                android:layout_height="32dp"
+                android:layout_height="36dp"
                 android:layout_weight="1"
                 android:text="@string/tab_stickers"
                 android:textColor="@color/textColorPrimary"

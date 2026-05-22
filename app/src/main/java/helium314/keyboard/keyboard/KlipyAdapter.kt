@@ -109,11 +109,13 @@ class KlipyAdapter(
         }
     }
 
-    private fun releaseHolder(holder: ViewHolder, clearImage: Boolean) {
+    private fun releaseHolder(holder: ViewHolder, clearImage: Boolean, disposeRequest: Boolean = true) {
         holder.pendingLoadRunnable?.let { holder.itemView.removeCallbacks(it) }
         holder.pendingLoadRunnable = null
         (holder.imageView.drawable as? Animatable)?.stop()
-        holder.imageView.dispose()
+        if (disposeRequest) {
+            holder.imageView.dispose()
+        }
         if (clearImage) {
             holder.imageView.setImageDrawable(null)
         }
@@ -251,14 +253,7 @@ class KlipyAdapter(
         super.onViewAttachedToWindow(holder)
         activeViews.add(holder)
         val drawable = holder.imageView.drawable
-        if (drawable == null && isImageLoadingEnabled) {
-            holder.itemView.post {
-                val position = holder.bindingAdapterPosition
-                if (position != RecyclerView.NO_POSITION) {
-                    notifyItemChanged(position)
-                }
-            }
-        } else if (areAnimationsRunning && drawable is Animatable) {
+        if (areAnimationsRunning && drawable is Animatable) {
             drawable.start()
         }
     }
@@ -266,7 +261,7 @@ class KlipyAdapter(
     override fun onViewDetachedFromWindow(holder: ViewHolder) {
         super.onViewDetachedFromWindow(holder)
         activeViews.remove(holder)
-        releaseHolder(holder, clearImage = true)
+        releaseHolder(holder, clearImage = false, disposeRequest = false)
     }
 
     override fun onViewRecycled(holder: ViewHolder) {
@@ -277,6 +272,7 @@ class KlipyAdapter(
 
     fun updateItems(newItems: List<KlipyHistoryDao.KlipyItem>) {
         val oldItems = items
+        if (oldItems == newItems) return
         items = newItems
         val diffResult = DiffUtil.calculateDiff(object : DiffUtil.Callback() {
             override fun getOldListSize() = oldItems.size

@@ -26,6 +26,20 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import android.net.Uri
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.ui.text.font.FontWeight
 import helium314.keyboard.latin.dictionary.Dictionary
 import helium314.keyboard.latin.R
 import helium314.keyboard.latin.common.Links
@@ -61,6 +75,43 @@ fun DictionaryScreen(
     var selectedLocale: Locale? by remember { mutableStateOf(null) }
     var showAddDictDialog by remember { mutableStateOf(false) }
     val dictPicker = dictionaryFilePicker(selectedLocale)
+    @Composable
+    fun DictionaryItem(locale: Locale) {
+        if (locale.language == SubtypeLocaleUtils.NO_LANGUAGE) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier
+                    .padding(vertical = 4.dp, horizontal = 16.dp)
+                    .fillMaxWidth()
+                    .clickable { showAddDictDialog = true }
+            ) {
+                Text(
+                    stringResource(R.string.add_new_dictionary_title),
+                )
+                Icon(painterResource(R.drawable.ic_plus), stringResource(R.string.add_new_dictionary_title))
+            }
+        } else {
+            Column(
+                Modifier
+                    .clickable { selectedLocale = locale }
+                    .padding(vertical = 6.dp, horizontal = 16.dp)
+                    .fillMaxWidth()
+            ) {
+                val (dicts, hasInternal) = getUserAndInternalDictionaries(ctx, locale)
+                val types = dicts.mapTo(mutableListOf()) { it.name.substringBefore("_${DictionaryInfoUtils.USER_DICTIONARY_SUFFIX}") }
+                if (hasInternal && !types.contains(Dictionary.TYPE_MAIN))
+                    types.add(0, stringResource(R.string.internal_dictionary_summary))
+                Text(locale.localizedDisplayName(LocalResources.current))
+                Text(
+                    types.joinToString(", "),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+
     SearchScreen(
         onClickBack = onClickBack,
         title = { Text(stringResource(R.string.dictionary_settings_category)) },
@@ -72,42 +123,65 @@ fun DictionaryScreen(
                                 .splitOnWhitespace().any { it.startsWith(term, true) }
                 }
         },
-        itemContent = { locale ->
-            if (locale.language == SubtypeLocaleUtils.NO_LANGUAGE) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    modifier = Modifier
-                        .padding(vertical = 4.dp, horizontal = 16.dp)
-                        .fillMaxWidth()
-                        .clickable { showAddDictDialog = true }
-                ) {
-                    Text(
-                        stringResource(R.string.add_new_dictionary_title),
-                    )
-                    Icon(painterResource(R.drawable.ic_plus), stringResource(R.string.add_new_dictionary_title))
+        itemContent = { locale -> DictionaryItem(locale) }
+    ) {
+        val context = LocalContext.current
+        androidx.compose.material3.Scaffold(
+            contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom)
+        ) { innerPadding ->
+            LazyColumn(contentPadding = innerPadding) {
+                item {
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(
+                                    painter = painterResource(R.drawable.ic_settings_about_wiki),
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                                Text(
+                                    text = stringResource(R.string.dict_guide_title),
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = stringResource(R.string.dict_guide_desc),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Button(
+                                onClick = {
+                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(Links.DICTIONARY_URL))
+                                    context.startActivity(intent)
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(text = stringResource(R.string.dict_download_btn))
+                            }
+                        }
+                    }
                 }
-            } else {
-                Column(
-                    Modifier
-                        .clickable { selectedLocale = locale }
-                        .padding(vertical = 6.dp, horizontal = 16.dp)
-                        .fillMaxWidth()
-                ) {
-                    val (dicts, hasInternal) = getUserAndInternalDictionaries(ctx, locale)
-                    val types = dicts.mapTo(mutableListOf()) { it.name.substringBefore("_${DictionaryInfoUtils.USER_DICTIONARY_SUFFIX}") }
-                    if (hasInternal && !types.contains(Dictionary.TYPE_MAIN))
-                        types.add(0, stringResource(R.string.internal_dictionary_summary))
-                    Text(locale.localizedDisplayName(LocalResources.current))
-                    Text(
-                        types.joinToString(", "),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                items(dictionaryLocales) { locale ->
+                    DictionaryItem(locale)
                 }
             }
         }
-    )
+    }
     if (showAddDictDialog) {
         ConfirmationDialog(
             onDismissRequest = { showAddDictDialog = false },

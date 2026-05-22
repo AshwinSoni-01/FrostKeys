@@ -623,8 +623,9 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
             setColor(Color.WHITE)
             colors.setColor(this, ColorType.SPECIAL_KEY_BACKGROUND)
         }
-        val inset = 1.dpToPx(resources)
-        return InsetDrawable(circle, inset, inset, inset, inset)
+        val horizontalInset = 3.dpToPx(resources)
+        val verticalInset = 3.dpToPx(resources)
+        return InsetDrawable(circle, horizontalInset, verticalInset, horizontalInset, verticalInset)
     }
 
     private fun setupKey(view: ImageButton, colors: Colors) {

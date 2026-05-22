@@ -2,34 +2,84 @@
 package helium314.keyboard.settings.screens
 
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.os.Build
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
 import helium314.keyboard.keyboard.KeyboardSwitcher
 import helium314.keyboard.latin.R
+import helium314.keyboard.latin.common.FileUtils
 import helium314.keyboard.latin.settings.Defaults
 import helium314.keyboard.latin.settings.Settings
+import helium314.keyboard.latin.utils.ChecksumCalculator
 import helium314.keyboard.latin.utils.JniUtils
 import helium314.keyboard.latin.utils.Log
 import helium314.keyboard.latin.utils.getActivity
 import helium314.keyboard.latin.utils.prefs
+import helium314.keyboard.latin.utils.protectedPrefs
 import helium314.keyboard.settings.Setting
 import helium314.keyboard.settings.SearchSettingsScreen
 import helium314.keyboard.settings.SettingsActivity
+import helium314.keyboard.settings.filePicker
+import helium314.keyboard.settings.dialogs.ConfirmationDialog
 import helium314.keyboard.settings.preferences.SliderPreference
 import helium314.keyboard.settings.preferences.SwitchPreference
 import helium314.keyboard.latin.utils.Theme
 import helium314.keyboard.settings.initPreview
 import helium314.keyboard.latin.utils.previewDark
 import androidx.core.content.edit
+import java.io.File
+import java.io.FileInputStream
+import java.io.FileOutputStream
+import java.io.IOException
 
 @Composable
 fun GestureTypingScreen(
     onClickBack: () -> Unit,
 ) {
+    if (!JniUtils.sHaveGestureLib) {
+        SearchSettingsScreen(
+            onClickBack = onClickBack,
+            title = stringResource(R.string.gesture_guide_title),
+            settings = emptyList()
+        ) {
+            GestureLibrarySetupGuide()
+        }
+        return
+    }
+
     val prefs = LocalContext.current.prefs()
     val b = (LocalContext.current.getActivity() as? SettingsActivity)?.prefChanged?.collectAsState()
     if ((b?.value ?: 0) < 0)
@@ -57,6 +107,164 @@ fun GestureTypingScreen(
         title = stringResource(R.string.settings_screen_gesture),
         settings = items
     )
+}
+
+@Composable
+fun GestureLibrarySetupGuide() {
+    val context = LocalContext.current
+    val abi = Build.SUPPORTED_ABIS[0]
+    val libFile = File(context.filesDir?.absolutePath + File.separator + JniUtils.JNI_LIB_IMPORT_FILE_NAME)
+    val prefs = context.protectedPrefs()
+    
+    var tempFilePath: String? by rememberSaveable { mutableStateOf(null) }
+    
+    fun renameToLibFileAndRestart(file: File, checksum: String) {
+        libFile.setWritable(true)
+        libFile.delete()
+        prefs.edit(commit = true) { putString(Settings.PREF_LIBRARY_CHECKSUM, checksum) }
+        file.copyTo(libFile)
+        libFile.setReadOnly()
+        file.delete()
+        Runtime.getRuntime().exit(0)
+    }
+
+    val launcher = filePicker { uri ->
+        val tmpfile = File(context.filesDir.absolutePath + File.separator + "tmplib")
+        try {
+            val otherTemporaryFile = File(context.filesDir.absolutePath + File.separator + "tmpfile")
+            FileUtils.copyContentUriToNewFile(uri, context, otherTemporaryFile)
+            val inputStream = FileInputStream(otherTemporaryFile)
+            val outputStream = FileOutputStream(tmpfile)
+            outputStream.use {
+                tmpfile.setReadOnly()
+                FileUtils.copyStreamToOtherStream(inputStream, it)
+            }
+            otherTemporaryFile.delete()
+
+            val checksum = ChecksumCalculator.checksum(tmpfile) ?: ""
+            if (checksum == JniUtils.expectedDefaultChecksum()) {
+                renameToLibFileAndRestart(tmpfile, checksum)
+            } else {
+                tempFilePath = tmpfile.absolutePath
+            }
+        } catch (e: IOException) {
+            tmpfile.delete()
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        Card(
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+            ),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        painter = painterResource(R.drawable.ic_settings_gesture),
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Text(
+                        text = stringResource(R.string.gesture_guide_title),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = stringResource(R.string.gesture_guide_desc),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+
+        Card(
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(
+                    text = stringResource(R.string.gesture_guide_step1, abi),
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Button(
+                    onClick = {
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/erkserkserks/openboard/tree/master/app/src/main/jniLibs"))
+                        context.startActivity(intent)
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(
+                        painter = painterResource(R.drawable.ic_settings_about_wiki),
+                        contentDescription = null,
+                        modifier = Modifier.padding(end = 8.dp).size(20.dp)
+                    )
+                    Text(text = stringResource(R.string.gesture_guide_download_btn))
+                }
+            }
+        }
+
+        Card(
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(
+                    text = stringResource(R.string.gesture_guide_step2),
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Button(
+                    onClick = {
+                        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT)
+                            .addCategory(Intent.CATEGORY_OPENABLE)
+                            .setType("application/octet-stream")
+                        launcher.launch(intent)
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.secondary
+                    )
+                ) {
+                    Icon(
+                        painter = painterResource(R.drawable.ic_plus),
+                        contentDescription = null,
+                        modifier = Modifier.padding(end = 8.dp).size(20.dp)
+                    )
+                    Text(text = stringResource(R.string.gesture_guide_import_btn))
+                }
+            }
+        }
+    }
+
+    if (tempFilePath != null) {
+        ConfirmationDialog(
+            onDismissRequest = {
+                File(tempFilePath!!).delete()
+                tempFilePath = null
+            },
+            content = { Text(stringResource(R.string.checksum_mismatch_message, abi)) },
+            onConfirmed = {
+                val tempFile = File(tempFilePath!!)
+                renameToLibFileAndRestart(tempFile, ChecksumCalculator.checksum(tempFile) ?: "")
+            }
+        )
+    }
 }
 
 fun createGestureTypingSettings(context: Context) = listOf(

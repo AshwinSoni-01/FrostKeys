@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-only
 package helium314.keyboard.settings.preferences
 
+import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
+import java.io.InputStream
 import android.os.Looper
 import android.widget.Toast
 import androidx.activity.compose.ManagedActivityResultLauncher
@@ -304,3 +306,65 @@ private val backupFilePatterns by lazy { listOf(
     "custom_font".toRegex(),
     "custom_emoji_font".toRegex(),
 ) }
+
+fun restoreSilently(ctx: Context, inputStream: InputStream): Boolean {
+    val restoredDb = ctx.getDatabasePath(Database.NAME + "_restored")
+    try {
+        ZipInputStream(inputStream).use { zip ->
+            var entry: ZipEntry? = zip.nextEntry
+            val filesDir = ctx.filesDir ?: return false
+            val deviceProtectedFilesDir = DeviceProtectedUtils.getFilesDir(ctx)
+            filesDir.deleteRecursively()
+            deviceProtectedFilesDir.deleteRecursively()
+            filesDir.mkdirs()
+            deviceProtectedFilesDir.mkdirs()
+            LayoutUtilsCustom.onLayoutFileChanged()
+            runCatching { Settings.getInstance().stopListener() }
+            while (entry != null) {
+                if (entry.name.startsWith("unprotected${File.separator}")) {
+                    val adjustedName = entry.name.substringAfter("unprotected${File.separator}")
+                    if (backupFilePatterns.any { adjustedName.matches(it) }) {
+                        if (!restoreEntryToDir(zip, deviceProtectedFilesDir, adjustedName)) {
+                            Log.w("BackupRestorePreference", "skipping unsafe backup entry $adjustedName")
+                        }
+                    }
+                } else if (backupFilePatterns.any { entry.name.matches(it) }) {
+                    if (!restoreEntryToDir(zip, filesDir, entry.name)) {
+                        Log.w("BackupRestorePreference", "skipping unsafe backup entry ${entry.name}")
+                    }
+                } else if (entry.name == Database.NAME) {
+                    FileUtils.copyStreamToNewFile(zip, restoredDb)
+                } else if (entry.name == PREFS_FILE_NAME) {
+                    val prefLines = String(zip.readBytes()).split("\n")
+                    val prefs = ctx.prefs()
+                    prefs.edit { clear() }
+                    readJsonLinesToSettings(prefLines, prefs)
+                } else if (entry.name == PROTECTED_PREFS_FILE_NAME) {
+                    val prefLines = String(zip.readBytes()).split("\n")
+                    val protectedPrefs = ctx.protectedPrefs()
+                    protectedPrefs.edit { clear() }
+                    readJsonLinesToSettings(prefLines, protectedPrefs)
+                }
+                zip.closeEntry()
+                entry = zip.nextEntry
+            }
+        }
+        
+        Database.copyFromDb(restoredDb, ctx)
+        runCatching { transferOldPinnedClips(ctx) }
+        runCatching { Settings.getInstance().startListener() }
+        runCatching { SubtypeSettings.reloadEnabledSubtypes(ctx) }
+        runCatching {
+            val newDictBroadcast = Intent(DictionaryPackConstants.NEW_DICTIONARY_INTENT_ACTION)
+            ctx.sendBroadcast(newDictBroadcast)
+        }
+        runCatching { LayoutUtilsCustom.onLayoutFileChanged() }
+        runCatching { LayoutUtilsCustom.removeMissingLayouts(ctx) }
+        runCatching { SupportedEmojis.load(ctx) }
+        runCatching { KeyboardSwitcher.getInstance().setThemeNeedsReload() }
+        return true
+    } catch (t: Throwable) {
+        Log.w("BackupRestorePreference", "error during silent restore", t)
+        return false
+    }
+}

@@ -48,9 +48,26 @@ import kotlin.collections.component1
 import kotlin.collections.component2
 import kotlin.collections.set
 
+private var isRestoringDefaultBackup = false
+private const val PREF_DEFAULT_BACKUP_RESTORED = "default_backup_restored"
+
 fun checkVersionUpgrade(context: Context) {
     val prefs = context.prefs()
-    val oldVersion = prefs.getInt(Settings.PREF_VERSION_CODE, 0)
+    var oldVersion = prefs.getInt(Settings.PREF_VERSION_CODE, 0)
+    if (oldVersion == 0 && !prefs.getBoolean(PREF_DEFAULT_BACKUP_RESTORED, false) && !isRestoringDefaultBackup) {
+        isRestoringDefaultBackup = true
+        try {
+            context.assets.open("default_backup.zip").use { inputStream ->
+                helium314.keyboard.settings.preferences.restoreSilently(context, inputStream)
+            }
+        } catch (e: Exception) {
+            Log.w("AppUpgrade", "Failed to restore default backup", e)
+        } finally {
+            prefs.edit { putBoolean(PREF_DEFAULT_BACKUP_RESTORED, true) }
+            isRestoringDefaultBackup = false
+        }
+        oldVersion = prefs.getInt(Settings.PREF_VERSION_CODE, 0)
+    }
     if (oldVersion != BuildConfig.VERSION_CODE)
         AppUpgrade.onUpgrade(context)
 }
