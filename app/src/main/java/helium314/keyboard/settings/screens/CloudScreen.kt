@@ -162,11 +162,13 @@ fun createCloudSettings(context: Context) = listOf(
                             request
                         )
 
-                        val message = if (response != null && response.isSuccessful) {
-                            "SUCCESS: Connected to the internet!"
-                        } else {
-                            "ERROR: Request failed."
-                        }
+                        val message = response?.use { resp ->
+                            if (resp.isSuccessful) {
+                                "SUCCESS: Connected to the internet!"
+                            } else {
+                                "ERROR: Request failed."
+                            }
+                        } ?: "ERROR: Request failed."
 
                         Handler(Looper.getMainLooper()).post {
                             Toast.makeText(context, message, Toast.LENGTH_LONG).show()

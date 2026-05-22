@@ -15,11 +15,13 @@ object SupportedEmojis {
         determineMaxSdk(context)
         val maxSdk = context.prefs().getInt(Settings.PREF_EMOJI_MAX_SDK, 0)
         unsupportedEmojis.clear()
-        context.assets.open("emoji/minApi.txt").reader().readLines().forEach {
-            val s = it.split(" ")
-            val minApi = s.first().toInt()
-            if (minApi > maxSdk)
-                unsupportedEmojis.addAll(s.drop(1))
+        context.assets.open("emoji/minApi.txt").bufferedReader().use { reader ->
+            reader.readLines().forEach {
+                val s = it.split(" ")
+                val minApi = s.first().toInt()
+                if (minApi > maxSdk)
+                    unsupportedEmojis.addAll(s.drop(1))
+            }
         }
     }
 
@@ -29,10 +31,12 @@ object SupportedEmojis {
         val paint = Paint()
         (KeyboardTypeface.emojiTypeface() ?: KeyboardTypeface.customTypeface())
             ?.let { paint.setTypeface(it) }
-        val maxApi = context.assets.open("emoji/minApi.txt").reader().readLines().maxOf {
-            val s = it.split(" ")
-            val supported = paint.hasGlyph(s[1])
-            if (supported) s.first().toInt() else 0
+        val maxApi = context.assets.open("emoji/minApi.txt").bufferedReader().use { reader ->
+            reader.readLines().maxOf {
+                val s = it.split(" ")
+                val supported = paint.hasGlyph(s[1])
+                if (supported) s.first().toInt() else 0
+            }
         }
         val newMax = maxApi.coerceAtLeast(Build.VERSION.SDK_INT)
         context.prefs().edit { putInt(Settings.PREF_EMOJI_MAX_SDK, newMax) }

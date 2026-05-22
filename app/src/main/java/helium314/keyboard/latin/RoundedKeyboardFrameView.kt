@@ -23,8 +23,30 @@ class RoundedKeyboardFrameView @JvmOverloads constructor(
     private var lastHeight = -1
     private var lastRadiusPx = -1f
 
+    private var cachedRadiusPx = -1f
+    private val prefListener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+        if (key == Settings.PREF_KEYBOARD_CORNER_RADIUS) {
+            cachedRadiusPx = -1f
+            postInvalidate()
+        }
+    }
+
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        context.prefs().registerOnSharedPreferenceChangeListener(prefListener)
+        cachedRadiusPx = -1f
+    }
+
+    override fun onDetachedFromWindow() {
+        super.onDetachedFromWindow()
+        context.prefs().unregisterOnSharedPreferenceChangeListener(prefListener)
+    }
+
     override fun draw(canvas: Canvas) {
-        val radiusPx = keyboardCornerRadiusPx()
+        if (cachedRadiusPx < 0f) {
+            cachedRadiusPx = keyboardCornerRadiusPx()
+        }
+        val radiusPx = cachedRadiusPx
         if (radiusPx <= 0f || width <= 0 || height <= 0) {
             super.draw(canvas)
             return

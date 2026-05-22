@@ -81,6 +81,11 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
     private LatinIME mLatinIME;
     private RichInputMethodManager mRichImm;
     private boolean mIsHardwareAcceleratedDrawingEnabled;
+    private java.util.List<String> mCachedPersistentEmojis = null;
+
+    public void clearCachedPersistentEmojis() {
+        mCachedPersistentEmojis = null;
+    }
 
     private KeyboardState mState;
 
@@ -156,6 +161,7 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
     public void loadKeyboard(final EditorInfo editorInfo, final SettingsValues settingsValues,
             final int currentAutoCapsState, @Nullable final RecapitalizeMode currentRecapitalizeState,
             KeyboardLayoutSet.InternalAction internalAction) {
+        clearCachedPersistentEmojis();
         final KeyboardLayoutSet.Builder builder = new KeyboardLayoutSet.Builder(
                 mThemeContext, editorInfo);
         final int keyboardWidth = ResourceUtils.getKeyboardWidth(mThemeContext, settingsValues);
@@ -1032,7 +1038,14 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
         mPersistentEmojiRowScroll.setVisibility(View.VISIBLE);
         if (divider != null) divider.setVisibility(View.VISIBLE);
 
-        final java.util.List<String> rawEmojis = helium314.keyboard.keyboard.emoji.EmojiPalettesView.AdaptiveEmojiEngine.getRankedEmojis(mPersistentEmojiRowContainer.getContext());
+        final java.util.List<String> rawEmojis;
+        if (mCachedPersistentEmojis != null
+                && !helium314.keyboard.keyboard.emoji.EmojiPalettesView.AdaptiveEmojiEngine.shouldRefreshFastRow(mPersistentEmojiRowContainer.getContext())) {
+            rawEmojis = mCachedPersistentEmojis;
+        } else {
+            rawEmojis = helium314.keyboard.keyboard.emoji.EmojiPalettesView.AdaptiveEmojiEngine.getFastRowEmojis(mPersistentEmojiRowContainer.getContext());
+            mCachedPersistentEmojis = rawEmojis;
+        }
         final java.util.List<String> emojis = new java.util.ArrayList<>();
         if (rawEmojis.size() >= 10) {
             // (6, 7, 8, 9, 10) on the left, (1, 2, 3, 4, 5) on the right just like old project
@@ -1065,8 +1078,10 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
                     mLatinIME.mKeyboardActionListener.onTextInput(emoji);
                     if (mEmojiPalettesView != null) {
                         mEmojiPalettesView.addRecentEmoji(emoji);
-                        updatePersistentEmojiRow();
+                    } else {
+                        helium314.keyboard.keyboard.emoji.EmojiPalettesView.AdaptiveEmojiEngine.recordEmojiUsage(context, emoji);
                     }
+                    updatePersistentEmojiRow();
                 }
             });
             mPersistentEmojiRowContainer.addView(tv);

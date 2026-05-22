@@ -79,25 +79,27 @@ fun createDictionaryTextAnnotated(locale: Locale): AnnotatedString {
 /** returns a pair of dictionary description and link for each dictionary  */
 fun getKnownDictionariesForLocale(locale: Locale, context: Context): List<Pair<String, String>> {
     val knownDicts = mutableListOf<Pair<String, String>>()
-    context.assets.open("dictionaries_in_dict_repo.csv").reader().forEachLine {
-        if (it.isBlank()) return@forEachLine
-        val (type, localeString, experimental) = it.split(",")
-        // we use a locale string here because that's in the dictionaries repo
-        // ideally the repo would switch to language tag, but not sure how this is handled in the dictionary header
-        // further, the dicts in the dictionaries repo should be compatible with other AOSP-based keyboards
-        val dictLocale = localeString.constructLocale()
-        if (LocaleUtils.getMatchLevel(locale, dictLocale) < LocaleUtils.LOCALE_GOOD_MATCH) return@forEachLine
-        val rawDictString = "$type: ${dictLocale.getDisplayName(context.resources.configuration.locale())}"
-        val dictString = if (experimental != "exp") rawDictString
-            else context.getString(R.string.available_dictionary_experimental, rawDictString)
-        val dictLinkSuffix = when (experimental) {
-            "cldr" -> Links.DICTIONARY_EMOJI_CLDR_SUFFIX
-            "exp"  -> Links.DICTIONARY_EXPERIMENTAL_SUFFIX
-            else   -> Links.DICTIONARY_NORMAL_SUFFIX
+    context.assets.open("dictionaries_in_dict_repo.csv").bufferedReader().use { reader ->
+        reader.forEachLine {
+            if (it.isBlank()) return@forEachLine
+            val (type, localeString, experimental) = it.split(",")
+            // we use a locale string here because that's in the dictionaries repo
+            // ideally the repo would switch to language tag, but not sure how this is handled in the dictionary header
+            // further, the dicts in the dictionaries repo should be compatible with other AOSP-based keyboards
+            val dictLocale = localeString.constructLocale()
+            if (LocaleUtils.getMatchLevel(locale, dictLocale) < LocaleUtils.LOCALE_GOOD_MATCH) return@forEachLine
+            val rawDictString = "$type: ${dictLocale.getDisplayName(context.resources.configuration.locale())}"
+            val dictString = if (experimental != "exp") rawDictString
+                else context.getString(R.string.available_dictionary_experimental, rawDictString)
+            val dictLinkSuffix = when (experimental) {
+                "cldr" -> Links.DICTIONARY_EMOJI_CLDR_SUFFIX
+                "exp"  -> Links.DICTIONARY_EXPERIMENTAL_SUFFIX
+                else   -> Links.DICTIONARY_NORMAL_SUFFIX
+            }
+            val dictBaseUrl = Links.DICTIONARY_URL + Links.DICTIONARY_DOWNLOAD_SUFFIX + dictLinkSuffix
+            val dictLink = dictBaseUrl + type + "_" + localeString.lowercase() + ".dict"
+            knownDicts.add(dictString to dictLink)
         }
-        val dictBaseUrl = Links.DICTIONARY_URL + Links.DICTIONARY_DOWNLOAD_SUFFIX + dictLinkSuffix
-        val dictLink = dictBaseUrl + type + "_" + localeString.lowercase() + ".dict"
-        knownDicts.add(dictString to dictLink)
     }
     return knownDicts
 }

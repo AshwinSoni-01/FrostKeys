@@ -133,11 +133,11 @@ fun GestureLibrarySetupGuide() {
         try {
             val otherTemporaryFile = File(context.filesDir.absolutePath + File.separator + "tmpfile")
             FileUtils.copyContentUriToNewFile(uri, context, otherTemporaryFile)
-            val inputStream = FileInputStream(otherTemporaryFile)
-            val outputStream = FileOutputStream(tmpfile)
-            outputStream.use {
-                tmpfile.setReadOnly()
-                FileUtils.copyStreamToOtherStream(inputStream, it)
+            FileInputStream(otherTemporaryFile).use { inputStream ->
+                FileOutputStream(tmpfile).use { outputStream ->
+                    tmpfile.setReadOnly()
+                    FileUtils.copyStreamToOtherStream(inputStream, outputStream)
+                }
             }
             otherTemporaryFile.delete()
 

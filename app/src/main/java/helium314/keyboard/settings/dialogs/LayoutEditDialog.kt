@@ -131,7 +131,7 @@ private var errorJob: Job? = null
 @Preview
 @Composable
 private fun Preview() {
-    val content = LocalContext.current.assets.open("layouts/main/dvorak.json").reader().readText()
+    val content = LocalContext.current.assets.open("layouts/main/dvorak.json").bufferedReader().use { it.readText() }
     initPreview(LocalContext.current)
     Theme(previewDark) {
         LayoutEditDialog({}, LayoutType.MAIN, "qwerty", locale = Locale.ENGLISH, startContent = content) { true }

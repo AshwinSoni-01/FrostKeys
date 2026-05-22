@@ -264,18 +264,18 @@ private data class Word(val word: String, val shortcut: String?, val weight: Int
 // getting all words instead of reading directly cursor, because filteredItems expects a list
 private fun getAll(locale: Locale?, context: Context): List<Word> {
     val cursor = createCursor(locale, context) ?: return emptyList()
-
-    if (!cursor.moveToFirst()) return emptyList()
-    val result = mutableListOf<Word>()
-    val wordIndex = cursor.getColumnIndexOrThrow(UserDictionary.Words.WORD)
-    val shortcutIndex = cursor.getColumnIndexOrThrow(UserDictionary.Words.SHORTCUT)
-    val frequencyIndex = cursor.getColumnIndexOrThrow(UserDictionary.Words.FREQUENCY)
-    while (!cursor.isAfterLast) {
-        result.add(Word(cursor.getString(wordIndex), cursor.getString(shortcutIndex), cursor.getInt(frequencyIndex)))
-        cursor.moveToNext()
+    cursor.use {
+        if (!it.moveToFirst()) return emptyList()
+        val result = mutableListOf<Word>()
+        val wordIndex = it.getColumnIndexOrThrow(UserDictionary.Words.WORD)
+        val shortcutIndex = it.getColumnIndexOrThrow(UserDictionary.Words.SHORTCUT)
+        val frequencyIndex = it.getColumnIndexOrThrow(UserDictionary.Words.FREQUENCY)
+        while (!it.isAfterLast) {
+            result.add(Word(it.getString(wordIndex), it.getString(shortcutIndex), it.getInt(frequencyIndex)))
+            it.moveToNext()
+        }
+        return result
     }
-    cursor.close()
-    return result
 }
 
 private fun createCursor(locale: Locale?, context: Context): Cursor? {

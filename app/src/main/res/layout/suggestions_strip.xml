@@ -8,7 +8,6 @@
 <merge
     xmlns:android="http://schemas.android.com/apk/res/android">
     <LinearLayout
-        android:animateLayoutChanges="true"
         android:id="@+id/suggestions_strip_wrapper"
         android:orientation="horizontal"
         android:layout_width="match_parent"

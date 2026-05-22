@@ -64,42 +64,43 @@ object GeminiService : SharedPreferences.OnSharedPreferenceChangeListener {
             val request = Request.Builder().url(url).build()
 
             try {
-                val response = CloudManager.client.newCall(request).execute()
-                val body = response.body?.string()
-                if (response.isSuccessful && body != null) {
-                    val json = JSONObject(body)
-                    val modelsArray = json.getJSONArray("models")
-                    val flashModels = mutableListOf<String>()
+                CloudManager.client.newCall(request).execute().use { response ->
+                    val body = response.body?.string()
+                    if (response.isSuccessful && body != null) {
+                        val json = JSONObject(body)
+                        val modelsArray = json.getJSONArray("models")
+                        val flashModels = mutableListOf<String>()
 
-                    for (i in 0 until modelsArray.length()) {
-                        val modelObj = modelsArray.getJSONObject(i)
-                        val name = modelObj.getString("name").removePrefix("models/")
-                        val supportedMethods = modelObj.getJSONArray("supportedGenerationMethods")
-                        
-                        var supportsGenerateContent = false
-                        for (j in 0 until supportedMethods.length()) {
-                            if (supportedMethods.getString(j) == "generateContent") {
-                                supportsGenerateContent = true
-                                break
+                        for (i in 0 until modelsArray.length()) {
+                            val modelObj = modelsArray.getJSONObject(i)
+                            val name = modelObj.getString("name").removePrefix("models/")
+                            val supportedMethods = modelObj.getJSONArray("supportedGenerationMethods")
+                            
+                            var supportsGenerateContent = false
+                            for (j in 0 until supportedMethods.length()) {
+                                if (supportedMethods.getString(j) == "generateContent") {
+                                    supportsGenerateContent = true
+                                    break
+                                }
+                            }
+
+                            if (supportsGenerateContent && name.contains("flash", ignoreCase = true)) {
+                                flashModels.add(name)
                             }
                         }
 
-                        if (supportsGenerateContent && name.contains("flash", ignoreCase = true)) {
-                            flashModels.add(name)
-                        }
+                        flashModels.sortDescending()
+
+                        val cachedString = flashModels.joinToString(",")
+                        // Synchronous commit to prevent race conditions
+                        prefs.edit().apply {
+                            putString(CloudManager.PREF_CACHED_GEMINI_MODELS, cachedString)
+                            putLong(CloudManager.PREF_GEMINI_MODELS_LAST_FETCH, now)
+                        }.commit() 
+                        Log.d(TAG, "Cached Gemini models: $cachedString")
+                    } else {
+                        Log.e(TAG, "Failed to fetch models: ${response.code} ${response.message}")
                     }
-
-                    flashModels.sortDescending()
-
-                    val cachedString = flashModels.joinToString(",")
-                    // Synchronous commit to prevent race conditions
-                    prefs.edit().apply {
-                        putString(CloudManager.PREF_CACHED_GEMINI_MODELS, cachedString)
-                        putLong(CloudManager.PREF_GEMINI_MODELS_LAST_FETCH, now)
-                    }.commit() 
-                    Log.d(TAG, "Cached Gemini models: $cachedString")
-                } else {
-                    Log.e(TAG, "Failed to fetch models: ${response.code} ${response.message}")
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Error fetching Gemini models: ${e.message}")
@@ -203,42 +204,44 @@ object GeminiService : SharedPreferences.OnSharedPreferenceChangeListener {
             }
 
             override fun onResponse(call: Call, response: Response) {
-                val responseBody = response.body?.string()
-                if (!response.isSuccessful) {
-                    Log.e(TAG, "Model $model returned error ${response.code}: $responseBody")
-                    
-                    // Immediately break for dead keys (400 or 403)
-                    if (response.code == 400 || response.code == 403) {
-                        mainHandler.post {
-                            callback(null, Exception("Invalid API Key. Please check your settings."))
-                        }
-                        return
-                    }
-
-                    executeWithFallback(context, apiKey, prompt, text, models, modelIndex + 1, callback)
-                    return
-                }
-
-                try {
-                    val jsonResponse = JSONObject(responseBody ?: "")
-                    val candidates = jsonResponse.getJSONArray("candidates")
-                    if (candidates.length() > 0) {
-                        val candidate = candidates.getJSONObject(0)
-                        val content = candidate.getJSONObject("content")
-                        val parts = content.getJSONArray("parts")
-                        if (parts.length() > 0) {
-                            val generatedText = parts.getJSONObject(0).getString("text")
+                response.use { resp ->
+                    val responseBody = resp.body?.string()
+                    if (!resp.isSuccessful) {
+                        Log.e(TAG, "Model $model returned error ${resp.code}: $responseBody")
+                        
+                        // Immediately break for dead keys (400 or 403)
+                        if (resp.code == 400 || resp.code == 403) {
                             mainHandler.post {
-                                callback(generatedText, null)
+                                callback(null, Exception("Invalid API Key. Please check your settings."))
                             }
                             return
                         }
+
+                        executeWithFallback(context, apiKey, prompt, text, models, modelIndex + 1, callback)
+                        return
                     }
-                    Log.w(TAG, "Model $model returned empty candidates")
-                    executeWithFallback(context, apiKey, prompt, text, models, modelIndex + 1, callback)
-                } catch (e: Exception) {
-                    Log.e(TAG, "Failed to parse response from $model: ${e.message}")
-                    executeWithFallback(context, apiKey, prompt, text, models, modelIndex + 1, callback)
+
+                    try {
+                        val jsonResponse = JSONObject(responseBody ?: "")
+                        val candidates = jsonResponse.getJSONArray("candidates")
+                        if (candidates.length() > 0) {
+                            val candidate = candidates.getJSONObject(0)
+                            val content = candidate.getJSONObject("content")
+                            val parts = content.getJSONArray("parts")
+                            if (parts.length() > 0) {
+                                val generatedText = parts.getJSONObject(0).getString("text")
+                                mainHandler.post {
+                                    callback(generatedText, null)
+                                }
+                                return
+                            }
+                        }
+                        Log.w(TAG, "Model $model returned empty candidates")
+                        executeWithFallback(context, apiKey, prompt, text, models, modelIndex + 1, callback)
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Failed to parse response from $model: ${e.message}")
+                        executeWithFallback(context, apiKey, prompt, text, models, modelIndex + 1, callback)
+                    }
                 }
             }
         })

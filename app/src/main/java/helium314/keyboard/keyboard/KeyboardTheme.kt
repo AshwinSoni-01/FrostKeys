@@ -237,16 +237,20 @@ private constructor(val themeId: Int, @JvmField val mStyleId: Int) {
                             ColorUtils.setAlphaComponent(saturatedColor, alpha)
                         }
                         val actionAlpha = (15 + (keyTransparency / 255f * 240)).toInt().coerceIn(0, 255)
-                        val accentBase = boostSaturation(if (isNight) ContextCompat.getColor(context, android.R.color.system_accent1_100)
-                            else ContextCompat.getColor(context, android.R.color.system_accent1_200))
+                        val systemAccentColor = if (isNight) ContextCompat.getColor(context, android.R.color.system_accent1_100)
+                            else ContextCompat.getColor(context, android.R.color.system_accent1_200)
+                        val systemNeutralColor = if (isNight) ContextCompat.getColor(context, android.R.color.system_neutral1_900)
+                            else ContextCompat.getColor(context, android.R.color.system_neutral1_50)
+
+                        val accentBase = boostSaturation(systemAccentColor)
                         val accent = ColorUtils.setAlphaComponent(accentBase, actionAlpha)
                         val baseBg = if (isNight) {
-                            val neutral1 = ContextCompat.getColor(context, android.R.color.system_neutral1_900)
+                            val neutral1 = systemNeutralColor
                             val accent1 = ContextCompat.getColor(context, android.R.color.system_accent1_700)
                             val blendRatio = (colorBlendVal - 0.1f).coerceIn(0f, 1f)
                             ColorUtils.blendARGB(neutral1, accent1, blendRatio)
                         } else {
-                            val neutral1 = ContextCompat.getColor(context, android.R.color.system_neutral1_50)
+                            val neutral1 = systemNeutralColor
                             val accent1 = ContextCompat.getColor(context, android.R.color.system_accent1_300)
                             val blendRatio = (colorBlendVal + 0.1f).coerceIn(0f, 1f)
                             ColorUtils.blendARGB(neutral1, accent1, blendRatio)
@@ -311,7 +315,9 @@ private constructor(val themeId: Int, @JvmField val mStyleId: Int) {
                             isFrosted = true,
                             keyBorderColor = borderColor,
                             specialKeyBackground = specialKeyBackground,
-                            enterKeyBackground = enterKeyBackground
+                            enterKeyBackground = enterKeyBackground,
+                            systemAccent = systemAccentColor,
+                            systemNeutral = systemNeutralColor
                         )
                     } else {
                         getThemeColors(if (isNight) THEME_DARK else THEME_LIGHT, themeStyle, context, prefs, isNight)

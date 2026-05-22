@@ -379,6 +379,8 @@ class DefaultColors (
     private val keyBorderColor: Int? = null,
     private val specialKeyBackground: Int = functionalKey,
     private val enterKeyBackground: Int = functionalKey,
+    private val systemAccent: Int? = null,
+    private val systemNeutral: Int? = null,
 ) : Colors {
     private val navBar: Int
     /** brightened or darkened variant of [background], to be used if exact background color would be
@@ -561,6 +563,18 @@ class DefaultColors (
             }
             else -> view.background.colorFilter = backgroundFilter
         }
+    }
+
+    override fun haveColorsChanged(context: Context): Boolean {
+        if (!isFrosted || Build.VERSION.SDK_INT < Build.VERSION_CODES.S || systemAccent == null || systemNeutral == null) {
+            return false
+        }
+        val isNight = helium314.keyboard.keyboard.KeyboardTheme.isDarkThemeActive(context)
+        val currentAccent = if (isNight) ContextCompat.getColor(context, android.R.color.system_accent1_100)
+            else ContextCompat.getColor(context, android.R.color.system_accent1_200)
+        val currentNeutral = if (isNight) ContextCompat.getColor(context, android.R.color.system_neutral1_900)
+            else ContextCompat.getColor(context, android.R.color.system_neutral1_50)
+        return currentAccent != systemAccent || currentNeutral != systemNeutral
     }
 
     private fun getColorFilter(color: ColorType): ColorFilter? = when (color) {

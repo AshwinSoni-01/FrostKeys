@@ -54,7 +54,10 @@ private const val PREF_DEFAULT_BACKUP_RESTORED = "default_backup_restored"
 fun checkVersionUpgrade(context: Context) {
     val prefs = context.prefs()
     var oldVersion = prefs.getInt(Settings.PREF_VERSION_CODE, 0)
-    if (oldVersion == 0 && !prefs.getBoolean(PREF_DEFAULT_BACKUP_RESTORED, false) && !isRestoringDefaultBackup) {
+    val isFreshInstall = prefs.all.keys.none {
+        it != PREF_DEFAULT_BACKUP_RESTORED && it != Settings.PREF_VERSION_CODE && it != Settings.PREF_EMOJI_MAX_SDK
+    }
+    if (oldVersion == 0 && isFreshInstall && !prefs.getBoolean(PREF_DEFAULT_BACKUP_RESTORED, false) && !isRestoringDefaultBackup) {
         isRestoringDefaultBackup = true
         try {
             context.assets.open("default_backup.zip").use { inputStream ->
@@ -67,6 +70,8 @@ fun checkVersionUpgrade(context: Context) {
             isRestoringDefaultBackup = false
         }
         oldVersion = prefs.getInt(Settings.PREF_VERSION_CODE, 0)
+    } else if (oldVersion == 0 && !isFreshInstall && !prefs.getBoolean(PREF_DEFAULT_BACKUP_RESTORED, false)) {
+        prefs.edit { putBoolean(PREF_DEFAULT_BACKUP_RESTORED, true) }
     }
     if (oldVersion != BuildConfig.VERSION_CODE)
         AppUpgrade.onUpgrade(context)

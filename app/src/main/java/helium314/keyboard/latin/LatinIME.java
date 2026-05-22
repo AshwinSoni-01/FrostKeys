@@ -59,7 +59,6 @@ import helium314.keyboard.keyboard.KeyboardId;
 import helium314.keyboard.keyboard.KeyboardLayoutSet;
 import helium314.keyboard.keyboard.KeyboardSwitcher;
 import helium314.keyboard.keyboard.KlipyPalettesView;
-import helium314.keyboard.keyboard.KlipyPanelActivity;
 import helium314.keyboard.keyboard.MainKeyboardView;
 import helium314.keyboard.latin.SuggestedWords.SuggestedWordInfo;
 import helium314.keyboard.latin.common.ColorType;
@@ -1000,6 +999,7 @@ public class LatinIME extends InputMethodService implements
     public void onStartInputView(final EditorInfo editorInfo, final boolean restarting) {
         mHandler.onStartInputView(editorInfo, restarting);
         mStatsUtilsManager.onStartInputView();
+        FrostedGlassHelper.configureFrostedGlass(this, mInputView, FrostedGlassHelper.isFrostedTheme(this));
     }
 
     @Override
@@ -1251,6 +1251,7 @@ public class LatinIME extends InputMethodService implements
         if (isInputViewShown()) {
             setNavigationBarColor();
             workaroundForHuaweiStatusBarIssue();
+            FrostedGlassHelper.configureFrostedGlass(this, mInputView, FrostedGlassHelper.isFrostedTheme(this));
         }
     }
 
@@ -1261,11 +1262,20 @@ public class LatinIME extends InputMethodService implements
         }
         super.onWindowHidden();
         Log.i(TAG, "onWindowHidden");
+
+        mKeyboardSwitcher.clearCachedPersistentEmojis();
+
+        // Completely disable background blur composition, layout attributes and clear SemBlurInfo/window flags to save GPU context
+        FrostedGlassHelper.configureFrostedGlass(this, mInputView, false);
+
         final MainKeyboardView mainKeyboardView = mKeyboardSwitcher.getMainKeyboardView();
         if (mainKeyboardView != null) {
             mainKeyboardView.closing();
         }
         clearNavigationBarColor();
+
+        // Release keyboard buffers and stop active panels without forcing a process-wide GC.
+        deallocateMemory();
     }
 
     void onFinishInputInternal() {
@@ -2062,14 +2072,6 @@ public class LatinIME extends InputMethodService implements
             return START_NOT_STICKY;
         }
 
-        if (intent != null && KlipyPanelActivity.KLIPY_DONE_ACTION.equals(intent.getAction())) {
-            Uri uri = intent.getParcelableExtra(KlipyPanelActivity.KLIPY_URI_KEY);
-            String mimeType = intent.getStringExtra(KlipyPanelActivity.KLIPY_MIME_KEY);
-            String label = intent.getStringExtra(KlipyPanelActivity.KLIPY_LABEL_KEY);
-            if (uri != null && mimeType != null) {
-                mHandler.postDelayed(() -> commitKlipyContent(uri, label != null ? label : "Klipy", mimeType), 100);
-            }
-        }
 
         return super.onStartCommand(intent, flags, startId);
     }

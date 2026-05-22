@@ -11,6 +11,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -39,8 +40,11 @@ fun PersonalDictionariesScreen(
 ) {
     // todo: consider adding "add word" button like old settings (requires additional navigation parameter, should not be hard)
     val ctx = LocalContext.current
-    val locales: MutableList<Locale?> = getSortedDictionaryLocales().toMutableList()
-    locales.add(0, null)
+    val locales = remember {
+        val list = getSortedDictionaryLocales().toMutableList<Locale?>()
+        list.add(0, null)
+        list
+    }
     SearchScreen(
         onClickBack = onClickBack,
         title = { Text(stringResource(R.string.edit_personal_dictionary)) },

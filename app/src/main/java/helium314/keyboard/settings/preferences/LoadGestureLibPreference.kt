@@ -51,11 +51,11 @@ fun LoadGestureLibPreference(setting: Setting) {
         try {
             val otherTemporaryFile = File(ctx.filesDir.absolutePath + File.separator + "tmpfile")
             FileUtils.copyContentUriToNewFile(uri, ctx, otherTemporaryFile)
-            val inputStream = FileInputStream(otherTemporaryFile)
-            val outputStream = FileOutputStream(tmpfile)
-            outputStream.use {
-                tmpfile.setReadOnly() // as per recommendations in https://developer.android.com/about/versions/14/behavior-changes-14#safer-dynamic-code-loading
-                FileUtils.copyStreamToOtherStream(inputStream, it)
+            FileInputStream(otherTemporaryFile).use { inputStream ->
+                FileOutputStream(tmpfile).use { outputStream ->
+                    tmpfile.setReadOnly() // as per recommendations in https://developer.android.com/about/versions/14/behavior-changes-14#safer-dynamic-code-loading
+                    FileUtils.copyStreamToOtherStream(inputStream, outputStream)
+                }
             }
             otherTemporaryFile.delete()
 

@@ -288,6 +288,10 @@ public final class EmojiPalettesView extends LinearLayout
 
     public static class AdaptiveEmojiEngine {
         private static final String PREF_ADAPTIVE_METADATA = "pref_adaptive_emoji_metadata";
+        private static final String PREF_FAST_ROW_CACHE = "pref_adaptive_emoji_fast_row_cache";
+        private static final String PREF_FAST_ROW_LAST_REFRESH = "pref_adaptive_emoji_fast_row_last_refresh";
+        private static final long FAST_ROW_REFRESH_INTERVAL_MILLIS = 12L * 60L * 60L * 1000L;
+        private static final double RECENCY_DECAY_SECONDS = 7.0 * 24.0 * 60.0 * 60.0;
 
         public static void recordEmojiUsage(@NonNull final Context context, @NonNull final String emoji) {
             final android.content.SharedPreferences prefs = helium314.keyboard.latin.utils.KtxKt.prefs(context);
@@ -331,7 +335,52 @@ public final class EmojiPalettesView extends LinearLayout
             prefs.edit().putString(PREF_ADAPTIVE_METADATA, root.toString()).apply();
         }
 
-        public static java.util.List<String> getRankedEmojis(@NonNull final Context context) {
+        public static boolean shouldRefreshFastRow(@NonNull final Context context) {
+            final android.content.SharedPreferences prefs = helium314.keyboard.latin.utils.KtxKt.prefs(context);
+            final long now = System.currentTimeMillis();
+            return shouldRefreshFastRow(prefs, readCachedFastRow(prefs), now);
+        }
+
+        public static java.util.List<String> getFastRowEmojis(@NonNull final Context context) {
+            final android.content.SharedPreferences prefs = helium314.keyboard.latin.utils.KtxKt.prefs(context);
+            final long now = System.currentTimeMillis();
+            final java.util.List<String> cached = readCachedFastRow(prefs);
+            if (!shouldRefreshFastRow(prefs, cached, now)) {
+                return cached;
+            }
+
+            final java.util.List<String> ranked = getRankedEmojis(context);
+            final java.util.ArrayList<Object> cacheObjects = new java.util.ArrayList<>();
+            cacheObjects.addAll(ranked);
+            prefs.edit()
+                    .putString(PREF_FAST_ROW_CACHE, helium314.keyboard.latin.utils.JsonUtils.listToJsonStr(cacheObjects))
+                    .putLong(PREF_FAST_ROW_LAST_REFRESH, now)
+                    .apply();
+            return ranked;
+        }
+
+        private static boolean shouldRefreshFastRow(final android.content.SharedPreferences prefs,
+                final java.util.List<String> cached, final long now) {
+            final long lastRefresh = prefs.getLong(PREF_FAST_ROW_LAST_REFRESH, 0L);
+            return cached.isEmpty()
+                    || lastRefresh <= 0L
+                    || now < lastRefresh
+                    || now - lastRefresh >= FAST_ROW_REFRESH_INTERVAL_MILLIS;
+        }
+
+        private static java.util.List<String> readCachedFastRow(final android.content.SharedPreferences prefs) {
+            final String jsonStr = prefs.getString(PREF_FAST_ROW_CACHE, "");
+            final java.util.List<Object> cachedObjects = helium314.keyboard.latin.utils.JsonUtils.jsonStrToList(jsonStr);
+            final java.util.ArrayList<String> cached = new java.util.ArrayList<>();
+            for (final Object o : cachedObjects) {
+                if (o instanceof String) {
+                    cached.add((String) o);
+                }
+            }
+            return cached;
+        }
+
+        private static java.util.List<String> getRankedEmojis(@NonNull final Context context) {
             final android.content.SharedPreferences prefs = helium314.keyboard.latin.utils.KtxKt.prefs(context);
             final String jsonStr = prefs.getString(PREF_ADAPTIVE_METADATA, "{}");
             org.json.JSONObject root;
@@ -352,19 +401,20 @@ public final class EmojiPalettesView extends LinearLayout
                     final int freq = record.optInt("freq", 1);
                     final int burst = record.optInt("burst", 1);
 
-                    // 1. Recency factor
+                    // 1. Frequency grows sublinearly so one emoji cannot dominate forever.
+                    double freqScore = Math.log1p(freq) * 30.0;
+
+                    // 2. Exponential Recency decay factor. The fast row should feel stable across days.
                     long deltaSec = (now - lastUsed) / 1000L;
                     if (deltaSec < 0) deltaSec = 0;
-                    double recencyScore = 100.0 / (1.0 + deltaSec / 600.0);
+                    double decay = Math.exp(-deltaSec / RECENCY_DECAY_SECONDS);
+                    double recencyScore = decay * 100.0;
 
-                    // 2. Burst factor
-                    double burstScore = (now - lastUsed < 300_000L) ? Math.min(burst, 10) * 15.0 : 0.0;
-
-                    // 3. Frequency factor
-                    double freqScore = Math.min(freq, 100) * 0.4;
+                    // 3. Burst factor (active 15-minute window for burst boosts)
+                    double burstBoost = (now - lastUsed < 900_000L) ? Math.min(burst, 5) * 20.0 : 0.0;
 
                     // Total Score
-                    double score = recencyScore * 1.2 + burstScore * 1.0 + freqScore * 1.0;
+                    double score = recencyScore + burstBoost + freqScore;
                     list.add(new EmojiScore(emoji, score));
                 }
             }

@@ -68,10 +68,12 @@ fun DictionaryScreen(
     onClickBack: () -> Unit,
 ) {
     val ctx = LocalContext.current
-    val enabledLanguages = SubtypeSettings.getEnabledSubtypes(true).map { it.locale().language }
-    val cachedDictFolders = DictionaryInfoUtils.getCacheDirectories(ctx).map { it.name }
-    val comparer = compareBy<Locale>({ it.language !in enabledLanguages }, { it.toLanguageTag() !in cachedDictFolders }, { it.displayName })
-    val dictionaryLocales = listOf(Locale(SubtypeLocaleUtils.NO_LANGUAGE)) + getDictionaryLocales(ctx).sortedWith(comparer)
+    val enabledLanguages = remember { SubtypeSettings.getEnabledSubtypes(true).map { it.locale().language } }
+    val cachedDictFolders = remember { DictionaryInfoUtils.getCacheDirectories(ctx).map { it.name } }
+    val dictionaryLocales = remember(enabledLanguages, cachedDictFolders) {
+        val comparer = compareBy<Locale>({ it.language !in enabledLanguages }, { it.toLanguageTag() !in cachedDictFolders }, { it.displayName })
+        listOf(Locale(SubtypeLocaleUtils.NO_LANGUAGE)) + getDictionaryLocales(ctx).sortedWith(comparer)
+    }
     var selectedLocale: Locale? by remember { mutableStateOf(null) }
     var showAddDictDialog by remember { mutableStateOf(false) }
     val dictPicker = dictionaryFilePicker(selectedLocale)
@@ -98,7 +100,7 @@ fun DictionaryScreen(
                     .padding(vertical = 6.dp, horizontal = 16.dp)
                     .fillMaxWidth()
             ) {
-                val (dicts, hasInternal) = getUserAndInternalDictionaries(ctx, locale)
+                val (dicts, hasInternal) = remember(locale) { getUserAndInternalDictionaries(ctx, locale) }
                 val types = dicts.mapTo(mutableListOf()) { it.name.substringBefore("_${DictionaryInfoUtils.USER_DICTIONARY_SUFFIX}") }
                 if (hasInternal && !types.contains(Dictionary.TYPE_MAIN))
                     types.add(0, stringResource(R.string.internal_dictionary_summary))

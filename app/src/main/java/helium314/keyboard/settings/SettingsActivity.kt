@@ -206,18 +206,18 @@ open class SettingsActivity : ComponentActivity(), SharedPreferences.OnSharedPre
         val files = findCrashReports(false)
         if (files.isEmpty()) return
         runCatching {
-            contentResolver.openOutputStream(uri)?.use {
-                val bos = BufferedOutputStream(it)
-                val z = ZipOutputStream(bos)
-                for (file in files) {
-                    val f = FileInputStream(file)
-                    z.putNextEntry(ZipEntry(file.name))
-                    FileUtils.copyStreamToOtherStream(f, z)
-                    f.close()
-                    z.closeEntry()
+            contentResolver.openOutputStream(uri)?.use { output ->
+                BufferedOutputStream(output).use { bos ->
+                    ZipOutputStream(bos).use { z ->
+                        for (file in files) {
+                            FileInputStream(file).use { f ->
+                                z.putNextEntry(ZipEntry(file.name))
+                                FileUtils.copyStreamToOtherStream(f, z)
+                                z.closeEntry()
+                            }
+                        }
+                    }
                 }
-                z.close()
-                bos.close()
                 for (file in files) {
                     file.delete()
                 }
