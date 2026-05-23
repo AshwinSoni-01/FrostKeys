@@ -15,3 +15,9 @@ tools/*.txt
 *.patch
 *.diff
 *.sh
+
+# Ignore root-level screenshots, log files, logcat dumps, and workspace
+/*.png
+/*.log
+/*logcat*.txt
+/*.code-workspace
