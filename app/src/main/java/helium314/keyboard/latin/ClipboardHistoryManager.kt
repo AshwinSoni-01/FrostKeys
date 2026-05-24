@@ -2,11 +2,19 @@
 
 package helium314.keyboard.latin
 
+import android.Manifest
+import android.content.ContentUris
 import android.content.ClipDescription
 import android.content.ClipboardManager
 import android.content.Context
+import android.database.ContentObserver
 import android.graphics.Outline
 import android.net.Uri
+import android.os.Build
+import android.os.Environment
+import android.os.Handler
+import android.os.Looper
+import android.provider.MediaStore
 import android.text.InputType
 import android.text.TextUtils
 import android.view.LayoutInflater
@@ -15,6 +23,7 @@ import android.view.ViewGroup
 import android.view.ViewOutlineProvider
 import android.view.inputmethod.EditorInfo
 import android.widget.ImageView
+import androidx.core.content.edit
 import androidx.core.content.FileProvider
 import androidx.core.view.isGone
 import coil.load
@@ -26,16 +35,15 @@ import helium314.keyboard.latin.common.ColorType
 import helium314.keyboard.latin.common.isValidNumber
 import helium314.keyboard.latin.database.ClipboardDao
 import helium314.keyboard.latin.databinding.ClipboardSuggestionBinding
+import helium314.keyboard.latin.permissions.PermissionsUtil
 import helium314.keyboard.latin.utils.InputTypeUtils
 import helium314.keyboard.latin.utils.Log
 import helium314.keyboard.latin.utils.ToolbarKey
+import helium314.keyboard.latin.utils.prefs
 import java.io.File
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
-import android.database.ContentObserver
-import android.provider.MediaStore
-import android.content.ContentUris
 
 class ClipboardHistoryManager(
         private val latinIME: LatinIME
@@ -46,6 +54,7 @@ class ClipboardHistoryManager(
     private var clipboardDao: ClipboardDao? = null
     private var screenshotObserver: ContentObserver? = null
     private var lastProcessedImageUri: String? = null
+    private var screenshotInFlightUri: String? = null
 
     fun onCreate() {
         clipboardManager = latinIME.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
@@ -53,7 +62,7 @@ class ClipboardHistoryManager(
         clipboardDao = ClipboardDao.getInstance(latinIME)
         if (latinIME.mSettings.current.mClipboardHistoryEnabled)
             fetchPrimaryClip()
-        registerScreenshotObserver()
+        syncScreenshotObserver()
     }
 
     fun onDestroy() {
@@ -61,24 +70,50 @@ class ClipboardHistoryManager(
         unregisterScreenshotObserver()
     }
 
+    private fun syncScreenshotObserver() {
+        if (shouldObserveScreenshots()) registerScreenshotObserver()
+        else unregisterScreenshotObserver()
+    }
+
+    private fun shouldObserveScreenshots(): Boolean {
+        val settings = latinIME.mSettings.current
+        return settings.mClipboardHistoryEnabled
+                && settings.mShowScreenshotsInClipboard
+                && hasScreenshotReadPermission()
+    }
+
+    private fun hasScreenshotReadPermission(): Boolean {
+        val permission = when {
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU -> Manifest.permission.READ_MEDIA_IMAGES
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.M -> Manifest.permission.READ_EXTERNAL_STORAGE
+            else -> return true
+        }
+        return PermissionsUtil.checkAllPermissionsGranted(latinIME, permission)
+    }
+
     private fun registerScreenshotObserver() {
         if (screenshotObserver != null) return
         
-        screenshotObserver = object : ContentObserver(android.os.Handler(android.os.Looper.getMainLooper())) {
+        screenshotObserver = object : ContentObserver(Handler(Looper.getMainLooper())) {
+            override fun onChange(selfChange: Boolean) {
+                super.onChange(selfChange)
+                onScreenshotMediaChanged()
+            }
+
             override fun onChange(selfChange: Boolean, uri: Uri?) {
                 super.onChange(selfChange, uri)
-                if (!latinIME.mSettings.current.mShowScreenshotsInClipboard || !latinIME.mSettings.current.mClipboardHistoryEnabled) return
-                if (uri != null) {
-                    checkForNewScreenshot(uri)
-                } else {
-                    checkForNewScreenshot(MediaStore.Images.Media.EXTERNAL_CONTENT_URI)
-                }
+                onScreenshotMediaChanged()
+            }
+
+            override fun onChange(selfChange: Boolean, uris: Collection<Uri>, flags: Int) {
+                super.onChange(selfChange, uris, flags)
+                onScreenshotMediaChanged()
             }
         }
         
         try {
             latinIME.contentResolver.registerContentObserver(
-                MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+                imageCollectionUri(),
                 true,
                 screenshotObserver!!
             )
@@ -98,95 +133,182 @@ class ClipboardHistoryManager(
         }
     }
 
-    private fun checkForNewScreenshot(targetUri: Uri) {
+    private fun onScreenshotMediaChanged() {
+        if (!shouldObserveScreenshots()) {
+            syncScreenshotObserver()
+            return
+        }
+        checkForNewScreenshot()
+    }
+
+    private fun checkForNewScreenshot() {
         GlobalScope.launch(Dispatchers.IO) {
             try {
-                val projection = arrayOf(
-                    MediaStore.Images.Media._ID,
-                    MediaStore.Images.Media.DISPLAY_NAME,
-                    MediaStore.Images.Media.DATE_ADDED
+                if (!shouldObserveScreenshots()) return@launch
+                val screenshot = queryLatestScreenshot() ?: return@launch
+                val uriString = screenshot.uri.toString()
+                if (!claimScreenshotUri(uriString)) return@launch
+
+                val imageClip = RecentClip.Image(
+                    uri = screenshot.uri,
+                    mimeType = screenshot.mimeType,
+                    label = "Screenshot",
+                    timeStamp = System.currentTimeMillis()
                 )
-                
-                val cursor = if (targetUri.toString().startsWith(MediaStore.Images.Media.EXTERNAL_CONTENT_URI.toString())) {
-                    if (targetUri == MediaStore.Images.Media.EXTERNAL_CONTENT_URI) {
-                        latinIME.contentResolver.query(
-                            targetUri,
-                            projection,
-                            null,
-                            null,
-                            "${MediaStore.Images.Media.DATE_ADDED} DESC LIMIT 1"
-                        )
-                    } else {
-                        latinIME.contentResolver.query(targetUri, projection, null, null, null)
-                    }
+
+                val cachedUri = cacheImageClip(imageClip)
+                val dao = clipboardDao
+                if (cachedUri != null && dao != null) {
+                    val timeStamp = System.currentTimeMillis()
+                    dao.addClip(
+                        timeStamp,
+                        false,
+                        encodeImageHistoryClip(cachedUri, imageClip.mimeType, imageClip.label)
+                    )
+                    completeScreenshotUri(uriString, screenshot.dateAdded, true)
+                    refreshClipboardSuggestion()
                 } else {
-                    null
-                }
-                
-                cursor?.use { c ->
-                    if (c.moveToFirst()) {
-                        val idIndex = c.getColumnIndex(MediaStore.Images.Media._ID)
-                        val nameIndex = c.getColumnIndex(MediaStore.Images.Media.DISPLAY_NAME)
-                        val dateIndex = c.getColumnIndex(MediaStore.Images.Media.DATE_ADDED)
-                        
-                        if (idIndex != -1 && nameIndex != -1 && dateIndex != -1) {
-                            val id = c.getLong(idIndex)
-                            val name = c.getString(nameIndex) ?: ""
-                            val dateAdded = c.getLong(dateIndex)
-                            
-                            val itemUri = ContentUris.withAppendedId(
-                                MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
-                                id
-                            )
-                            
-                            // Check if this image was added very recently (e.g. within 15 seconds)
-                            val nowSec = System.currentTimeMillis() / 1000L
-                            val isRecent = (nowSec - dateAdded) < 15L
-                            
-                            // Check if the display name indicates it is a screenshot
-                            val isScreenshot = name.contains("screenshot", ignoreCase = true)
-                            
-                            if (isRecent && isScreenshot && itemUri.toString() != lastProcessedImageUri) {
-                                lastProcessedImageUri = itemUri.toString()
-                                val mimeType = latinIME.contentResolver.getType(itemUri) ?: "image/png"
-                                
-                                val imageClip = RecentClip.Image(
-                                    uri = itemUri,
-                                    mimeType = mimeType,
-                                    label = "Screenshot",
-                                    timeStamp = System.currentTimeMillis()
-                                )
-                                
-                                val cachedUri = cacheImageClip(imageClip)
-                                if (cachedUri != null) {
-                                    val timeStamp = System.currentTimeMillis()
-                                    clipboardDao?.addClip(
-                                        timeStamp,
-                                        false,
-                                        encodeImageHistoryClip(cachedUri, imageClip.mimeType, imageClip.label)
-                                    )
-                                    
-                                    val clipData = android.content.ClipData.newUri(
-                                        latinIME.contentResolver,
-                                        "Screenshot",
-                                        cachedUri
-                                    )
-                                    
-                                    latinIME.mHandler.post {
-                                        try {
-                                            clipboardManager.setPrimaryClip(clipData)
-                                        } catch (e: Exception) {
-                                            Log.e("ClipboardHistoryManager", "Failed to update system clipboard", e)
-                                        }
-                                        refreshClipboardSuggestion()
-                                    }
-                                }
-                            }
-                        }
-                    }
+                    completeScreenshotUri(uriString, screenshot.dateAdded, false)
                 }
             } catch (e: Exception) {
                 Log.e("ClipboardHistoryManager", "Failed checking for new screenshot", e)
+            }
+        }
+    }
+
+    private data class ScreenshotMedia(
+        val uri: Uri,
+        val mimeType: String,
+        val dateAdded: Long
+    )
+
+    private fun queryLatestScreenshot(): ScreenshotMedia? {
+        val projection = mutableListOf(
+            MediaStore.Images.Media._ID,
+            MediaStore.Images.Media.DATE_ADDED,
+            MediaStore.Images.Media.MIME_TYPE
+        ).apply {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                add(MediaStore.Images.Media.RELATIVE_PATH)
+            } else {
+                @Suppress("DEPRECATION")
+                add(MediaStore.Images.Media.DATA)
+            }
+        }.toTypedArray()
+        val recentSinceSeconds = System.currentTimeMillis() / 1000L - SCREENSHOT_RECENT_WINDOW_SECONDS
+        val (selection, selectionArgs) = screenshotSelection(recentSinceSeconds)
+        val sortOrder = "${MediaStore.Images.Media.DATE_ADDED} DESC, ${MediaStore.Images.Media._ID} DESC"
+        latinIME.contentResolver.query(
+            imageCollectionUri(),
+            projection,
+            selection,
+            selectionArgs,
+            sortOrder
+        )?.use { cursor ->
+            val idIndex = cursor.getColumnIndex(MediaStore.Images.Media._ID)
+            val dateIndex = cursor.getColumnIndex(MediaStore.Images.Media.DATE_ADDED)
+            val mimeIndex = cursor.getColumnIndex(MediaStore.Images.Media.MIME_TYPE)
+            val pathIndex = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                cursor.getColumnIndex(MediaStore.Images.Media.RELATIVE_PATH)
+            } else {
+                @Suppress("DEPRECATION")
+                cursor.getColumnIndex(MediaStore.Images.Media.DATA)
+            }
+            if (idIndex == -1 || dateIndex == -1 || mimeIndex == -1 || pathIndex == -1) return null
+
+            var checkedRows = 0
+            while (cursor.moveToNext() && checkedRows < MAX_SCREENSHOT_ROWS_TO_CHECK) {
+                checkedRows++
+                val path = cursor.getString(pathIndex)
+                if (!isScreenshotPath(path)) continue
+
+                val id = cursor.getLong(idIndex)
+                val itemUri = ContentUris.withAppendedId(imageCollectionUri(), id)
+                val mimeType = cursor.getString(mimeIndex)
+                    ?.takeIf { ClipDescription.compareMimeTypes(it, "image/*") }
+                    ?: latinIME.contentResolver.getType(itemUri)
+                        ?.takeIf { ClipDescription.compareMimeTypes(it, "image/*") }
+                    ?: continue
+                return ScreenshotMedia(itemUri, mimeType, cursor.getLong(dateIndex))
+            }
+        }
+        return null
+    }
+
+    private fun imageCollectionUri(): Uri {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL)
+        } else {
+            MediaStore.Images.Media.EXTERNAL_CONTENT_URI
+        }
+    }
+
+    private fun screenshotSelection(recentSinceSeconds: Long): Pair<String, Array<String>> {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val pathSelection = SCREENSHOT_RELATIVE_PATHS.joinToString(" OR ") {
+                "${MediaStore.Images.Media.RELATIVE_PATH} LIKE ?"
+            }
+            val selection = "($pathSelection) AND ${MediaStore.Images.Media.DATE_ADDED} >= ? " +
+                    "AND ${MediaStore.Images.Media.MIME_TYPE} LIKE ? " +
+                    "AND ${MediaStore.Images.Media.IS_PENDING} = 0"
+            val args = SCREENSHOT_RELATIVE_PATHS.map { "$it%" } +
+                    listOf(recentSinceSeconds.toString(), "image/%")
+            selection to args.toTypedArray()
+        } else {
+            @Suppress("DEPRECATION")
+            val pathSelection = screenshotAbsoluteDirectoryPrefixes().joinToString(" OR ") {
+                "${MediaStore.Images.Media.DATA} LIKE ?"
+            }
+            @Suppress("DEPRECATION")
+            val selection = "($pathSelection) AND ${MediaStore.Images.Media.DATE_ADDED} >= ? " +
+                    "AND ${MediaStore.Images.Media.MIME_TYPE} LIKE ?"
+            val args = screenshotAbsoluteDirectoryPrefixes().map { "$it%" } +
+                    listOf(recentSinceSeconds.toString(), "image/%")
+            selection to args.toTypedArray()
+        }
+    }
+
+    private fun isScreenshotPath(path: String?): Boolean {
+        val normalizedPath = path?.replace('\\', '/') ?: return false
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            SCREENSHOT_RELATIVE_PATHS.any { normalizedPath.startsWith(it, ignoreCase = true) }
+        } else {
+            screenshotAbsoluteDirectoryPrefixes()
+                .map { it.replace('\\', '/') }
+                .any { normalizedPath.startsWith(it, ignoreCase = true) }
+        }
+    }
+
+    private fun screenshotAbsoluteDirectoryPrefixes(): List<String> {
+        @Suppress("DEPRECATION")
+        val root = Environment.getExternalStorageDirectory()
+        @Suppress("DEPRECATION")
+        return listOf(
+            File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES), "Screenshots"),
+            File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM), "Screenshots"),
+            File(root, "Screenshots")
+        ).map { it.absolutePath.trimEnd('/', '\\') + File.separator }
+    }
+
+    private fun claimScreenshotUri(uriString: String): Boolean = synchronized(this) {
+        val lastPersistedUri = latinIME.prefs().getString(PREF_LAST_SCREENSHOT_MEDIA_URI, null)
+        if (uriString == lastProcessedImageUri || uriString == screenshotInFlightUri || uriString == lastPersistedUri) {
+            false
+        } else {
+            screenshotInFlightUri = uriString
+            true
+        }
+    }
+
+    private fun completeScreenshotUri(uriString: String, dateAdded: Long, processed: Boolean) {
+        synchronized(this) {
+            if (processed) lastProcessedImageUri = uriString
+            if (screenshotInFlightUri == uriString) screenshotInFlightUri = null
+        }
+        if (processed) {
+            latinIME.prefs().edit {
+                putString(PREF_LAST_SCREENSHOT_MEDIA_URI, uriString)
+                putLong(PREF_LAST_SCREENSHOT_DATE_ADDED, dateAdded)
             }
         }
     }
@@ -201,6 +323,7 @@ class ClipboardHistoryManager(
     }
 
     fun updatePrimaryClip() {
+        syncScreenshotObserver()
         if (latinIME.mSettings.current.mClipboardHistoryEnabled) {
             fetchPrimaryClip()
         }
@@ -422,9 +545,9 @@ class ClipboardHistoryManager(
     private fun pasteImageClip(clip: RecentClip.Image, chipView: View, feedbackView: View) {
         val cachedUri = cacheImageClip(clip) ?: return
         dontShowCurrentSuggestion = true
-        latinIME.commitKlipyContent(cachedUri, clip.label, clip.mimeType)
+        val pasted = latinIME.commitKlipyContent(cachedUri, clip.label, clip.mimeType)
         AudioAndHapticFeedbackManager.getInstance().performHapticAndAudioFeedback(KeyCode.NOT_SPECIFIED, feedbackView, HapticEvent.KEY_PRESS)
-        chipView.isGone = true
+        if (pasted) chipView.isGone = true
     }
 
     private fun cacheImageClip(clip: RecentClip.Image): Uri? {
@@ -451,8 +574,7 @@ class ClipboardHistoryManager(
 
     fun pasteHistoryEntry(entry: ClipboardHistoryEntry): Boolean {
         val clip = decodeImageHistoryClip(entry.text) ?: return false
-        latinIME.commitKlipyContent(clip.uri, clip.label, clip.mimeType)
-        return true
+        return latinIME.commitKlipyContent(clip.uri, clip.label, clip.mimeType)
     }
 
     private fun removeClipboardSuggestion() {
@@ -468,6 +590,15 @@ class ClipboardHistoryManager(
 
     companion object {
         private const val IMAGE_HISTORY_PREFIX = "\u0001image\t"
+        private const val PREF_LAST_SCREENSHOT_MEDIA_URI = "clipboard_last_screenshot_media_uri"
+        private const val PREF_LAST_SCREENSHOT_DATE_ADDED = "clipboard_last_screenshot_date_added"
+        private const val SCREENSHOT_RECENT_WINDOW_SECONDS = 30L
+        private const val MAX_SCREENSHOT_ROWS_TO_CHECK = 5
+        private val SCREENSHOT_RELATIVE_PATHS = listOf(
+            "Pictures/Screenshots/",
+            "DCIM/Screenshots/",
+            "Screenshots/"
+        )
         private var dontShowCurrentSuggestion: Boolean = false
         const val RECENT_TIME_MILLIS = 3 * 60 * 1000L // 3 minutes (for clipboard suggestions)
 

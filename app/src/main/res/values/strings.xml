@@ -217,9 +217,9 @@
     <!-- Description for enabling/disabling clipboard history mentioning that if disabled, clipboard content is pasted -->
     <string name="enable_clipboard_history_summary">If disabled, clipboard key will paste clipboard content if any</string>
     <!-- Preferences item for showing screenshots and image clipboard entries in clipboard UI. -->
-    <string name="show_screenshots_in_clipboard">Show screenshots in clipboard</string>
+    <string name="show_screenshots_in_clipboard">Show recent screenshots and copied images in clipboard</string>
     <!-- Description for showing screenshots and image clipboard entries in clipboard UI. -->
-    <string name="show_screenshots_in_clipboard_summary">Show recent screenshot and image clips in clipboard history and the paste suggestion</string>
+    <string name="show_screenshots_in_clipboard_summary">Requires storage permission. Shows copied images and recent screenshots from standard Screenshots folders in clipboard history and the paste suggestion</string>
     <!-- Preferences item for controlling clipboard history retention time -->
     <string name="clipboard_history_retention_time">History retention time</string>
     <!-- Preferences item for showing pinned clipboard items first -->
@@ -984,6 +984,8 @@ New dictionary:
     <string name="auto_hide_toolbar_summary">Hide the toolbar when suggestions become available</string>
     <!-- Toast message shown when content is copied to the clipboard -->
     <string name="toast_msg_clipboard_copy">Content copied</string>
+    <!-- Toast message shown when rich content, like an image, GIF, or sticker, cannot be pasted into the current app. -->
+    <string name="toast_msg_content_paste_failed">Could not send media</string>
     <!-- Title of the setting to customize icons for keyboard and toolbar keys -->
     <string name="customize_icons">Customize icons</string>
     <!-- Confirmation message when resetting all custom icons -->

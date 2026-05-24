@@ -3,8 +3,11 @@
 package helium314.keyboard.keyboard.clipboard
 
 import android.annotation.SuppressLint
+import android.graphics.Color
 import android.graphics.Outline
 import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.StateListDrawable
 import android.util.TypedValue
 import android.view.LayoutInflater
 import android.view.MotionEvent
@@ -17,11 +20,13 @@ import androidx.core.view.isGone
 import androidx.recyclerview.widget.RecyclerView
 import androidx.recyclerview.widget.StaggeredGridLayoutManager
 import coil.load
+import helium314.keyboard.keyboard.KeyboardTheme
 import helium314.keyboard.latin.ClipboardHistoryEntry
 import helium314.keyboard.latin.ClipboardHistoryManager
 import helium314.keyboard.latin.R
 import helium314.keyboard.latin.common.ColorType
 import helium314.keyboard.latin.settings.Settings
+import androidx.core.graphics.ColorUtils
 
 class ClipboardAdapter(
        val clipboardLayoutParams: ClipboardLayoutParams,
@@ -39,6 +44,8 @@ class ClipboardAdapter(
     companion object {
         private const val VIEW_TYPE_TEXT = 0
         private const val VIEW_TYPE_IMAGE = 1
+        private const val ROUNDED_ENTRY_RADIUS_DP = 18f
+        private const val DEFAULT_IMAGE_RADIUS_DP = 8f
     }
 
     override fun getItemViewType(position: Int): Int {
@@ -83,30 +90,66 @@ class ClipboardAdapter(
                 setBackgroundResource(itemBackgroundId)
                 isHapticFeedbackEnabled = false
             }
-            Settings.getValues().mColors.setBackground(view, ColorType.KEY_BACKGROUND)
+            val colors = Settings.getValues().mColors
+            val usesRoundedCards = colors.themeStyle == KeyboardTheme.STYLE_ROUNDED
+                    || colors.themeStyle == KeyboardTheme.STYLE_CIRCLE
+            if (usesRoundedCards) {
+                view.background = createRoundedClipboardEntryBackground(view)
+            } else {
+                colors.setBackground(view, ColorType.KEY_BACKGROUND)
+            }
             pinnedIconView = view.findViewById<ImageView>(R.id.clipboard_entry_pinned_icon).apply {
                 visibility = View.GONE
                 setImageResource(pinnedIconResId)
             }
             imageView = view.findViewById(R.id.clipboard_entry_image)
-            val cornerRadiusDp = Settings.getValues().mKeyboardCornerRadiusDp
-            if (cornerRadiusDp > 0) {
-                val cornerRadiusPx = cornerRadiusDp * view.resources.displayMetrics.density
-                imageView.outlineProvider = object : ViewOutlineProvider() {
-                    override fun getOutline(view: View, outline: Outline) {
-                        outline.setRoundRect(0, 0, view.width, view.height, cornerRadiusPx)
-                    }
-                }
-                imageView.clipToOutline = true
-            }
+            configureImagePreviewCorners(usesRoundedCards)
             contentView = view.findViewById<TextView>(R.id.clipboard_entry_content)?.apply {
                 typeface = itemTypeFace
                 setTextColor(itemTextColor)
                 setTextSize(TypedValue.COMPLEX_UNIT_PX, itemTextSize)
             }
             clipboardLayoutParams.setItemProperties(view)
-            val colors = Settings.getValues().mColors
             colors.setColor(pinnedIconView, ColorType.CLIPBOARD_PIN)
+        }
+
+        private fun createRoundedClipboardEntryBackground(view: View): StateListDrawable {
+            val colors = Settings.getValues().mColors
+            val normalColor = colors.get(ColorType.KEY_BACKGROUND)
+            val pressedColor = pressedEntryColor(normalColor)
+            val radius = ROUNDED_ENTRY_RADIUS_DP * view.resources.displayMetrics.density
+            return StateListDrawable().apply {
+                addState(intArrayOf(android.R.attr.state_pressed), roundedRectDrawable(pressedColor, radius))
+                addState(intArrayOf(android.R.attr.state_selected), roundedRectDrawable(pressedColor, radius))
+                addState(intArrayOf(), roundedRectDrawable(normalColor, radius))
+            }
+        }
+
+        private fun roundedRectDrawable(color: Int, radius: Float) = GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            cornerRadius = radius
+            setColor(color)
+        }
+
+        private fun pressedEntryColor(normalColor: Int): Int {
+            val base = if (ColorUtils.calculateLuminance(normalColor) < 0.5) Color.WHITE else Color.BLACK
+            return ColorUtils.blendARGB(normalColor, base, 0.10f)
+        }
+
+        private fun configureImagePreviewCorners(usesRoundedCards: Boolean) {
+            val density = imageView.resources.displayMetrics.density
+            val radius = if (usesRoundedCards) {
+                val margin = (imageView.layoutParams as? ViewGroup.MarginLayoutParams)?.leftMargin ?: 0
+                ROUNDED_ENTRY_RADIUS_DP * density - margin
+            } else {
+                DEFAULT_IMAGE_RADIUS_DP * density
+            }.coerceAtLeast(0f)
+            imageView.outlineProvider = object : ViewOutlineProvider() {
+                override fun getOutline(view: View, outline: Outline) {
+                    outline.setRoundRect(0, 0, view.width, view.height, radius)
+                }
+            }
+            imageView.clipToOutline = true
         }
 
         fun setContent(historyEntry: ClipboardHistoryEntry?) {

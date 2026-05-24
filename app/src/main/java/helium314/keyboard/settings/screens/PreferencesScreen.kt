@@ -1,20 +1,29 @@
 // SPDX-License-Identifier: GPL-3.0-only
 package helium314.keyboard.settings.screens
 
+import android.Manifest
 import android.content.Context
 import android.media.AudioManager
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.core.content.edit
 import helium314.keyboard.keyboard.KeyboardLayoutSet
 import helium314.keyboard.keyboard.KeyboardSwitcher
 import helium314.keyboard.latin.AudioAndHapticFeedbackManager
 import helium314.keyboard.latin.R
 import helium314.keyboard.latin.database.ClipboardDao
+import helium314.keyboard.latin.permissions.PermissionsUtil
 import helium314.keyboard.latin.settings.Defaults
 import helium314.keyboard.latin.settings.Settings
 import helium314.keyboard.latin.utils.Log
@@ -27,7 +36,9 @@ import helium314.keyboard.settings.Setting
 import helium314.keyboard.settings.preferences.ReorderSwitchPreference
 import helium314.keyboard.settings.SearchSettingsScreen
 import helium314.keyboard.settings.SettingsActivity
+import helium314.keyboard.settings.preferences.Preference
 import helium314.keyboard.settings.preferences.SliderPreference
+import helium314.keyboard.settings.preferences.SettingsSwitch
 import helium314.keyboard.settings.preferences.SwitchPreference
 import helium314.keyboard.latin.utils.Theme
 import helium314.keyboard.settings.initPreview
@@ -173,7 +184,7 @@ fun createPreferencesSettings(context: Context) = listOf(
     Setting(context, Settings.PREF_SHOW_SCREENSHOTS_IN_CLIPBOARD,
         R.string.show_screenshots_in_clipboard, R.string.show_screenshots_in_clipboard_summary)
     {
-        SwitchPreference(it, Defaults.PREF_SHOW_SCREENSHOTS_IN_CLIPBOARD)
+        ScreenshotClipboardPreference(it)
     },
     Setting(context, Settings.PREF_CLIPBOARD_HISTORY_RETENTION_TIME, R.string.clipboard_history_retention_time) { setting ->
         val ctx = LocalContext.current
@@ -219,6 +230,55 @@ fun createPreferencesSettings(context: Context) = listOf(
         )
     },
 )
+
+@Composable
+private fun ScreenshotClipboardPreference(setting: Setting) {
+    val ctx = LocalContext.current
+    val activity = ctx.getActivity() ?: return
+    val prefs = ctx.prefs()
+    val permission = screenshotClipboardPermission()
+    var permissionGranted by remember {
+        mutableStateOf(permission == null || PermissionsUtil.checkAllPermissionsGranted(ctx, permission))
+    }
+    val b = (activity as? SettingsActivity)?.prefChanged?.collectAsState()
+    if ((b?.value ?: 0) < 0)
+        Log.v("irrelevant", "stupid way to trigger recomposition on preference change")
+
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        permissionGranted = granted
+        if (granted) {
+            prefs.edit { putBoolean(setting.key, true) }
+        }
+    }
+    val enabled = prefs.getBoolean(setting.key, Defaults.PREF_SHOW_SCREENSHOTS_IN_CLIPBOARD) && permissionGranted
+
+    fun switchTo(newValue: Boolean) {
+        if (newValue && permission != null && !permissionGranted) {
+            launcher.launch(permission)
+            return
+        }
+        prefs.edit { putBoolean(setting.key, newValue) }
+    }
+
+    Preference(
+        name = setting.title,
+        description = setting.description,
+        onClick = { switchTo(!enabled) }
+    ) {
+        SettingsSwitch(
+            checked = enabled,
+            onCheckedChange = { switchTo(it) }
+        )
+    }
+}
+
+private fun screenshotClipboardPermission(): String? {
+    return when {
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU -> Manifest.permission.READ_MEDIA_IMAGES
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.M -> Manifest.permission.READ_EXTERNAL_STORAGE
+        else -> null
+    }
+}
 
 // todo (later): not good to have it hardcoded, but reading a bunch of files may be noticeably slow
 private val localesWithLocalizedNumberRow = listOf("ar", "bn", "fa", "gu", "hi", "kn", "mr", "ne", "ur")

@@ -720,62 +720,63 @@ public class LatinIME extends InputMethodService implements
     public boolean commitKlipyContent(Uri contentUri, String description, String mimeType) {
         final EditorInfo editorInfo = getCurrentInputEditorInfo();
         final InputConnection inputConnection = getCurrentInputConnection();
-        if (editorInfo == null || inputConnection == null) return false;
-
-        String[] mimeTypes = EditorInfoCompat.getContentMimeTypes(editorInfo);
-        boolean supported = false;
-        if (mimeTypes != null) {
-            for (String type : mimeTypes) {
-                if (ClipDescription.compareMimeTypes(type, mimeType)) {
-                    supported = true;
-                    break;
-                }
-            }
+        if (editorInfo == null || inputConnection == null) {
+            showContentPasteFailedToast();
+            return false;
         }
 
-        // Special check for WhatsApp stickers if not explicitly listed but image/webp is
-        if (!supported && mimeType.equals("image/webp.wasticker") && mimeTypes != null) {
-            for (String type : mimeTypes) {
-                if (ClipDescription.compareMimeTypes(type, "image/webp")) {
-                    supported = true;
-                    break;
-                }
-            }
+        final String[] contentMimeTypes = getKlipyContentMimeTypes(mimeType);
+        if (!isKlipyContentSupported(editorInfo, contentMimeTypes)) {
+            showContentPasteFailedToast();
+            return false;
         }
 
-        if (supported) {
-            InputContentInfoCompat inputContentInfo = new InputContentInfoCompat(
+        try {
+            final InputContentInfoCompat inputContentInfo = new InputContentInfoCompat(
                     contentUri,
-                    new ClipDescription(description, new String[]{mimeType}),
+                    new ClipDescription(description, contentMimeTypes),
                     null
             );
 
-            // Explicitly grant permission
             try {
                 grantUriPermission(editorInfo.packageName, contentUri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
             } catch (Exception e) {
                 Log.e(TAG, "Failed to grant URI permission", e);
             }
 
-            boolean success = InputConnectionCompat.commitContent(inputConnection, editorInfo, inputContentInfo,
+            final boolean success = InputConnectionCompat.commitContent(inputConnection, editorInfo, inputContentInfo,
                     InputConnectionCompat.INPUT_CONTENT_GRANT_READ_URI_PERMISSION, null);
             if (success) return true;
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to commit rich content", e);
         }
 
-        // Fallback: Intent.ACTION_SEND if not supported or commitContent failed
-        Intent intent = new Intent(Intent.ACTION_SEND);
-        intent.setType(mimeType.contains("webp") ? "image/webp" : mimeType);
-        intent.putExtra(Intent.EXTRA_STREAM, contentUri);
-        intent.setPackage("com.whatsapp");
-        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        try {
-            startActivity(intent);
-            return true;
-        } catch (Exception e) {
-            Log.e(TAG, "Fallback ACTION_SEND failed", e);
-            return false;
+        showContentPasteFailedToast();
+        return false;
+    }
+
+    private String[] getKlipyContentMimeTypes(final String mimeType) {
+        if ("image/webp.wasticker".equals(mimeType)) {
+            return new String[]{"image/webp.wasticker", "image/webp"};
         }
+        return new String[]{mimeType};
+    }
+
+    private boolean isKlipyContentSupported(final EditorInfo editorInfo, final String[] contentMimeTypes) {
+        final String[] supportedMimeTypes = EditorInfoCompat.getContentMimeTypes(editorInfo);
+        if (supportedMimeTypes == null) return false;
+        for (String contentMimeType : contentMimeTypes) {
+            for (String supportedMimeType : supportedMimeTypes) {
+                if (ClipDescription.compareMimeTypes(contentMimeType, supportedMimeType)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private void showContentPasteFailedToast() {
+        mKeyboardSwitcher.showToast(getString(R.string.toast_msg_content_paste_failed), true);
     }
 
     private void loadSettings() {
