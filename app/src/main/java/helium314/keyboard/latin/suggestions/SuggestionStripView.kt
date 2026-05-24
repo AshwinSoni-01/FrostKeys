@@ -168,7 +168,7 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
         // toolbar keys setup
         findViewById<ImageButton>(R.id.access_point_trigger_btn)?.let {
             setupKey(it, colors)
-            it.imageTintList = android.content.res.ColorStateList.valueOf(colors.get(ColorType.KEY_TEXT))
+            applyAlphabetIconTint(it, colors)
             applySpecialKeyCircleBackground(it, colors)
         }
 
@@ -589,7 +589,7 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
     fun updateThemeColors(colors: Colors) {
         colors.setBackground(this, ColorType.STRIP_BACKGROUND)
         findViewById<ImageButton>(R.id.access_point_trigger_btn)?.let {
-            it.imageTintList = android.content.res.ColorStateList.valueOf(colors.get(ColorType.KEY_TEXT))
+            applyAlphabetIconTint(it, colors)
             applySpecialKeyCircleBackground(it, colors)
         }
         val childCount = pinnedKeys.childCount
@@ -609,6 +609,12 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
     private fun applySpecialKeyCircleBackground(view: ImageButton, colors: Colors) {
         applySuggestionStripButtonIconSizing(view)
         view.background = createSpecialKeyCircleBackground(colors)
+    }
+
+    private fun applyAlphabetIconTint(view: ImageButton, colors: Colors) {
+        view.clearColorFilter()
+        view.imageTintMode = PorterDuff.Mode.SRC_IN
+        view.imageTintList = ColorStateList.valueOf(colors.get(ColorType.KEY_TEXT))
     }
 
     private fun applySuggestionStripButtonIconSizing(view: ImageButton) {

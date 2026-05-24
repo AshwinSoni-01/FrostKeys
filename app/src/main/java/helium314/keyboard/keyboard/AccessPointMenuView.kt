@@ -3,6 +3,9 @@ package helium314.keyboard.keyboard
 
 import android.content.ClipData
 import android.content.Context
+import android.content.res.ColorStateList
+import android.graphics.PorterDuff
+import android.graphics.drawable.Drawable
 import android.util.AttributeSet
 import android.view.DragEvent
 import android.view.LayoutInflater
@@ -13,6 +16,7 @@ import android.widget.ImageButton
 import android.widget.TextView
 import android.widget.FrameLayout
 import android.content.Intent
+import androidx.core.graphics.drawable.DrawableCompat
 import helium314.keyboard.keyboard.internal.KeyboardIconsSet
 import helium314.keyboard.keyboard.KeyboardTypeface
 import helium314.keyboard.latin.AudioAndHapticFeedbackManager
@@ -104,9 +108,7 @@ class AccessPointMenuView @JvmOverloads constructor(
                 }
 
                 val keyboardTextColor = Settings.getValues().mColors.get(helium314.keyboard.latin.common.ColorType.KEY_TEXT)
-                val safeIcon = drawable?.mutate()
-                safeIcon?.setColorFilter(keyboardTextColor, android.graphics.PorterDuff.Mode.SRC_IN)
-                iconView.setImageDrawable(safeIcon)
+                applyKeyTextIcon(iconView, drawable, keyboardTextColor)
 
                 labelView.text = key.name.lowercase().getStringResourceOrName("", context)
                 labelView.setTextColor(keyboardTextColor)
@@ -279,11 +281,23 @@ class AccessPointMenuView @JvmOverloads constructor(
 
             val drawable = iconView.drawable
             if (drawable != null) {
-                val safeIcon = drawable.mutate()
-                safeIcon.setColorFilter(keyboardTextColor, android.graphics.PorterDuff.Mode.SRC_IN)
-                iconView.setImageDrawable(safeIcon)
+                applyKeyTextIcon(iconView, drawable, keyboardTextColor)
             }
         }
         keyboardViewAttr.recycle()
+    }
+
+    private fun applyKeyTextIcon(iconView: ImageButton, icon: Drawable?, keyboardTextColor: Int) {
+        if (icon == null) {
+            iconView.setImageDrawable(null)
+            return
+        }
+        val tintedIcon = DrawableCompat.wrap(icon.mutate())
+        DrawableCompat.setTint(tintedIcon, keyboardTextColor)
+        DrawableCompat.setTintMode(tintedIcon, PorterDuff.Mode.SRC_IN)
+        iconView.clearColorFilter()
+        iconView.imageTintMode = PorterDuff.Mode.SRC_IN
+        iconView.imageTintList = ColorStateList.valueOf(keyboardTextColor)
+        iconView.setImageDrawable(tintedIcon)
     }
 }

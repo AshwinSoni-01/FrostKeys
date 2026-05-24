@@ -1735,16 +1735,22 @@ public class LatinIME extends InputMethodService implements
             return;
         }
         if (event.getKeyCode() == KeyCode.GIFS) {
-            KeyboardSwitcher.getInstance().onToggleKeyboard(KeyboardSwitcher.KeyboardSwitchState.KLIPY);
-            if (KeyboardSwitcher.getInstance().isShowingKlipyPalettes()) {
-                KeyboardSwitcher.getInstance().getKlipyPalettesView().selectTab("GIFS");
+            final KeyboardSwitcher switcher = KeyboardSwitcher.getInstance();
+            if (!switcher.isShowingKlipyPalettes()) {
+                switcher.onToggleKeyboard(KeyboardSwitcher.KeyboardSwitchState.KLIPY);
+            }
+            if (switcher.isShowingKlipyPalettes()) {
+                switcher.getKlipyPalettesView().selectTab("GIF");
             }
             return;
         }
         if (event.getKeyCode() == KeyCode.STICKERS) {
-            KeyboardSwitcher.getInstance().onToggleKeyboard(KeyboardSwitcher.KeyboardSwitchState.KLIPY);
-            if (KeyboardSwitcher.getInstance().isShowingKlipyPalettes()) {
-                KeyboardSwitcher.getInstance().getKlipyPalettesView().selectTab("STICKERS");
+            final KeyboardSwitcher switcher = KeyboardSwitcher.getInstance();
+            if (!switcher.isShowingKlipyPalettes()) {
+                switcher.onToggleKeyboard(KeyboardSwitcher.KeyboardSwitchState.KLIPY);
+            }
+            if (switcher.isShowingKlipyPalettes()) {
+                switcher.getKlipyPalettesView().selectTab("STICKER");
             }
             return;
         }
@@ -1783,6 +1789,11 @@ public class LatinIME extends InputMethodService implements
     public void onCancelBatchInput() {
         mInputLogic.onCancelBatchInput(mHandler);
         mGestureConsumer.onGestureCanceled();
+    }
+
+    public void getKlipySearchGestureSuggestion(final InputPointers batchPointers,
+            final Keyboard keyboard, final Suggest.OnGetSuggestedWordsCallback callback) {
+        mInputLogic.getGestureSuggestedWordsForExternalInput(batchPointers, keyboard, callback);
     }
 
     /**

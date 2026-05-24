@@ -589,6 +589,37 @@ public final class InputLogic {
                 SuggestedWords.getEmptyInstance(), true /* dismissGestureFloatingPreviewText */);
     }
 
+    public void getGestureSuggestedWordsForExternalInput(final InputPointers batchPointers,
+            final Keyboard keyboard, final OnGetSuggestedWordsCallback callback) {
+        if (batchPointers == null || keyboard == null) {
+            callback.onGetSuggestedWords(SuggestedWords.getEmptyInstance());
+            return;
+        }
+        final InputPointers batchPointersCopy =
+                new InputPointers(Math.max(1, batchPointers.getPointerSize()));
+        batchPointersCopy.set(batchPointers);
+        mInputLogicHandler.getSuggestedWords(() -> {
+            final SettingsValues settingsValues = Settings.getValues();
+            final WordComposer wordComposer = new WordComposer();
+            wordComposer.setBatchInputPointers(batchPointersCopy);
+            wordComposer.adviseCapitalizedModeBeforeFetchingSuggestions(
+                    getActualCapsMode(settingsValues,
+                            KeyboardSwitcher.getInstance().getKeyboardShiftMode()));
+            try {
+                callback.onGetSuggestedWords(mSuggest.getSuggestedWords(wordComposer,
+                        NgramContext.EMPTY_PREV_WORDS_INFO,
+                        keyboard,
+                        settingsValues.mSettingsValuesForSuggestion,
+                        settingsValues.mAutoCorrectEnabled,
+                        SuggestedWords.INPUT_STYLE_TAIL_BATCH,
+                        SuggestedWords.NOT_A_SEQUENCE_NUMBER));
+            } catch (Exception e) {
+                Log.e(TAG, "Error fetching external gesture suggestion", e);
+                callback.onGetSuggestedWords(SuggestedWords.getEmptyInstance());
+            }
+        });
+    }
+
     // TODO: on the long term, this method should become private, but it will be difficult.
     // Especially, how do we deal with InputMethodService.onDisplayCompletions?
     public void setSuggestedWords(final SuggestedWords suggestedWords) {

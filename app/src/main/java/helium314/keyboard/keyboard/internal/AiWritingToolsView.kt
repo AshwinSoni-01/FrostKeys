@@ -457,16 +457,10 @@ class AiWritingToolsView @JvmOverloads constructor(
         val deleteBtn = findViewById<ImageButton>(R.id.btn_delete_ai)
         val deleteClickListener = OnClickListener { view ->
             val isRepeat = (view.tag as? Int ?: 0) > 0
-            AudioAndHapticFeedbackManager.getInstance().performHapticAndAudioFeedback(
-                KeyCode.DELETE,
-                view,
-                if (isRepeat) HapticEvent.KEY_REPEAT else HapticEvent.KEY_PRESS
-            )
-            if (::keyboardActionListener.isInitialized) {
-                keyboardActionListener.onCodeInput(KeyCode.DELETE, Constants.NOT_A_COORDINATE, Constants.NOT_A_COORDINATE, isRepeat)
-            }
+            deleteOneCharacter(view, isRepeat)
             updateButtonStates()
         }
+        deleteBtn.isLongClickable = false
         deleteBtn.setOnTouchListener(RepeatListener(400, 50, deleteClickListener))
 
         copyButton.setOnClickListener { view ->
@@ -545,6 +539,27 @@ class AiWritingToolsView @JvmOverloads constructor(
         if (::keyboardActionListener.isInitialized) {
             keyboardActionListener.onCodeInput(KeyCode.ALPHA, Constants.NOT_A_COORDINATE, Constants.NOT_A_COORDINATE, false)
         }
+    }
+
+    private fun deleteOneCharacter(view: View, isRepeat: Boolean) {
+        val ic = inputConnection ?: getLatinIME()?.currentInputConnection ?: return
+        val selectedText = ic.getSelectedText(0)
+        val beforeCursor = ic.getTextBeforeCursor(2, 0)?.toString().orEmpty()
+        if (selectedText.isNullOrEmpty() && beforeCursor.isEmpty()) return
+
+        AudioAndHapticFeedbackManager.getInstance().performHapticAndAudioFeedback(
+            KeyCode.DELETE,
+            view,
+            if (isRepeat) HapticEvent.KEY_REPEAT else HapticEvent.KEY_PRESS
+        )
+
+        if (!selectedText.isNullOrEmpty()) {
+            ic.commitText("", 1)
+            return
+        }
+
+        val deleteLength = Character.charCount(beforeCursor.codePointBefore(beforeCursor.length))
+        ic.deleteSurroundingText(deleteLength, 0)
     }
 
     private fun onToolClicked(toolName: String, prompt: String) {

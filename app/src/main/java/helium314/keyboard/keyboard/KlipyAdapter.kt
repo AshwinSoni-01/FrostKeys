@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-only
 package helium314.keyboard.keyboard
 
+import android.annotation.SuppressLint
 import android.os.SystemClock
 import android.view.LayoutInflater
+import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.graphics.Canvas
@@ -24,6 +26,9 @@ import coil.load
 import coil.dispose
 import coil.size.Scale
 import coil.memory.MemoryCache
+import helium314.keyboard.event.HapticEvent
+import helium314.keyboard.keyboard.internal.keyboard_parser.floris.KeyCode
+import helium314.keyboard.latin.AudioAndHapticFeedbackManager
 import helium314.keyboard.latin.R
 import helium314.keyboard.latin.database.KlipyHistoryDao
 
@@ -31,6 +36,13 @@ class KlipyAdapter(
     private var items: List<KlipyHistoryDao.KlipyItem>,
     private val onItemClick: (KlipyHistoryDao.KlipyItem) -> Unit
 ) : RecyclerView.Adapter<KlipyAdapter.ViewHolder>() {
+
+    companion object {
+        private const val TAP_SCALE = 0.97f
+        private const val TAP_ALPHA = 0.90f
+        private const val TAP_PRESS_DURATION_MS = 70L
+        private const val TAP_RELEASE_DURATION_MS = 120L
+    }
 
     init {
         setHasStableIds(true)
@@ -194,9 +206,7 @@ class KlipyAdapter(
         holder.imageView.setImageDrawable(placeholder)
 
         if (!isImageLoadingEnabled) {
-            holder.itemView.setOnClickListener {
-                onItemClick(item)
-            }
+            setItemClickListener(holder.itemView, item)
             return
         }
 
@@ -235,8 +245,49 @@ class KlipyAdapter(
 
         holder.itemView.postDelayed(runnable, delay)
 
-        holder.itemView.setOnClickListener {
+        setItemClickListener(holder.itemView, item)
+    }
+
+    private fun setItemClickListener(view: View, item: KlipyHistoryDao.KlipyItem) {
+        installTapAnimation(view)
+        view.setOnClickListener {
+            AudioAndHapticFeedbackManager.getInstance().performHapticAndAudioFeedback(
+                KeyCode.NOT_SPECIFIED,
+                it,
+                HapticEvent.KEY_PRESS
+            )
             onItemClick(item)
+        }
+    }
+
+    @SuppressLint("ClickableViewAccessibility")
+    private fun installTapAnimation(view: View) {
+        view.setOnTouchListener { touchedView, event ->
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    if (touchedView.isEnabled) {
+                        touchedView.animate().cancel()
+                        touchedView.animate()
+                            .scaleX(TAP_SCALE)
+                            .scaleY(TAP_SCALE)
+                            .alpha(TAP_ALPHA)
+                            .setDuration(TAP_PRESS_DURATION_MS)
+                            .start()
+                    }
+                }
+                MotionEvent.ACTION_UP,
+                MotionEvent.ACTION_CANCEL,
+                MotionEvent.ACTION_OUTSIDE -> {
+                    touchedView.animate().cancel()
+                    touchedView.animate()
+                        .scaleX(1f)
+                        .scaleY(1f)
+                        .alpha(1f)
+                        .setDuration(TAP_RELEASE_DURATION_MS)
+                        .start()
+                }
+            }
+            false
         }
     }
 
