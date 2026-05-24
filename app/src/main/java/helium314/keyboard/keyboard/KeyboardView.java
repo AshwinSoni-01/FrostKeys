@@ -177,7 +177,7 @@ public class KeyboardView extends View {
      * Attaches a keyboard to this view. The keyboard can be switched at any time
      * and the
      * view will re-layout itself to accommodate the keyboard.
-     * 
+     *
      * @see Keyboard
      * @see #getKeyboard()
      * @param keyboard the keyboard to display in this view
@@ -208,7 +208,7 @@ public class KeyboardView extends View {
 
     /**
      * Returns the current keyboard being displayed by this view.
-     * 
+     *
      * @return the currently attached keyboard
      * @see #setKeyboard(Keyboard)
      */
@@ -726,6 +726,7 @@ public class KeyboardView extends View {
             hintX = keyWidth - mKeyHintLetterPadding - TypefaceUtils.getReferenceCharWidth(paint) / 2.0f;
         }
         final float hintY = keyHeight - mKeyPopupHintLetterPadding;
+        paint.setTypeface(KeyboardTypeface.resolve(mKeyPopupHintLetter, params.mTypeface));
         canvas.drawText(mKeyPopupHintLetter, hintX, hintY, paint);
     }
 
@@ -741,11 +742,11 @@ public class KeyboardView extends View {
         final Paint paint = new Paint();
         paint.setAntiAlias(true);
         if (key == null) {
-            paint.setTypeface(mKeyDrawParams.mTypeface);
+            paint.setTypeface(KeyboardTypeface.resolve(null, mKeyDrawParams.mTypeface));
             paint.setTextSize(mKeyDrawParams.mLabelSize);
         } else {
             paint.setColor(key.selectTextColor(mKeyDrawParams));
-            paint.setTypeface(key.selectTypeface(mKeyDrawParams));
+            paint.setTypeface(KeyboardTypeface.resolve(key.getLabel(), key.selectTypeface(mKeyDrawParams)));
             paint.setTextSize(key.selectTextSize(mKeyDrawParams) * mFontSizeMultiplier);
         }
         return paint;
@@ -757,7 +758,7 @@ public class KeyboardView extends View {
      * because the keyboard renders the keys to an off-screen buffer and an
      * invalidate() only
      * draws the cached buffer.
-     * 
+     *
      * @see #invalidateKey(Key)
      */
     public void updateThemeColors(final Colors colors) {
@@ -794,7 +795,7 @@ public class KeyboardView extends View {
      * one key is changing it's content. Any changes that affect the position or
      * size of the key
      * may not be honored.
-     * 
+     *
      * @param key key in the attached {@link Keyboard}.
      * @see #invalidateAllKeys
      */

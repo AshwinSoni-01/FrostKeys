@@ -31,8 +31,10 @@ import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import helium314.keyboard.keyboard.KeyboardSwitcher
+import helium314.keyboard.keyboard.FrostedLiveValues
+import helium314.keyboard.keyboard.KeyboardTheme
 import helium314.keyboard.latin.R
+import helium314.keyboard.latin.LatinIME
 import helium314.keyboard.latin.settings.Defaults
 import helium314.keyboard.latin.settings.Settings
 import helium314.keyboard.latin.utils.prefs
@@ -99,7 +101,47 @@ fun FrostedGlassAdjustDialog(
     var snapshot by remember { mutableStateOf(initialSnapshot) }
     var isSaved by remember { mutableStateOf(false) }
 
-    // Helper to update current profile in snapshot AND write to prefs for LIVE feedback
+    fun applyLivePreview(profile: FrostedProfileSnapshot) {
+        KeyboardTheme.livePreviewValues = FrostedLiveValues(
+            blurRadius = profile.blurRadius,
+            keyTransparency = profile.keyTransparency,
+            bgTransparency = profile.bgTransparency,
+            colorBlend = profile.colorBlend,
+            saturation = profile.saturation,
+            edgeContrast = profile.edgeContrast,
+            specialVibrancy = profile.specialVibrancy,
+            alphabetVibrancy = profile.alphabetVibrancy
+        )
+        LatinIME.getInstance()?.requestFrostedLivePreviewRefresh()
+    }
+
+    fun writeSnapshotToPrefs(values: FrostedSettingsSnapshot) {
+        prefs.edit()
+            .putInt(Settings.PREF_FROSTED_BLUR_RADIUS, values.light.blurRadius)
+            .putInt(Settings.PREF_FROSTED_KEY_TRANSPARENCY, values.light.keyTransparency)
+            .putInt(Settings.PREF_FROSTED_BG_TRANSPARENCY, values.light.bgTransparency)
+            .putInt(Settings.PREF_FROSTED_COLOR_BLEND, values.light.colorBlend)
+            .putInt(Settings.PREF_FROSTED_SATURATION, values.light.saturation)
+            .putInt(Settings.PREF_FROSTED_EDGE_CONTRAST, values.light.edgeContrast)
+            .putInt(Settings.PREF_FROSTED_SPECIAL_VIBRANCY, values.light.specialVibrancy)
+            .putInt(Settings.PREF_FROSTED_ALPHABET_VIBRANCY, values.light.alphabetVibrancy)
+            .putInt(Settings.PREF_FROSTED_BLUR_RADIUS_NIGHT, values.dark.blurRadius)
+            .putInt(Settings.PREF_FROSTED_KEY_TRANSPARENCY_NIGHT, values.dark.keyTransparency)
+            .putInt(Settings.PREF_FROSTED_BG_TRANSPARENCY_NIGHT, values.dark.bgTransparency)
+            .putInt(Settings.PREF_FROSTED_COLOR_BLEND_NIGHT, values.dark.colorBlend)
+            .putInt(Settings.PREF_FROSTED_SATURATION_NIGHT, values.dark.saturation)
+            .putInt(Settings.PREF_FROSTED_EDGE_CONTRAST_NIGHT, values.dark.edgeContrast)
+            .putInt(Settings.PREF_FROSTED_SPECIAL_VIBRANCY_NIGHT, values.dark.specialVibrancy)
+            .putInt(Settings.PREF_FROSTED_ALPHABET_VIBRANCY_NIGHT, values.dark.alphabetVibrancy)
+            .apply()
+    }
+
+    fun requestFinalFrostedSync() {
+        LatinIME.getInstance()?.requestFrostedHardThemeReset()
+            ?: prefs.edit().putLong(Settings.PREF_FROSTED_GLASS_TRIGGER, System.currentTimeMillis()).apply()
+    }
+
+    // Helper to update current profile in snapshot and redraw the keyboard from staged values.
     fun updateCurrentProfile(update: (FrostedProfileSnapshot) -> FrostedProfileSnapshot) {
         val oldProfile = if (activeProfile == "light") snapshot.light else snapshot.dark
         val newProfile = update(oldProfile)
@@ -110,43 +152,7 @@ fun FrostedGlassAdjustDialog(
             snapshot.copy(dark = newProfile)
         }
 
-        // Live update: Write the changed values to SharedPreferences immediately.
-        // This triggers the "Live Redraw" (mKeyboardSwitcher.updateLiveFrostedGlassColors()) in LatinIME.
-        if (activeProfile == "light") {
-            prefs.edit()
-                .putInt(Settings.PREF_FROSTED_BLUR_RADIUS, newProfile.blurRadius)
-                .putInt(Settings.PREF_FROSTED_KEY_TRANSPARENCY, newProfile.keyTransparency)
-                .putInt(Settings.PREF_FROSTED_BG_TRANSPARENCY, newProfile.bgTransparency)
-                .putInt(Settings.PREF_FROSTED_COLOR_BLEND, newProfile.colorBlend)
-                .putInt(Settings.PREF_FROSTED_SATURATION, newProfile.saturation)
-                .putInt(Settings.PREF_FROSTED_EDGE_CONTRAST, newProfile.edgeContrast)
-                .putInt(Settings.PREF_FROSTED_SPECIAL_VIBRANCY, newProfile.specialVibrancy)
-                .putInt(Settings.PREF_FROSTED_ALPHABET_VIBRANCY, newProfile.alphabetVibrancy)
-                .apply()
-        } else {
-            prefs.edit()
-                .putInt(Settings.PREF_FROSTED_BLUR_RADIUS_NIGHT, newProfile.blurRadius)
-                .putInt(Settings.PREF_FROSTED_KEY_TRANSPARENCY_NIGHT, newProfile.keyTransparency)
-                .putInt(Settings.PREF_FROSTED_BG_TRANSPARENCY_NIGHT, newProfile.bgTransparency)
-                .putInt(Settings.PREF_FROSTED_COLOR_BLEND_NIGHT, newProfile.colorBlend)
-                .putInt(Settings.PREF_FROSTED_SATURATION_NIGHT, newProfile.saturation)
-                .putInt(Settings.PREF_FROSTED_EDGE_CONTRAST_NIGHT, newProfile.edgeContrast)
-                .putInt(Settings.PREF_FROSTED_SPECIAL_VIBRANCY_NIGHT, newProfile.specialVibrancy)
-                .putInt(Settings.PREF_FROSTED_ALPHABET_VIBRANCY_NIGHT, newProfile.alphabetVibrancy)
-                .apply()
-        }
-
-        // Also update the static staging variable so the redraw can use the latest values
-        helium314.keyboard.keyboard.KeyboardTheme.livePreviewValues = helium314.keyboard.keyboard.FrostedLiveValues(
-            blurRadius = newProfile.blurRadius,
-            keyTransparency = newProfile.keyTransparency,
-            bgTransparency = newProfile.bgTransparency,
-            colorBlend = newProfile.colorBlend,
-            saturation = newProfile.saturation,
-            edgeContrast = newProfile.edgeContrast,
-            specialVibrancy = newProfile.specialVibrancy,
-            alphabetVibrancy = newProfile.alphabetVibrancy
-        )
+        applyLivePreview(newProfile)
     }
 
     // Current profile view for easier slider binding
@@ -160,32 +166,15 @@ fun FrostedGlassAdjustDialog(
         onDispose {
             if (!isSaved) {
                 // User cancelled or dismissed! Roll back preferences to the snapshot
-                prefs.edit()
-                    .putInt(Settings.PREF_FROSTED_BLUR_RADIUS, initialSnapshot.light.blurRadius)
-                    .putInt(Settings.PREF_FROSTED_KEY_TRANSPARENCY, initialSnapshot.light.keyTransparency)
-                    .putInt(Settings.PREF_FROSTED_BG_TRANSPARENCY, initialSnapshot.light.bgTransparency)
-                    .putInt(Settings.PREF_FROSTED_COLOR_BLEND, initialSnapshot.light.colorBlend)
-                    .putInt(Settings.PREF_FROSTED_SATURATION, initialSnapshot.light.saturation)
-                    .putInt(Settings.PREF_FROSTED_EDGE_CONTRAST, initialSnapshot.light.edgeContrast)
-                    .putInt(Settings.PREF_FROSTED_SPECIAL_VIBRANCY, initialSnapshot.light.specialVibrancy)
-                    .putInt(Settings.PREF_FROSTED_ALPHABET_VIBRANCY, initialSnapshot.light.alphabetVibrancy)
-                    .putInt(Settings.PREF_FROSTED_BLUR_RADIUS_NIGHT, initialSnapshot.dark.blurRadius)
-                    .putInt(Settings.PREF_FROSTED_KEY_TRANSPARENCY_NIGHT, initialSnapshot.dark.keyTransparency)
-                    .putInt(Settings.PREF_FROSTED_BG_TRANSPARENCY_NIGHT, initialSnapshot.dark.bgTransparency)
-                    .putInt(Settings.PREF_FROSTED_COLOR_BLEND_NIGHT, initialSnapshot.dark.colorBlend)
-                    .putInt(Settings.PREF_FROSTED_SATURATION_NIGHT, initialSnapshot.dark.saturation)
-                    .putInt(Settings.PREF_FROSTED_EDGE_CONTRAST_NIGHT, initialSnapshot.dark.edgeContrast)
-                    .putInt(Settings.PREF_FROSTED_SPECIAL_VIBRANCY_NIGHT, initialSnapshot.dark.specialVibrancy)
-                    .putInt(Settings.PREF_FROSTED_ALPHABET_VIBRANCY_NIGHT, initialSnapshot.dark.alphabetVibrancy)
-                    .apply()
+                writeSnapshotToPrefs(initialSnapshot)
             }
             
             // Clear spoofing state
-            helium314.keyboard.keyboard.KeyboardTheme.themeOverride = null
-            helium314.keyboard.keyboard.KeyboardTheme.livePreviewValues = null
+            KeyboardTheme.themeOverride = null
+            KeyboardTheme.livePreviewValues = null
             
             // Final catch-up refresh to sync keyboard with restored/final state
-            prefs.edit().putLong(Settings.PREF_FROSTED_GLASS_TRIGGER, System.currentTimeMillis()).apply()
+            requestFinalFrostedSync()
         }
     }
 
@@ -312,9 +301,8 @@ fun FrostedGlassAdjustDialog(
                                 onClick = { 
                                     if (activeProfile != "light") {
                                         activeProfile = "light"
-                                        helium314.keyboard.keyboard.KeyboardTheme.themeOverride = "light"
-                                        // Trigger the true physical bulldozer reset
-                                        prefs.edit().putLong(Settings.PREF_FROSTED_GLASS_TRIGGER, System.currentTimeMillis()).apply()
+                                        KeyboardTheme.themeOverride = "light"
+                                        applyLivePreview(snapshot.light)
                                     }
                                 },
                                 text = { Text("Light Profile") }
@@ -324,9 +312,8 @@ fun FrostedGlassAdjustDialog(
                                 onClick = { 
                                     if (activeProfile != "dark") {
                                         activeProfile = "dark"
-                                        helium314.keyboard.keyboard.KeyboardTheme.themeOverride = "dark"
-                                        // Trigger the true physical bulldozer reset
-                                        prefs.edit().putLong(Settings.PREF_FROSTED_GLASS_TRIGGER, System.currentTimeMillis()).apply()
+                                        KeyboardTheme.themeOverride = "dark"
+                                        applyLivePreview(snapshot.dark)
                                     }
                                 },
                                 text = { Text("Dark Profile") }
@@ -564,9 +551,7 @@ fun FrostedGlassAdjustDialog(
                             Button(
                                 onClick = {
                                     isSaved = true
-                                    // Everything is already in SharedPreferences due to live updates.
-                                    // Just ensure the trigger key is touched one last time.
-                                    prefs.edit().putLong(Settings.PREF_FROSTED_GLASS_TRIGGER, System.currentTimeMillis()).apply()
+                                    writeSnapshotToPrefs(snapshot)
                                     onDismissRequest()
                                 }
                             ) {

@@ -23,11 +23,14 @@ class Database private constructor(context: Context, name: String = NAME) : SQLi
         if (oldVersion <= 2) {
             db.execSQL(KlipyHistoryDao.CREATE_TABLE)
         }
+        if (oldVersion == 3) {
+            db.execSQL("ALTER TABLE ${KlipyHistoryDao.TABLE_NAME} ADD COLUMN ${KlipyHistoryDao.COLUMN_PREVIEW_URL} TEXT")
+        }
     }
 
     companion object {
         private val TAG = Database::class.java.simpleName
-        private const val VERSION = 3
+        private const val VERSION = 4
         const val NAME = "heliboard.db"
         private var instance: Database? = null
         fun getInstance(context: Context): Database {

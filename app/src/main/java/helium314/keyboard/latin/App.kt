@@ -3,6 +3,7 @@ package helium314.keyboard.latin
 
 import android.app.Application
 import android.os.Build
+import android.os.StrictMode
 import helium314.keyboard.keyboard.emoji.SupportedEmojis
 import helium314.keyboard.keyboard.internal.GeminiService
 import helium314.keyboard.latin.define.DebugFlags
@@ -21,6 +22,14 @@ import kotlinx.coroutines.launch
 class App : Application() {
     override fun onCreate() {
         super.onCreate()
+        if (BuildConfig.DEBUG) {
+            StrictMode.setVmPolicy(
+                StrictMode.VmPolicy.Builder()
+                    .detectLeakedClosableObjects()
+                    .penaltyLog()
+                    .build()
+            )
+        }
         DebugFlags.init(this)
         FoldableUtils.init(this)
         Settings.init(this)

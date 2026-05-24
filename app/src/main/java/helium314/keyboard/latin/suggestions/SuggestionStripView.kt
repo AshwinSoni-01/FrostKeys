@@ -36,6 +36,7 @@ import androidx.core.view.doOnNextLayout
 import androidx.core.view.isVisible
 import helium314.keyboard.event.HapticEvent
 import helium314.keyboard.keyboard.KeyboardSwitcher
+import helium314.keyboard.keyboard.KeyboardTypeface
 import helium314.keyboard.keyboard.internal.KeyboardIconsSet
 import helium314.keyboard.keyboard.internal.keyboard_parser.floris.KeyCode
 import helium314.keyboard.latin.AudioAndHapticFeedbackManager
@@ -106,6 +107,7 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
             word.contentDescription = resources.getString(R.string.spoken_empty_suggestion)
             word.setOnClickListener(this)
             word.setOnLongClickListener(this)
+            KeyboardTypeface.applyToTextView(word)
             colors.setBackground(word, ColorType.STRIP_BACKGROUND)
             wordViews.add(word)
             val divider = inflater.inflate(R.layout.suggestion_divider, null)
@@ -113,6 +115,7 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
             val info = TextView(context, null, R.attr.suggestionWordStyle)
             info.setTextColor(colors.get(ColorType.KEY_TEXT))
             info.setTextSize(TypedValue.COMPLEX_UNIT_DIP, DEBUG_INFO_TEXT_SIZE_IN_DIP)
+            KeyboardTypeface.applyToTextView(info)
             debugInfoViews.add(info)
         }
 

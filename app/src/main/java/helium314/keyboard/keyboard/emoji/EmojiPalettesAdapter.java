@@ -18,6 +18,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import helium314.keyboard.keyboard.Keyboard;
+import helium314.keyboard.keyboard.KeyboardTypeface;
 import helium314.keyboard.latin.R;
 import helium314.keyboard.latin.common.ColorType;
 import helium314.keyboard.latin.settings.Settings;
@@ -129,7 +130,7 @@ final class EmojiPalettesAdapter extends RecyclerView.Adapter<EmojiPalettesAdapt
             final int paddingV = (int) (8 * density);
             textView.setPadding(paddingH, paddingV, paddingH, paddingV);
             textView.setTextSize(14f);
-            textView.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+            KeyboardTypeface.applyToTextView(textView, null, android.graphics.Typeface.DEFAULT_BOLD);
             textView.setTextColor(Settings.getValues().mColors.get(ColorType.EMOJI_KEY_TEXT));
             textView.setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
             return new HeaderViewHolder(textView);

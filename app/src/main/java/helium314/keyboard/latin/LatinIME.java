@@ -556,6 +556,32 @@ public class LatinIME extends InputMethodService implements
         Log.i(TAG, "Hardware accelerated drawing: " + mIsHardwareAcceleratedDrawingEnabled);
     }
 
+    private static final long FROSTED_LIVE_REDRAW_THROTTLE_MS = 32L;
+    private static final long FROSTED_HARD_RESET_DEBOUNCE_MS = 120L;
+    private final android.os.Handler mFrostedPrefsHandler =
+            new android.os.Handler(android.os.Looper.getMainLooper());
+    private boolean mFrostedLiveRedrawScheduled;
+    private boolean mFrostedLiveRedrawDirty;
+    private long mLastFrostedLiveRedrawUptimeMs;
+    private final Runnable mApplyLiveFrostedRedraw = new Runnable() {
+        @Override
+        public void run() {
+            mFrostedLiveRedrawScheduled = false;
+            mLastFrostedLiveRedrawUptimeMs = android.os.SystemClock.uptimeMillis();
+            mKeyboardSwitcher.updateLiveFrostedGlassColors();
+            if (mFrostedLiveRedrawDirty) {
+                mFrostedLiveRedrawDirty = false;
+                requestFrostedLivePreviewRefresh();
+            }
+        }
+    };
+    private final Runnable mApplyHardFrostedReset = new Runnable() {
+        @Override
+        public void run() {
+            forceHardThemeReset();
+        }
+    };
+
     private final SharedPreferences.OnSharedPreferenceChangeListener mPrefsListener =
         new SharedPreferences.OnSharedPreferenceChangeListener() {
             @Override
@@ -563,24 +589,53 @@ public class LatinIME extends InputMethodService implements
                 if (key == null) return;
                 // Loophole Fix: Differentiate between live redraw and hard reset
                 if (helium314.keyboard.latin.settings.Settings.PREF_FROSTED_GLASS_TRIGGER.equals(key)) {
-                    Log.d(TAG, "Hard Reset trigger detected.");
-                    new android.os.Handler(android.os.Looper.getMainLooper()).post(new Runnable() {
-                        @Override
-                        public void run() {
-                            forceHardThemeReset();
-                        }
-                    });
+                    Log.d(TAG, "Hard Reset trigger queued.");
+                    requestFrostedHardThemeReset();
                 } else if (key.startsWith("pref_frosted_")) {
-                    Log.d(TAG, "Live Redraw trigger detected for: " + key);
-                    new android.os.Handler(android.os.Looper.getMainLooper()).post(new Runnable() {
-                        @Override
-                        public void run() {
-                            mKeyboardSwitcher.updateLiveFrostedGlassColors();
-                        }
-                    });
+                    Log.d(TAG, "Live Redraw trigger queued for: " + key);
+                    requestFrostedLivePreviewRefresh();
                 }
             }
         };
+
+    public void requestFrostedLivePreviewRefresh() {
+        if (android.os.Looper.myLooper() != android.os.Looper.getMainLooper()) {
+            mFrostedPrefsHandler.post(new Runnable() {
+                @Override
+                public void run() {
+                    requestFrostedLivePreviewRefresh();
+                }
+            });
+            return;
+        }
+        if (mFrostedLiveRedrawScheduled) {
+            mFrostedLiveRedrawDirty = true;
+            return;
+        }
+        final long now = android.os.SystemClock.uptimeMillis();
+        final long elapsed = now - mLastFrostedLiveRedrawUptimeMs;
+        final long delay = Math.max(0L, FROSTED_LIVE_REDRAW_THROTTLE_MS - elapsed);
+        mFrostedLiveRedrawScheduled = true;
+        mFrostedPrefsHandler.postDelayed(mApplyLiveFrostedRedraw, delay);
+    }
+
+    public void requestFrostedHardThemeReset() {
+        if (android.os.Looper.myLooper() != android.os.Looper.getMainLooper()) {
+            mFrostedPrefsHandler.post(new Runnable() {
+                @Override
+                public void run() {
+                    requestFrostedHardThemeReset();
+                }
+            });
+            return;
+        }
+        mFrostedPrefsHandler.removeCallbacks(mApplyLiveFrostedRedraw);
+        mFrostedPrefsHandler.removeCallbacks(mApplyHardFrostedReset);
+        mFrostedLiveRedrawScheduled = false;
+        mFrostedLiveRedrawDirty = false;
+        mFrostedPrefsHandler.postDelayed(mApplyHardFrostedReset,
+                FROSTED_HARD_RESET_DEBOUNCE_MS);
+    }
 
     public void forceHardThemeReset() {
         // 1. Instantly hide the window to stop user interaction
@@ -906,6 +961,10 @@ public class LatinIME extends InputMethodService implements
         unregisterReceiver(mRestartAfterDeviceUnlockReceiver);
         mStatsUtilsManager.onDestroy(this /* context */);
         KtxKt.prefs(this).unregisterOnSharedPreferenceChangeListener(mPrefsListener);
+        mFrostedPrefsHandler.removeCallbacks(mApplyLiveFrostedRedraw);
+        mFrostedPrefsHandler.removeCallbacks(mApplyHardFrostedReset);
+        mFrostedLiveRedrawScheduled = false;
+        mFrostedLiveRedrawDirty = false;
         super.onDestroy();
         mHandler.removeCallbacksAndMessages(null);
         helium314.keyboard.keyboard.KeyboardTheme.setThemeOverride(null);

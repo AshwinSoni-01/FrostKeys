@@ -70,7 +70,8 @@ public final class TypefaceUtils {
         } else if (face == Typeface.MONOSPACE) {
             return codePointOffset + labelSize + 0x2000;
         } else {
-            return codePointOffset + labelSize;
+            // Use face.hashCode() to differentiate between custom typefaces
+            return codePointOffset + labelSize + (face != null ? face.hashCode() : 0);
         }
     }
 
@@ -93,6 +94,15 @@ public final class TypefaceUtils {
         synchronized (sStringWidthBounds) {
             paint.getTextBounds(string, 0, string.length(), sStringWidthBounds);
             return sStringWidthBounds.width();
+        }
+    }
+
+    public static void clearCache() {
+        synchronized (sTextHeightCache) {
+            sTextHeightCache.clear();
+        }
+        synchronized (sTextWidthCache) {
+            sTextWidthCache.clear();
         }
     }
 }

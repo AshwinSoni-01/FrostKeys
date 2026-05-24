@@ -8,7 +8,7 @@ import android.database.sqlite.SQLiteDatabase
 class KlipyHistoryDao private constructor(context: Context) {
     private val dbHelper = Database.getInstance(context)
 
-    fun addHistory(id: String, url: String, type: String, width: Int = 0, height: Int = 0) {
+    fun addHistory(id: String, url: String, type: String, width: Int = 0, height: Int = 0, previewUrl: String? = null) {
         val db = dbHelper.writableDatabase
         db.beginTransaction()
         try {
@@ -22,6 +22,7 @@ class KlipyHistoryDao private constructor(context: Context) {
                 put(COLUMN_TIMESTAMP, System.currentTimeMillis())
                 put(COLUMN_WIDTH, width)
                 put(COLUMN_HEIGHT, height)
+                put(COLUMN_PREVIEW_URL, previewUrl)
             }
             db.insert(TABLE_NAME, null, values)
 
@@ -46,7 +47,7 @@ class KlipyHistoryDao private constructor(context: Context) {
         val db = dbHelper.readableDatabase
         val list = mutableListOf<KlipyItem>()
         db.rawQuery(
-            "SELECT $COLUMN_ID, $COLUMN_URL, $COLUMN_WIDTH, $COLUMN_HEIGHT FROM $TABLE_NAME WHERE $COLUMN_TYPE = ? ORDER BY $COLUMN_TIMESTAMP DESC",
+            "SELECT $COLUMN_ID, $COLUMN_URL, $COLUMN_WIDTH, $COLUMN_HEIGHT, $COLUMN_PREVIEW_URL FROM $TABLE_NAME WHERE $COLUMN_TYPE = ? ORDER BY $COLUMN_TIMESTAMP DESC",
             arrayOf(type)
         ).use { cursor ->
             while (cursor.moveToNext()) {
@@ -54,7 +55,8 @@ class KlipyHistoryDao private constructor(context: Context) {
                     cursor.getString(0),
                     cursor.getString(1),
                     cursor.getInt(2),
-                    cursor.getInt(3)
+                    cursor.getInt(3),
+                    cursor.getString(4)
                 ))
             }
         }
@@ -74,6 +76,7 @@ class KlipyHistoryDao private constructor(context: Context) {
         const val COLUMN_TIMESTAMP = "TIMESTAMP"
         const val COLUMN_WIDTH = "WIDTH"
         const val COLUMN_HEIGHT = "HEIGHT"
+        const val COLUMN_PREVIEW_URL = "PREVIEW_URL"
 
         const val TYPE_GIF = "GIF"
         const val TYPE_STICKER = "STICKER"
@@ -87,6 +90,7 @@ class KlipyHistoryDao private constructor(context: Context) {
                 $COLUMN_TIMESTAMP INTEGER,
                 $COLUMN_WIDTH INTEGER,
                 $COLUMN_HEIGHT INTEGER,
+                $COLUMN_PREVIEW_URL TEXT,
                 PRIMARY KEY ($COLUMN_ID, $COLUMN_TYPE)
             )
         """

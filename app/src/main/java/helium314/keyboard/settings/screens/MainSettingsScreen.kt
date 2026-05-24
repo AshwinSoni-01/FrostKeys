@@ -135,7 +135,7 @@ fun MainSettingsScreen(
                     Preference(
                         name = stringResource(R.string.cloud_features),
                         onClick = onClickCloud,
-                        icon = R.drawable.ic_settings_advanced
+                        icon = R.drawable.ic_cloud
                     ) { NextScreenIcon() }
                 }
                 item("gesture_typing") {

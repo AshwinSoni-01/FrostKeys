@@ -25,7 +25,13 @@ object GeminiService : SharedPreferences.OnSharedPreferenceChangeListener {
     private lateinit var appContext: Context
     private var isInitialized = false
     private const val CACHE_TTL_MS = 7L * 24 * 60 * 60 * 1000 // 7 days
+    private const val QUOTA_COOLDOWN_FALLBACK_MS = 60_000L
     private var lastReactiveHealTime = 0L
+    private val generationLock = Any()
+    private var generationInFlight = false
+    private var activeGenerationId = 0L
+    @Volatile private var quotaCooldownUntilMs = 0L
+    @Volatile private var quotaCooldownMessage: String? = null
 
     fun init(context: Context) {
         if (isInitialized) return
@@ -75,7 +81,7 @@ object GeminiService : SharedPreferences.OnSharedPreferenceChangeListener {
                             val modelObj = modelsArray.getJSONObject(i)
                             val name = modelObj.getString("name").removePrefix("models/")
                             val supportedMethods = modelObj.getJSONArray("supportedGenerationMethods")
-                            
+
                             var supportsGenerateContent = false
                             for (j in 0 until supportedMethods.length()) {
                                 if (supportedMethods.getString(j) == "generateContent") {
@@ -84,19 +90,20 @@ object GeminiService : SharedPreferences.OnSharedPreferenceChangeListener {
                                 }
                             }
 
-                            if (supportsGenerateContent && name.contains("flash", ignoreCase = true)) {
+                            if (supportsGenerateContent && isSupportedTextFlashModel(name)) {
                                 flashModels.add(name)
                             }
                         }
 
-                        flashModels.sortDescending()
+                        // Prioritize 8B models as they are significantly faster
+                        flashModels.sortWith(compareByDescending<String> { it.contains("8b", ignoreCase = true) }.thenByDescending { it })
 
                         val cachedString = flashModels.joinToString(",")
                         // Synchronous commit to prevent race conditions
                         prefs.edit().apply {
                             putString(CloudManager.PREF_CACHED_GEMINI_MODELS, cachedString)
                             putLong(CloudManager.PREF_GEMINI_MODELS_LAST_FETCH, now)
-                        }.commit() 
+                        }.commit()
                         Log.d(TAG, "Cached Gemini models: $cachedString")
                     } else {
                         Log.e(TAG, "Failed to fetch models: ${response.code} ${response.message}")
@@ -127,8 +134,20 @@ object GeminiService : SharedPreferences.OnSharedPreferenceChangeListener {
             return
         }
 
+        getActiveQuotaCooldownMessage()?.let { message ->
+            mainHandler.post {
+                callback(null, Exception(message))
+            }
+            return
+        }
+
         val cachedModels = prefs.getString(CloudManager.PREF_CACHED_GEMINI_MODELS, "") ?: ""
-        if (cachedModels.isBlank()) {
+        val modelList = sanitizeModelList(cachedModels.split(","))
+        if (cachedModels.isNotBlank() && modelList.joinToString(",") != cachedModels) {
+            prefs.edit().putString(CloudManager.PREF_CACHED_GEMINI_MODELS, modelList.joinToString(",")).apply()
+        }
+
+        if (modelList.isEmpty()) {
             fetchAndCacheModels(context, apiKey, forceRefresh = true)
             mainHandler.post {
                 callback(null, Exception("Initializing AI Models. Please try again in a few seconds."))
@@ -136,8 +155,141 @@ object GeminiService : SharedPreferences.OnSharedPreferenceChangeListener {
             return
         }
 
-        val modelList = cachedModels.split(",")
-        executeWithFallback(context, apiKey, prompt, text, modelList, 0, callback)
+        val generationId = tryStartGeneration()
+        if (generationId == null) {
+            Log.d(TAG, "Ignoring duplicate generation request while another is active")
+            mainHandler.post {
+                callback(null, Exception("AI is already generating. Please wait for the current request to finish."))
+            }
+            return
+        }
+
+        val guardedCallback = { result: String?, error: Exception? ->
+            finishGeneration(generationId)
+            callback(result, error)
+        }
+
+        try {
+            executeWithFallback(context, apiKey, prompt, text, modelList, 0, guardedCallback)
+        } catch (e: Exception) {
+            mainHandler.post {
+                guardedCallback(null, e)
+            }
+        }
+    }
+
+    private fun tryStartGeneration(): Long? {
+        synchronized(generationLock) {
+            if (generationInFlight) return null
+            generationInFlight = true
+            activeGenerationId += 1L
+            return activeGenerationId
+        }
+    }
+
+    private fun finishGeneration(generationId: Long) {
+        synchronized(generationLock) {
+            if (!generationInFlight || activeGenerationId != generationId) return
+            generationInFlight = false
+            Log.d(TAG, "Generation request finished")
+        }
+    }
+
+    private fun sanitizeModelList(models: List<String>): List<String> {
+        return models
+            .map { it.trim().removePrefix("models/") }
+            .filter { isSupportedTextFlashModel(it) }
+            .distinct()
+    }
+
+    private fun isSupportedTextFlashModel(model: String): Boolean {
+        val lower = model.lowercase()
+        if (!lower.contains("flash")) return false
+        val unsupportedMarkers = listOf(
+            "tts",
+            "image",
+            "imagen",
+            "embedding",
+            "embed",
+            "live",
+            "audio",
+            "video"
+        )
+        return unsupportedMarkers.none { lower.contains(it) }
+    }
+
+    private fun getActiveQuotaCooldownMessage(): String? {
+        val remainingMs = quotaCooldownUntilMs - System.currentTimeMillis()
+        if (remainingMs <= 0L) {
+            quotaCooldownUntilMs = 0L
+            quotaCooldownMessage = null
+            return null
+        }
+        return quotaCooldownMessage ?: quotaMessageForDelay(remainingMs)
+    }
+
+    private fun setQuotaCooldown(delayMs: Long) {
+        val safeDelayMs = delayMs.coerceAtLeast(1_000L)
+        quotaCooldownUntilMs = System.currentTimeMillis() + safeDelayMs
+        quotaCooldownMessage = quotaMessageForDelay(safeDelayMs)
+    }
+
+    private fun quotaMessageForDelay(delayMs: Long): String {
+        val seconds = ((delayMs + 999L) / 1000L).coerceAtLeast(1L)
+        return "Gemini quota is temporarily exhausted. Please retry in ${seconds}s."
+    }
+
+    private fun parseRetryDelayMs(responseBody: String?): Long? {
+        if (responseBody.isNullOrBlank()) return null
+        try {
+            val details = JSONObject(responseBody)
+                .optJSONObject("error")
+                ?.optJSONArray("details")
+            if (details != null) {
+                for (i in 0 until details.length()) {
+                    val detail = details.optJSONObject(i) ?: continue
+                    val retryDelay = detail.optString("retryDelay", "")
+                    parseDelayStringMs(retryDelay)?.let { return it }
+                }
+            }
+        } catch (_: Exception) {
+            // Fall through to the loose message parser below.
+        }
+
+        val retryMatch = Regex("""retry in ([0-9.]+)s""", RegexOption.IGNORE_CASE)
+            .find(responseBody)
+        return retryMatch?.groupValues?.getOrNull(1)?.toDoubleOrNull()?.let {
+            (it * 1000.0).toLong()
+        }
+    }
+
+    private fun parseDelayStringMs(value: String): Long? {
+        if (value.isBlank()) return null
+        val match = Regex("""([0-9.]+)\s*([a-z]*)""", RegexOption.IGNORE_CASE).matchEntire(value.trim())
+            ?: return null
+        val amount = match.groupValues[1].toDoubleOrNull() ?: return null
+        val unit = match.groupValues[2].lowercase()
+        val multiplier = when (unit) {
+            "", "s", "sec", "secs", "second", "seconds" -> 1000.0
+            "m", "min", "mins", "minute", "minutes" -> 60_000.0
+            "ms", "millisecond", "milliseconds" -> 1.0
+            else -> 1000.0
+        }
+        return (amount * multiplier).toLong()
+    }
+
+    private fun isDeveloperInstructionUnsupported(responseBody: String?): Boolean {
+        return responseBody?.contains("Developer instruction is not enabled", ignoreCase = true) == true
+    }
+
+    private fun isApiKeyOrAuthError(code: Int, responseBody: String?): Boolean {
+        val lower = responseBody?.lowercase().orEmpty()
+        if (code == 401) return true
+        if (lower.contains("api key not valid") || lower.contains("invalid api key")) return true
+        if (code == 403 && (lower.contains("api key") || lower.contains("permission_denied") || lower.contains("forbidden"))) {
+            return true
+        }
+        return false
     }
 
     private fun executeWithFallback(
@@ -163,7 +315,7 @@ object GeminiService : SharedPreferences.OnSharedPreferenceChangeListener {
 
             Log.w(TAG, "All cached models failed. Triggering reactive cache invalidation.")
             fetchAndCacheModels(context, apiKey, forceRefresh = true)
-            
+
             mainHandler.post {
                 callback(null, Exception("AI model list refreshed. Please tap the button again."))
             }
@@ -172,17 +324,25 @@ object GeminiService : SharedPreferences.OnSharedPreferenceChangeListener {
 
         val model = models[modelIndex]
         Log.d(TAG, "Attempting generation with model: $model (index $modelIndex)")
-        
+
         val url = "https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=$apiKey"
-        val fullPrompt = "$prompt\n\n$text"
 
         val payload = try {
             JSONObject().apply {
+                put("system_instruction", JSONObject().apply {
+                    put("parts", JSONArray().put(JSONObject().apply {
+                        put("text", "You are a helpful writing assistant. Give me 3 distinct variations of the requested transformation, separated by '---VAR---'. Return only the variations and delimiters. Do not add any preamble or explanation.")
+                    }))
+                })
                 put("contents", JSONArray().put(JSONObject().apply {
                     put("parts", JSONArray().put(JSONObject().apply {
-                        put("text", fullPrompt)
+                        put("text", "$prompt\n\n$text")
                     }))
                 }))
+                put("generationConfig", JSONObject().apply {
+                    put("temperature", 0.7)
+                    put("maxOutputTokens", 1024)
+                })
             }
         } catch (e: Exception) {
             mainHandler.post { callback(null, e) }
@@ -208,9 +368,22 @@ object GeminiService : SharedPreferences.OnSharedPreferenceChangeListener {
                     val responseBody = resp.body?.string()
                     if (!resp.isSuccessful) {
                         Log.e(TAG, "Model $model returned error ${resp.code}: $responseBody")
-                        
-                        // Immediately break for dead keys (400 or 403)
-                        if (resp.code == 400 || resp.code == 403) {
+
+                        if (resp.code == 429) {
+                            val retryDelayMs = parseRetryDelayMs(responseBody) ?: QUOTA_COOLDOWN_FALLBACK_MS
+                            setQuotaCooldown(retryDelayMs)
+                            mainHandler.post {
+                                callback(null, Exception(getActiveQuotaCooldownMessage() ?: quotaMessageForDelay(retryDelayMs)))
+                            }
+                            return
+                        }
+
+                        if (isDeveloperInstructionUnsupported(responseBody)) {
+                            executeWithFallback(context, apiKey, prompt, text, models, modelIndex + 1, callback)
+                            return
+                        }
+
+                        if (isApiKeyOrAuthError(resp.code, responseBody)) {
                             mainHandler.post {
                                 callback(null, Exception("Invalid API Key. Please check your settings."))
                             }

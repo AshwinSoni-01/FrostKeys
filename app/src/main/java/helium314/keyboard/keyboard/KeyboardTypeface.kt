@@ -8,6 +8,7 @@ import android.widget.TextView
 import androidx.compose.ui.text.font.FontFamily
 import helium314.keyboard.latin.common.isEmoji
 import helium314.keyboard.latin.settings.Settings
+import helium314.keyboard.latin.utils.TypefaceUtils
 
 object KeyboardTypeface {
     private val lock = Any()
@@ -72,10 +73,14 @@ object KeyboardTypeface {
         defaultTypeface: Typeface = Typeface.DEFAULT,
     ): Typeface {
         val emojiTypeface = emojiTypeface()
-        return if (emojiTypeface != null && text != null && isEmoji(text)) {
-            emojiTypeface
+        if (emojiTypeface != null && text != null && isEmoji(text)) {
+            return emojiTypeface
+        }
+        val custom = customTypeface() ?: return defaultTypeface
+        return if (defaultTypeface.style != Typeface.NORMAL) {
+            Typeface.create(custom, defaultTypeface.style)
         } else {
-            customTypeface() ?: defaultTypeface
+            custom
         }
     }
 
@@ -97,6 +102,7 @@ object KeyboardTypeface {
             customTypefaceLoaded = false
             cachedEmojiTypeface = null
             emojiTypefaceLoaded = false
+            TypefaceUtils.clearCache()
         }
     }
 }

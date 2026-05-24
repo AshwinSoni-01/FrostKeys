@@ -90,7 +90,7 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
 
     // judging by usage before adding multilingual typing, this should check primary group locale only
     override fun isForLocale(locale: Locale?): Boolean {
-        return locale != null && locale == dictionaryGroups[0].locale
+        return locale != null && locale == dictionaryGroups.firstOrNull()?.locale
     }
 
     override fun onStartInput() {
@@ -644,7 +644,7 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
         }
 
         private fun getUsedLocales(mainLocale: Locale, context: Context): Collection<Locale> {
-            val locales = hashSetOf(mainLocale)
+            val locales = linkedSetOf(mainLocale)
             // adding secondary locales is a bit tricky since they depend on the subtype
             // but usually this is called with the selected subtype locale
             val selectedSubtype = SubtypeSettings.getSelectedSubtype(context.prefs())

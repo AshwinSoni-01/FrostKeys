@@ -193,6 +193,7 @@ final class SuggestionStripLayoutHelper {
         paint.setTextAlign(Align.CENTER);
         paint.setTextSize(textSize);
         paint.setColor(color);
+        paint.setTypeface(KeyboardTypeface.resolve(MORE_SUGGESTIONS_HINT, Typeface.DEFAULT_BOLD));
         final Rect bounds = new Rect();
         paint.getTextBounds(MORE_SUGGESTIONS_HINT, 0, MORE_SUGGESTIONS_HINT.length(), bounds);
         final int width = Math.round(bounds.width() + 0.5f);
@@ -757,6 +758,7 @@ final class SuggestionStripLayoutHelper {
     }
 
     private static Typeface getTextTypeface(@Nullable final CharSequence text) {
-        return hasStyleSpan(text, BOLD_SPAN) ? Typeface.DEFAULT_BOLD : Typeface.DEFAULT;
+        Typeface base = hasStyleSpan(text, BOLD_SPAN) ? Typeface.DEFAULT_BOLD : Typeface.DEFAULT;
+        return KeyboardTypeface.resolve(text, base);
     }
 }

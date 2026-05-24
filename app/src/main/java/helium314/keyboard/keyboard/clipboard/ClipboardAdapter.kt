@@ -21,6 +21,7 @@ import androidx.recyclerview.widget.RecyclerView
 import androidx.recyclerview.widget.StaggeredGridLayoutManager
 import coil.load
 import helium314.keyboard.keyboard.KeyboardTheme
+import helium314.keyboard.keyboard.KeyboardTypeface
 import helium314.keyboard.latin.ClipboardHistoryEntry
 import helium314.keyboard.latin.ClipboardHistoryManager
 import helium314.keyboard.latin.R
@@ -105,7 +106,7 @@ class ClipboardAdapter(
             imageView = view.findViewById(R.id.clipboard_entry_image)
             configureImagePreviewCorners(usesRoundedCards)
             contentView = view.findViewById<TextView>(R.id.clipboard_entry_content)?.apply {
-                typeface = itemTypeFace
+                KeyboardTypeface.applyToTextView(this, null, itemTypeFace ?: android.graphics.Typeface.DEFAULT)
                 setTextColor(itemTextColor)
                 setTextSize(TypedValue.COMPLEX_UNIT_PX, itemTextSize)
             }
@@ -166,6 +167,7 @@ class ClipboardAdapter(
                 imageView.isGone = false
                 imageView.load(imageClip.uri)
                 contentView?.text = imageClip.label
+                contentView?.let { KeyboardTypeface.applyToTextView(it, imageClip.label, itemTypeFace ?: android.graphics.Typeface.DEFAULT) }
 
                 // Enforce perfectly square dimension
                 if (parent.width > 0) {
@@ -190,7 +192,9 @@ class ClipboardAdapter(
             } else {
                 imageView.isGone = true
                 imageView.setImageDrawable(null)
-                contentView?.text = historyEntry?.text?.take(1000) // truncate displayed text for performance reasons
+                val text = historyEntry?.text?.take(1000) // truncate displayed text for performance reasons
+                contentView?.text = text
+                contentView?.let { KeyboardTypeface.applyToTextView(it, text, itemTypeFace ?: android.graphics.Typeface.DEFAULT) }
 
                 // Reset text items back to standard wrap_content height
                 if (lp != null) {

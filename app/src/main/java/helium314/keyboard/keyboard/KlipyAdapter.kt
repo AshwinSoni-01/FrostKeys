@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 package helium314.keyboard.keyboard
 
-import android.os.Build
 import android.os.SystemClock
 import android.view.LayoutInflater
 import android.view.View
@@ -10,7 +9,6 @@ import android.graphics.Canvas
 import android.graphics.ColorFilter
 import android.graphics.Paint
 import android.graphics.PixelFormat
-import android.graphics.Rect
 import android.graphics.RectF
 import android.graphics.drawable.Animatable
 import android.graphics.drawable.Drawable
@@ -22,7 +20,6 @@ import androidx.recyclerview.widget.RecyclerView
 import androidx.recyclerview.widget.StaggeredGridLayoutManager
 import coil.ImageLoader
 import coil.decode.GifDecoder
-import coil.decode.ImageDecoderDecoder
 import coil.load
 import coil.dispose
 import coil.size.Scale
@@ -46,6 +43,7 @@ class KlipyAdapter(
     class ViewHolder(view: View, val parent: ViewGroup) : RecyclerView.ViewHolder(view) {
         val imageView: ImageView = view.findViewById(R.id.klipyImage)
         var pendingLoadRunnable: Runnable? = null
+        var releasedWhileDetached: Boolean = false
 
         init {
             imageView.clipToOutline = true
@@ -112,7 +110,8 @@ class KlipyAdapter(
     private fun releaseHolder(holder: ViewHolder, clearImage: Boolean, disposeRequest: Boolean = true) {
         holder.pendingLoadRunnable?.let { holder.itemView.removeCallbacks(it) }
         holder.pendingLoadRunnable = null
-        (holder.imageView.drawable as? Animatable)?.stop()
+        val drawable = holder.imageView.drawable
+        (drawable as? Animatable)?.stop()
         if (disposeRequest) {
             holder.imageView.dispose()
         }
@@ -125,11 +124,7 @@ class KlipyAdapter(
         return imageLoader ?: synchronized(this) {
             imageLoader ?: ImageLoader.Builder(context.applicationContext)
                 .components {
-                    if (Build.VERSION.SDK_INT >= 28) {
-                        add(ImageDecoderDecoder.Factory())
-                    } else {
-                        add(GifDecoder.Factory())
-                    }
+                    add(GifDecoder.Factory())
                 }
                 .memoryCache {
                     MemoryCache.Builder(context.applicationContext)
@@ -142,6 +137,7 @@ class KlipyAdapter(
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         val item = items[position]
+        holder.releasedWhileDetached = false
 
         // Prevent StaggeredGridLayoutManager from making items full-span
         val lp = holder.itemView.layoutParams
@@ -211,7 +207,6 @@ class KlipyAdapter(
             holder.pendingLoadRunnable = null
             if (holder.bindingAdapterPosition == position) {
                 holder.imageView.load(imageUrl, loader) {
-                    crossfade(150)
                     scale(Scale.FIT)
                     if (hasDimensions && targetWidth > 0 && targetHeight > 0) {
                         size(targetWidth, targetHeight)
@@ -220,12 +215,10 @@ class KlipyAdapter(
                         onSuccess = { _, result ->
                             val drawable = result.drawable
                             if (drawable is Animatable) {
-                                val throttled = ThrottledAnimatableDrawable(drawable, 150L)
-                                holder.imageView.setImageDrawable(throttled)
                                 if (areAnimationsRunning) {
-                                    throttled.start()
+                                    drawable.start()
                                 } else {
-                                    throttled.stop()
+                                    drawable.stop()
                                 }
                             }
                         }
@@ -252,6 +245,17 @@ class KlipyAdapter(
     override fun onViewAttachedToWindow(holder: ViewHolder) {
         super.onViewAttachedToWindow(holder)
         activeViews.add(holder)
+        if (holder.releasedWhileDetached && isImageLoadingEnabled) {
+            holder.releasedWhileDetached = false
+            holder.itemView.post {
+                val position = holder.bindingAdapterPosition
+                if (position != RecyclerView.NO_POSITION) {
+                    notifyItemChanged(position)
+                }
+            }
+            return
+        }
+        holder.releasedWhileDetached = false
         val drawable = holder.imageView.drawable
         if (areAnimationsRunning && drawable is Animatable) {
             drawable.start()
@@ -261,7 +265,8 @@ class KlipyAdapter(
     override fun onViewDetachedFromWindow(holder: ViewHolder) {
         super.onViewDetachedFromWindow(holder)
         activeViews.remove(holder)
-        releaseHolder(holder, clearImage = false, disposeRequest = false)
+        holder.releasedWhileDetached = true
+        releaseHolder(holder, clearImage = true, disposeRequest = true)
     }
 
     override fun onViewRecycled(holder: ViewHolder) {
@@ -349,104 +354,5 @@ class SubtleCircularProgressDrawable : Drawable(), Animatable, Runnable {
             invalidateSelf()
             scheduleSelf(this, SystemClock.uptimeMillis() + 16)
         }
-    }
-}
-
-class ThrottledAnimatableDrawable(
-    private val delegate: Drawable,
-    private val minFrameDurationMs: Long = 150L // Cap frame rate to ~7 FPS for previews
-) : Drawable(), Drawable.Callback, Animatable {
-
-    init {
-        delegate.callback = this
-    }
-
-    private val isAnimatable: Boolean
-        get() = delegate is Animatable
-
-    override fun draw(canvas: Canvas) {
-        delegate.draw(canvas)
-    }
-
-    override fun setAlpha(alpha: Int) {
-        delegate.alpha = alpha
-    }
-
-    override fun setColorFilter(colorFilter: ColorFilter?) {
-        delegate.colorFilter = colorFilter
-    }
-
-    @Deprecated("Deprecated in Java")
-    @Suppress("DEPRECATION")
-    override fun getOpacity(): Int {
-        return delegate.opacity
-    }
-
-    override fun onBoundsChange(bounds: Rect) {
-        super.onBoundsChange(bounds)
-        delegate.bounds = bounds
-    }
-
-    override fun getIntrinsicWidth(): Int = delegate.intrinsicWidth
-    override fun getIntrinsicHeight(): Int = delegate.intrinsicHeight
-
-    override fun setVisible(visible: Boolean, restart: Boolean): Boolean {
-        val changed = super.setVisible(visible, restart)
-        val delegateChanged = delegate.setVisible(visible, restart)
-        return changed || delegateChanged
-    }
-
-    override fun getPadding(padding: Rect): Boolean = delegate.getPadding(padding)
-    override fun isStateful(): Boolean = delegate.isStateful
-    override fun onStateChange(state: IntArray): Boolean = delegate.setState(state)
-    override fun getCurrent(): Drawable = delegate.current
-
-    // Animatable implementation
-    override fun start() {
-        if (isAnimatable) {
-            (delegate as Animatable).start()
-        }
-    }
-
-    override fun stop() {
-        if (isAnimatable) {
-            (delegate as Animatable).stop()
-        }
-    }
-
-    override fun isRunning(): Boolean {
-        return isAnimatable && (delegate as Animatable).isRunning
-    }
-
-    // Callback implementation
-    private var lastFrameTime = 0L
-
-    override fun invalidateDrawable(who: Drawable) {
-        val now = SystemClock.uptimeMillis()
-        if (now - lastFrameTime >= minFrameDurationMs) {
-            lastFrameTime = now
-            invalidateSelf()
-        }
-    }
-
-    override fun scheduleDrawable(who: Drawable, what: Runnable, `when`: Long) {
-        val now = SystemClock.uptimeMillis()
-        val delay = `when` - now
-        val targetWhen = if (delay <= 0) {
-            `when`
-        } else {
-            val currentLastFrame = lastFrameTime
-            val earliestNextFrame = currentLastFrame + minFrameDurationMs
-            if (`when` < earliestNextFrame) {
-                earliestNextFrame
-            } else {
-                `when`
-            }
-        }
-        scheduleSelf(what, targetWhen)
-    }
-
-    override fun unscheduleDrawable(who: Drawable, what: Runnable) {
-        unscheduleSelf(what)
     }
 }

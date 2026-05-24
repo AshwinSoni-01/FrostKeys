@@ -33,6 +33,7 @@ import androidx.annotation.Nullable;
 import helium314.keyboard.event.Event;
 import helium314.keyboard.event.HapticEvent;
 import helium314.keyboard.keyboard.KeyboardLayoutSet.KeyboardLayoutSetException;
+import helium314.keyboard.keyboard.KeyboardTypeface;
 import helium314.keyboard.keyboard.clipboard.ClipboardHistoryView;
 import helium314.keyboard.keyboard.emoji.EmojiPalettesView;
 import helium314.keyboard.keyboard.internal.AiWritingToolsView;
@@ -777,6 +778,7 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
             mFakeToastView.setCompoundDrawables(appIcon, null, null, null);
         }
         mFakeToastView.setText(text);
+        KeyboardTypeface.applyToTextView(mFakeToastView);
         mFakeToastView.setVisibility(View.VISIBLE);
         mFakeToastView.bringToFront();
         mFakeToastView.startAnimation(AnimationUtils.loadAnimation(mLatinIME, R.anim.fade_in));
@@ -1071,6 +1073,7 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
             final TextView tv = new TextView(context);
             tv.setText(emoji);
             tv.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 20f);
+            KeyboardTypeface.applyToTextView(tv, emoji, android.graphics.Typeface.DEFAULT);
             tv.setGravity(Gravity.CENTER);
             tv.setLayoutParams(new LinearLayout.LayoutParams(itemWidth, height));
             tv.setClickable(true);
@@ -1124,6 +1127,7 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
         final TextView removeText = new TextView(context);
         removeText.setText("Remove row");
         removeText.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 12f);
+        KeyboardTypeface.applyToTextView(removeText);
         removeText.setGravity(Gravity.CENTER);
         removeText.setTextColor(0xFF808080); // subtle gray text matching t.keyText.copy(alpha = 0.6f)
         removeBtn.addView(removeText);
@@ -1160,14 +1164,9 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
 
     public void updateLiveFrostedGlassColors() {
         if (mCurrentInputView == null) return;
-        final Settings settings = Settings.getInstance();
-        final SettingsValues oldValues = Settings.getValues();
-        if (oldValues != null) {
-            settings.loadSettings(mCurrentInputView.getContext(), oldValues.mLocale, oldValues.mInputAttributes);
-        }
-        final SettingsValues settingsValues = Settings.getValues();
-        if (settingsValues == null) return;
-        final helium314.keyboard.latin.common.Colors colors = settingsValues.mColors;
+        final helium314.keyboard.latin.common.Colors colors =
+                helium314.keyboard.keyboard.KeyboardTheme.getColorsForCurrentTheme(
+                        mCurrentInputView.getContext());
         if (colors == null) return;
 
         // 1. Update mMainKeyboardFrame background

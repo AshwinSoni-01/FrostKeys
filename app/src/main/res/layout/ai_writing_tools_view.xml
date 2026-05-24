@@ -37,6 +37,7 @@
             android:textStyle="bold"
             android:textSize="20sp"
             android:paddingStart="8dp"/>
+
     </LinearLayout>
 
     <HorizontalScrollView
@@ -51,18 +52,40 @@
             android:orientation="horizontal"
             android:paddingHorizontal="4dp">
 
-            <Button android:id="@+id/btn_tool_proofread"
-                android:layout_width="wrap_content" android:layout_height="40dp"
-                android:background="@drawable/bg_ai_chip" android:text="Fix Grammar"
+            <Button
+                android:id="@+id/btn_tool_proofread"
+                android:layout_width="wrap_content"
+                android:layout_height="40dp"
+                android:layout_marginEnd="8dp"
+                android:background="@drawable/bg_ai_chip"
                 android:foreground="?android:attr/selectableItemBackground"
-                android:textAllCaps="false" android:layout_marginEnd="8dp" android:paddingHorizontal="16dp"
-                android:textColor="?android:attr/textColorPrimary"/>
+                android:paddingHorizontal="16dp"
+                android:text="Proofread"
+                android:textAllCaps="false"
+                android:elevation="0dp"
+                android:stateListAnimator="@null"
+                android:textColor="?android:attr/textColorPrimary" />
+
+            <Button
+                android:id="@+id/btn_tool_fix_grammar"
+                android:layout_width="wrap_content"
+                android:layout_height="40dp"
+                android:layout_marginEnd="8dp"
+                android:background="@drawable/bg_ai_chip"
+                android:foreground="?android:attr/selectableItemBackground"
+                android:paddingHorizontal="16dp"
+                android:text="Fix Grammar"
+                android:textAllCaps="false"
+                android:elevation="0dp"
+                android:stateListAnimator="@null"
+                android:textColor="?android:attr/textColorPrimary" />
 
             <Button android:id="@+id/btn_tool_rewrite"
                 android:layout_width="wrap_content" android:layout_height="40dp"
                 android:background="@drawable/bg_ai_chip" android:text="Rewrite"
                 android:foreground="?android:attr/selectableItemBackground"
                 android:textAllCaps="false" android:layout_marginEnd="8dp" android:paddingHorizontal="16dp"
+                android:elevation="0dp" android:stateListAnimator="@null"
                 android:textColor="?android:attr/textColorPrimary"/>
 
             <Button android:id="@+id/btn_tone_professional"
@@ -70,23 +93,50 @@
                 android:background="@drawable/bg_ai_chip" android:text="Professional"
                 android:foreground="?android:attr/selectableItemBackground"
                 android:textAllCaps="false" android:layout_marginEnd="8dp" android:paddingHorizontal="16dp"
+                android:elevation="0dp" android:stateListAnimator="@null"
                 android:textColor="?android:attr/textColorPrimary"/>
 
             <Button android:id="@+id/btn_tone_friendly"
                 android:layout_width="wrap_content" android:layout_height="40dp"
                 android:background="@drawable/bg_ai_chip" android:text="Friendly"
                 android:foreground="?android:attr/selectableItemBackground"
+                android:textAllCaps="false" android:layout_marginEnd="8dp" android:paddingHorizontal="16dp"
+                android:elevation="0dp" android:stateListAnimator="@null"
+                android:textColor="?android:attr/textColorPrimary"/>
+
+            <Button android:id="@+id/btn_tool_old_english"
+                android:layout_width="wrap_content" android:layout_height="40dp"
+                android:background="@drawable/bg_ai_chip" android:text="Old English"
+                android:foreground="?android:attr/selectableItemBackground"
                 android:textAllCaps="false" android:paddingHorizontal="16dp"
+                android:elevation="0dp" android:stateListAnimator="@null"
                 android:textColor="?android:attr/textColorPrimary"/>
         </LinearLayout>
     </HorizontalScrollView>
 
-    <androidx.viewpager2.widget.ViewPager2
-        android:id="@+id/vp_ai_carousel"
+    <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="200dp"
-        android:orientation="horizontal"
-        android:layout_marginBottom="0dp" />
+        android:layout_marginBottom="0dp"
+        android:clipChildren="false"
+        android:clipToPadding="false">
+
+        <androidx.viewpager2.widget.ViewPager2
+            android:id="@+id/vp_ai_carousel"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="horizontal" />
+
+        <View
+            android:id="@+id/glow_border"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_margin="2dp"
+            android:clickable="false"
+            android:focusable="false"
+            android:importantForAccessibility="no"
+            android:visibility="gone" />
+    </FrameLayout>
 
     <LinearLayout
         android:id="@+id/ll_page_indicators"
@@ -112,7 +162,9 @@
             android:text="Copy" android:textColor="?android:attr/textColorPrimary"
             android:textAllCaps="false"
             android:paddingHorizontal="20dp"
-            android:layout_marginEnd="8dp" />
+            android:layout_marginEnd="8dp"
+            android:elevation="0dp"
+            android:stateListAnimator="@null" />
 
         <View
             android:layout_width="0dp"

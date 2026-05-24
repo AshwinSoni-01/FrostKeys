@@ -29,6 +29,7 @@ import android.widget.ProgressBar
 import android.widget.ImageView
 import android.view.KeyEvent
 import helium314.keyboard.event.HapticEvent
+import helium314.keyboard.keyboard.KeyboardTypeface
 import helium314.keyboard.keyboard.internal.KeyVisualAttributes
 import helium314.keyboard.keyboard.internal.keyboard_parser.floris.KeyCode
 import helium314.keyboard.latin.LatinIME
@@ -100,7 +101,7 @@ class KlipyPalettesView @JvmOverloads constructor(
     private val inFlightStickerJobs = ConcurrentHashMap<String, Deferred<File?>>()
     private var stickerProcessorDispatcher = createStickerProcessorDispatcher()
     private var isStickerProcessorDispatcherClosed = false
-    
+
     private fun getLatinIME(): LatinIME? {
         var ctx = context
         while (ctx is ContextWrapper) {
@@ -360,7 +361,7 @@ class KlipyPalettesView @JvmOverloads constructor(
     }
 
     private fun onItemUsed(item: KlipyItem) {
-        historyDao.addHistory(item.id, item.url, currentTab, item.width, item.height)
+        historyDao.addHistory(item.id, item.url, currentTab, item.width, item.height, item.previewUrl)
 
         viewScope.launch {
             showLoading()
@@ -678,23 +679,23 @@ class KlipyPalettesView @JvmOverloads constructor(
                 }
 
                 val hasMore = rawList.size >= 24
-                val useGifUrl = currentTab == KlipyHistoryDao.TYPE_GIF && !shouldSendGifsAsStickers()
+                val sendAsGif = currentTab == KlipyHistoryDao.TYPE_GIF && !shouldSendGifsAsStickers()
 
                 val items = rawList.mapNotNull { item ->
-                    val previewUrl = if (useGifUrl) {
-                        item.file.sm?.gif?.url ?: item.file.hd.gif.url
-                    } else {
-                        item.file.sm?.webp?.url ?: item.file.hd.webp?.url
-                    }
+                    val gifPreviewUrl = item.file.sm?.gif?.url?.takeIf { it.isNotBlank() }
+                        ?: item.file.hd.gif.url.takeIf { it.isNotBlank() }
+                    val webpPreviewUrl = item.file.sm?.webp?.url?.takeIf { it.isNotBlank() }
+                        ?: item.file.hd.webp?.url?.takeIf { it.isNotBlank() }
+                    val previewUrl = gifPreviewUrl ?: webpPreviewUrl
 
-                    val hdUrl = if (useGifUrl) {
-                        item.file.hd.gif.url
+                    val hdUrl = if (sendAsGif) {
+                        item.file.hd.gif.url.takeIf { it.isNotBlank() }
                     } else {
-                        item.file.hd.webp?.url
+                        item.file.hd.webp?.url?.takeIf { it.isNotBlank() }
                     }
 
                     if (hdUrl == null) {
-                        Log.d("KlipyPalettesView", "Skipped item ${item.id} - No HD WebP available for sticker send mode")
+                        Log.d("KlipyPalettesView", "Skipped item ${item.id} - No sendable HD URL available")
                         return@mapNotNull null
                     }
 
@@ -783,6 +784,7 @@ class KlipyPalettesView @JvmOverloads constructor(
                 tabGifs.setTextColor(toolBarColor)
                 val drawables = tabGifs.compoundDrawablesRelative
                 drawables[0]?.let { androidx.core.graphics.drawable.DrawableCompat.setTint(it.mutate(), toolBarColor) }
+                KeyboardTypeface.applyToTextView(tabGifs)
             }
             val tabStickers = findViewById<TextView>(R.id.tabStickers)
             if (tabStickers != null) {
@@ -790,6 +792,7 @@ class KlipyPalettesView @JvmOverloads constructor(
                 tabStickers.setTextColor(toolBarColor)
                 val drawables = tabStickers.compoundDrawablesRelative
                 drawables[0]?.let { androidx.core.graphics.drawable.DrawableCompat.setTint(it.mutate(), toolBarColor) }
+                KeyboardTypeface.applyToTextView(tabStickers)
             }
 
             // Theme search bar elements
@@ -802,6 +805,7 @@ class KlipyPalettesView @JvmOverloads constructor(
                 val toolBarColor = colors.get(ColorType.TOOL_BAR_KEY)
                 dummySearchTextView.setTextColor(toolBarColor)
                 dummySearchTextView.setHintTextColor((toolBarColor and 0x00FFFFFF) or 0x80000000.toInt())
+                KeyboardTypeface.applyToTextView(dummySearchTextView)
             }
             val searchIcon = findViewById<ImageView>(R.id.searchIcon)
             if (searchIcon != null) {
@@ -814,18 +818,26 @@ class KlipyPalettesView @JvmOverloads constructor(
             val clearHistoryButton = findViewById<TextView>(R.id.clearKlipyHistoryButton)
             if (clearHistoryButton != null) {
                 clearHistoryButton.setTextColor(colors.get(ColorType.TOOL_BAR_KEY))
+                KeyboardTypeface.applyToTextView(clearHistoryButton)
             }
             val clearHistoryConfirmTitle = findViewById<TextView>(R.id.clearHistoryConfirmTitle)
             if (clearHistoryConfirmTitle != null) {
                 clearHistoryConfirmTitle.setTextColor(colors.get(ColorType.TOOL_BAR_KEY))
+                KeyboardTypeface.applyToTextView(clearHistoryConfirmTitle)
             }
             val confirmClearHistoryButton = findViewById<TextView>(R.id.confirmClearHistoryButton)
             if (confirmClearHistoryButton != null) {
                 confirmClearHistoryButton.setTextColor(colors.get(ColorType.TOOL_BAR_KEY))
+                KeyboardTypeface.applyToTextView(confirmClearHistoryButton)
             }
             val cancelClearHistoryButton = findViewById<TextView>(R.id.cancelClearHistoryButton)
             if (cancelClearHistoryButton != null) {
                 cancelClearHistoryButton.setTextColor(colors.get(ColorType.TOOL_BAR_KEY))
+                KeyboardTypeface.applyToTextView(cancelClearHistoryButton)
+            }
+
+            findViewById<TextView>(R.id.emptyState)?.let {
+                KeyboardTypeface.applyToTextView(it)
             }
         } catch (e: Exception) {
             Log.e("KlipyPalettesView", "Failed to apply theme", e)

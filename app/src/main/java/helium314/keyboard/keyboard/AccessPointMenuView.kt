@@ -14,6 +14,7 @@ import android.widget.TextView
 import android.widget.FrameLayout
 import android.content.Intent
 import helium314.keyboard.keyboard.internal.KeyboardIconsSet
+import helium314.keyboard.keyboard.KeyboardTypeface
 import helium314.keyboard.latin.AudioAndHapticFeedbackManager
 import helium314.keyboard.latin.R
 import helium314.keyboard.latin.common.Constants
@@ -109,6 +110,7 @@ class AccessPointMenuView @JvmOverloads constructor(
 
                 labelView.text = key.name.lowercase().getStringResourceOrName("", context)
                 labelView.setTextColor(keyboardTextColor)
+                KeyboardTypeface.applyToTextView(labelView)
 
                 // Icon is non-interactive; touch is handled by parent tile
                 iconView.isClickable = false
@@ -269,11 +271,12 @@ class AccessPointMenuView @JvmOverloads constructor(
                 iconView.layoutParams = lp
                 iconView.background = colors.selectAndColorDrawable(keyboardViewAttr, helium314.keyboard.latin.common.ColorType.KEY_BACKGROUND)
             }
-            
+
             val labelView = tile.findViewById<TextView>(R.id.menu_tile_label)
             val keyboardTextColor = colors.get(helium314.keyboard.latin.common.ColorType.KEY_TEXT)
             labelView.setTextColor(keyboardTextColor)
-            
+            KeyboardTypeface.applyToTextView(labelView)
+
             val drawable = iconView.drawable
             if (drawable != null) {
                 val safeIcon = drawable.mutate()
