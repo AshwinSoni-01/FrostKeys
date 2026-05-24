@@ -13,10 +13,10 @@ KBoard takes the privacy-focused foundation of HeliBoard and adds modern, high-p
 ## 📸 Screenshots
 
 <p float="left" align="center">
-  <img src="assets/screenshots/Screenshot_4.png" width="220" />
-  <img src="assets/screenshots/Screenshot_5.png" width="220" />
-  <img src="assets/screenshots/Screenshot_2.png" width="220" />
-  <img src="assets/screenshots/Screenshot_3.png" width="220" />
+  <img src="assets/screenshots/Screenshot_4.png" width="200" />
+  <img src="assets/screenshots/Screenshot_5.png" width="200" />
+  <img src="assets/screenshots/Screenshot_2.png" width="200" />
+  <img src="assets/screenshots/Screenshot_3.png" width="200" />
 </p>
 
 ---
