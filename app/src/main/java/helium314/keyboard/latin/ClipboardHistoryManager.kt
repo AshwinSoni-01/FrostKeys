@@ -55,6 +55,8 @@ class ClipboardHistoryManager(
     private var screenshotObserver: ContentObserver? = null
     private var lastProcessedImageUri: String? = null
     private var screenshotInFlightUri: String? = null
+    @Volatile
+    private var latestImageSuggestion: RecentClip.Image? = null
 
     fun onCreate() {
         clipboardManager = latinIME.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
@@ -165,6 +167,7 @@ class ClipboardHistoryManager(
                         false,
                         encodeImageHistoryClip(cachedUri, imageClip.mimeType, imageClip.label)
                     )
+                    rememberImageSuggestion(imageClip.copy(uri = cachedUri, timeStamp = timeStamp))
                     completeScreenshotUri(uriString, screenshot.dateAdded, true)
                     refreshClipboardSuggestion()
                 } else {
@@ -317,7 +320,7 @@ class ClipboardHistoryManager(
         dontShowCurrentSuggestion = false
         // Make sure we read clipboard history content only if history settings is set.
         if (latinIME.mSettings.current.mClipboardHistoryEnabled) {
-            fetchPrimaryClip()
+            fetchPrimaryClip(clipChanged = true)
         }
         refreshClipboardSuggestion()
     }
@@ -329,17 +332,27 @@ class ClipboardHistoryManager(
         }
     }
 
-    private fun fetchPrimaryClip() {
+    private fun fetchPrimaryClip(clipChanged: Boolean = false) {
         try {
-            val clipData = clipboardManager.primaryClip ?: return
-            if (clipData.itemCount == 0) return
+            val clipData = clipboardManager.primaryClip ?: run {
+                if (clipChanged) latestImageSuggestion = null
+                return
+            }
+            if (clipData.itemCount == 0) {
+                if (clipChanged) latestImageSuggestion = null
+                return
+            }
             val timeStamp = ClipboardManagerCompat.getClipTimestamp(clipData)
             if (latinIME.mSettings.current.mShowScreenshotsInClipboard) {
                 recentImageClip(clipData)?.let { imageClip ->
                     val cachedUri = cacheImageClip(imageClip) ?: return
                     clipboardDao?.addClip(timeStamp, false, encodeImageHistoryClip(cachedUri, imageClip.mimeType, imageClip.label))
+                    rememberImageSuggestion(imageClip.copy(uri = cachedUri))
                     return
                 }
+            }
+            if (shouldReplaceLatestImageSuggestion(timeStamp, clipChanged)) {
+                latestImageSuggestion = null
             }
             if (clipData.description?.hasMimeType("text/*") == false) return
             clipData.getItemAt(0)?.let { clipItem ->
@@ -444,6 +457,32 @@ class ClipboardHistoryManager(
         return RecentClip.Image(uri, mimeType, label, ClipboardManagerCompat.getClipTimestamp(clipData))
     }
 
+    private fun rememberImageSuggestion(clip: RecentClip.Image) {
+        latestImageSuggestion = clip
+        dontShowCurrentSuggestion = false
+    }
+
+    private fun shouldReplaceLatestImageSuggestion(timeStamp: Long, clipChanged: Boolean): Boolean {
+        val imageClip = latestImageSuggestion ?: return true
+        return clipChanged || timeStamp >= imageClip.timeStamp
+    }
+
+    private fun latestRecentImageSuggestion(inputType: Int): RecentClip.Image? {
+        if (!latinIME.mSettings.current.mShowScreenshotsInClipboard) {
+            latestImageSuggestion = null
+            return null
+        }
+        if (InputTypeUtils.isPasswordInputType(inputType) || InputTypeUtils.isNumberInputType(inputType)) {
+            return null
+        }
+        val imageClip = latestImageSuggestion ?: return null
+        if (System.currentTimeMillis() - imageClip.timeStamp > RECENT_TIME_MILLIS) {
+            latestImageSuggestion = null
+            return null
+        }
+        return imageClip
+    }
+
     private fun android.content.ClipData.imageUri(): Uri? {
         for (i in 0 until itemCount) {
             val item = getItemAt(i) ?: continue
@@ -454,12 +493,13 @@ class ClipboardHistoryManager(
     }
 
     private fun recentClip(editorInfo: EditorInfo?): RecentClip? {
+        val inputType = editorInfo?.inputType ?: InputType.TYPE_NULL
+        latestRecentImageSuggestion(inputType)?.let { return it }
         val clipData = clipboardManager.primaryClip ?: return null
         if (clipData.itemCount == 0) return null
         val description = clipData.description ?: return null
         val timeStamp = ClipboardManagerCompat.getClipTimestamp(clipData)
         if (System.currentTimeMillis() - timeStamp > RECENT_TIME_MILLIS) return null
-        val inputType = editorInfo?.inputType ?: InputType.TYPE_NULL
 
         if (latinIME.mSettings.current.mShowScreenshotsInClipboard) recentImageClip(clipData)?.let { imageClip ->
             if (InputTypeUtils.isPasswordInputType(inputType) || InputTypeUtils.isNumberInputType(inputType)) {
@@ -589,7 +629,6 @@ class ClipboardHistoryManager(
     }
 
     companion object {
-        private const val IMAGE_HISTORY_PREFIX = "\u0001image\t"
         private const val PREF_LAST_SCREENSHOT_MEDIA_URI = "clipboard_last_screenshot_media_uri"
         private const val PREF_LAST_SCREENSHOT_DATE_ADDED = "clipboard_last_screenshot_date_added"
         private const val SCREENSHOT_RECENT_WINDOW_SECONDS = 30L
@@ -602,18 +641,9 @@ class ClipboardHistoryManager(
         private var dontShowCurrentSuggestion: Boolean = false
         const val RECENT_TIME_MILLIS = 3 * 60 * 1000L // 3 minutes (for clipboard suggestions)
 
-        data class ImageHistoryClip(val uri: Uri, val mimeType: String, val label: String)
+        fun decodeImageHistoryClip(text: String) = ClipboardImageHistoryClip.decode(text)
 
-        fun decodeImageHistoryClip(text: String): ImageHistoryClip? {
-            if (!text.startsWith(IMAGE_HISTORY_PREFIX)) return null
-            val parts = text.removePrefix(IMAGE_HISTORY_PREFIX).split('\t', limit = 3)
-            if (parts.size != 3) return null
-            return ImageHistoryClip(Uri.parse(parts[0]), parts[1], parts[2])
-        }
-
-        fun encodeImageHistoryClip(uri: Uri, mimeType: String, label: String): String {
-            val safeLabel = label.replace('\t', ' ').replace('\n', ' ')
-            return "$IMAGE_HISTORY_PREFIX$uri\t$mimeType\t$safeLabel"
-        }
+        fun encodeImageHistoryClip(uri: Uri, mimeType: String, label: String) =
+            ClipboardImageHistoryClip.encode(uri, mimeType, label)
     }
 }

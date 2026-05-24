@@ -3,10 +3,13 @@ package helium314.keyboard.latin.database
 
 import android.content.ContentValues
 import android.content.Context
+import android.net.Uri
 import android.os.SystemClock
+import helium314.keyboard.latin.ClipboardImageHistoryClip
 import helium314.keyboard.latin.ClipboardHistoryEntry
 import helium314.keyboard.latin.settings.Settings
 import helium314.keyboard.latin.utils.Log
+import java.io.File
 
 /*
  possible extension for later: allow non-text
@@ -22,7 +25,7 @@ import helium314.keyboard.latin.utils.Log
 
 /** Class providing cached access to the clipboard table */
 // currently we should not need to worry about synchronizing access (though maybe we could addClip in a coroutine, then it might be relevant)
-class ClipboardDao private constructor(private val db: Database) {
+class ClipboardDao private constructor(private val db: Database, context: Context) {
     interface Listener {
         fun onClipInserted(position: Int)
         fun onClipsRemoved(position: Int, count: Int)
@@ -30,6 +33,7 @@ class ClipboardDao private constructor(private val db: Database) {
     }
 
     var listener: Listener? = null
+    private val context = context.applicationContext
 
     // we clean up old clips when a new clip is added, but not too frequently
     private var lastClearOldClips = 0L
@@ -120,6 +124,7 @@ class ClipboardDao private constructor(private val db: Database) {
         val entry = cache[index]
         cache.remove(entry)
         db.writableDatabase.delete(TABLE, "$COLUMN_ID = ${entry.id}", null)
+        deleteCachedImageFiles(listOf(entry))
     }
 
     fun clearOldClips(now: Boolean = false) {
@@ -132,34 +137,77 @@ class ClipboardDao private constructor(private val db: Database) {
         val retentionTime = Settings.getValues()?.mClipboardHistoryRetentionTime ?: 121L
         if (retentionTime > 120) return
         val minTime = System.currentTimeMillis() - retentionTime * 60 * 1000L
-        if (!cache.removeAll { it.timeStamp < minTime && !it.isPinned })
+        val entriesToRemove = cache.filter { it.timeStamp < minTime && !it.isPinned }
+        if (entriesToRemove.isEmpty())
             return // nothing was removed
+        cache.removeAll(entriesToRemove.toSet())
 
         db.writableDatabase.delete(TABLE, "$COLUMN_TIMESTAMP < $minTime AND $COLUMN_PINNED = 0", null)
+        deleteCachedImageFiles(entriesToRemove)
     }
 
     fun clearNonPinned() {
+        val entriesToRemove = cache.filter { !it.isPinned }
+        if (entriesToRemove.isEmpty())
+            return // nothing to remove
+
         if (listener != null) {
             val indicesToRemove = mutableListOf<Int>()
             cache.forEachIndexed { idx, clip ->
                 if (!clip.isPinned)
                     indicesToRemove.add(idx)
             }
-            if (indicesToRemove.isEmpty())
-                return // nothing to remove
-            cache.removeAll { !it.isPinned }
+            cache.removeAll(entriesToRemove.toSet())
             listener?.onClipsRemoved(indicesToRemove[0], indicesToRemove.size)
-        } else if (!cache.removeAll { !it.isPinned }) {
-            return // no listener, nothing to remove
+        } else {
+            cache.removeAll(entriesToRemove.toSet())
         }
         db.writableDatabase.delete(TABLE, "$COLUMN_PINNED = 0", null)
+        deleteCachedImageFiles(entriesToRemove)
     }
 
     fun clear() {
         if (count() == 0) return
+        val entriesToRemove = cache.toList()
+        val removedCount = entriesToRemove.size
         cache.clear()
-        listener?.onClipsRemoved(0, count())
+        listener?.onClipsRemoved(0, removedCount)
         db.writableDatabase.delete(TABLE, null, null)
+        deleteCachedImageFiles(entriesToRemove)
+    }
+
+    private fun deleteCachedImageFiles(entries: Collection<ClipboardHistoryEntry>) {
+        entries.forEach { entry ->
+            val uri = ClipboardImageHistoryClip.decode(entry.text)?.uri ?: return@forEach
+            val file = cachedImageFile(uri) ?: return@forEach
+            if (file.exists() && !file.delete()) {
+                Log.e(TAG, "can't delete cached clipboard image: $file")
+            }
+        }
+    }
+
+    private fun cachedImageFile(uri: Uri): File? {
+        val clipboardDir = File(context.cacheDir, "clipboard")
+        val file = when (uri.scheme) {
+            "content" -> {
+                if (uri.authority != "${context.packageName}.fileprovider") return null
+                val segments = uri.pathSegments
+                if (segments.size < 3 || segments[0] != "cache" || segments[1] != "clipboard") return null
+                File(context.cacheDir, segments.drop(1).joinToString(File.separator))
+            }
+            "file" -> File(uri.path ?: return null)
+            else -> return null
+        }
+        return try {
+            val canonicalDir = clipboardDir.canonicalFile
+            val canonicalFile = file.canonicalFile
+            val dirPath = canonicalDir.path
+            val filePath = canonicalFile.path
+            if (filePath.startsWith("$dirPath${File.separator}")) canonicalFile else null
+        } catch (e: Exception) {
+            Log.e(TAG, "can't resolve cached clipboard image: $uri", e)
+            null
+        }
     }
 
     companion object {
@@ -187,7 +235,7 @@ class ClipboardDao private constructor(private val db: Database) {
         fun getInstance(context: Context): ClipboardDao? {
             if (instance == null)
                 try {
-                    instance = ClipboardDao(Database.getInstance(context))
+                    instance = ClipboardDao(Database.getInstance(context), context)
                 } catch (e: Throwable) {
                     Log.e(TAG, "can't create ClipboardDao", e)
                 }

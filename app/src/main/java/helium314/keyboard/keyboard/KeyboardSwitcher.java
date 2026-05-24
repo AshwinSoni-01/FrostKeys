@@ -31,11 +31,13 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import helium314.keyboard.event.Event;
+import helium314.keyboard.event.HapticEvent;
 import helium314.keyboard.keyboard.KeyboardLayoutSet.KeyboardLayoutSetException;
 import helium314.keyboard.keyboard.clipboard.ClipboardHistoryView;
 import helium314.keyboard.keyboard.emoji.EmojiPalettesView;
 import helium314.keyboard.keyboard.internal.AiWritingToolsView;
 import helium314.keyboard.keyboard.internal.KeyboardState;
+import helium314.keyboard.keyboard.internal.keyboard_parser.floris.KeyCode;
 import helium314.keyboard.keyboard.internal.keyboard_parser.EmojiParserKt;
 import helium314.keyboard.latin.InputView;
 import helium314.keyboard.latin.KeyboardWrapperView;
@@ -1078,7 +1080,9 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
             tv.setBackgroundResource(outValue.resourceId);
             tv.setOnClickListener(v -> {
                 if (mLatinIME != null && mLatinIME.mKeyboardActionListener != null) {
+                    mLatinIME.mKeyboardActionListener.onPressKey(KeyCode.NOT_SPECIFIED, 0, true, HapticEvent.KEY_PRESS);
                     mLatinIME.mKeyboardActionListener.onTextInput(emoji);
+                    mLatinIME.mKeyboardActionListener.onReleaseKey(KeyCode.NOT_SPECIFIED, false);
                     if (mEmojiPalettesView != null) {
                         mEmojiPalettesView.addRecentEmoji(emoji);
                     } else {
