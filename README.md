@@ -1,5 +1,7 @@
 # KBoard
 
+<img src="assets/icon/FrostKeys_Icon_with_bg.png" alt="KBoard Icon" width="200">
+
 **A personalized fork of [HeliBoard](https://github.com/HeliBorg/HeliBoard) with custom themes, AI writing tools, and Klipy GIF & animated sticker support.**
 
 KBoard takes the privacy-focused foundation of HeliBoard and adds modern, high-performance features for users who want more from their keyboard without sacrificing their data.
@@ -8,10 +10,21 @@ KBoard takes the privacy-focused foundation of HeliBoard and adds modern, high-p
 
 ---
 
+## 📸 Screenshots
+
+<p float="left" align="center">
+  <img src="assets/screenshots/Screenshot_4.png" width="220" />
+  <img src="assets/screenshots/Screenshot_5.png" width="220" />
+  <img src="assets/screenshots/Screenshot_2.png" width="220" />
+  <img src="assets/screenshots/Screenshot_3.png" width="220" />
+</p>
+
+---
+
 ## 📋 Table of Contents
 - [New Features](#-new-features)
 - [Original Features](#original-features)
-- [Contributing & Support](#contributing--support)
+- [Contributing & Support](contributing--support-#)
 - [License & Legal](#license--legal)
 - [Credits](#credits)
 
@@ -57,7 +70,7 @@ KBoard brings modern AI writing tools directly into your text field.
 
 ---
 
-## Contributing & Support ❤
+## Contributing & Support ❤️
 KBoard is a personal project, but the heavy lifting was done by the HeliBoard team.
 
 ### Support HeliBoard
