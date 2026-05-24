@@ -573,7 +573,8 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
             button.setOnClickListener(this)
             button.setOnLongClickListener(this)
             button.imageTintList = android.content.res.ColorStateList.valueOf(colors.get(ColorType.KEY_TEXT))
-            if (index == 0) {
+            val isRightMost = if (layoutDirection == LAYOUT_DIRECTION_RTL) index == 0 else index == pinned.size - 1
+            if (isRightMost) {
                 applySpecialKeyCircleBackground(button, colors)
             } else {
                 colors.setColor(button.background, ColorType.TOOL_BAR_EXPAND_KEY_BACKGROUND)
@@ -588,10 +589,12 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
             it.imageTintList = android.content.res.ColorStateList.valueOf(colors.get(ColorType.KEY_TEXT))
             applySpecialKeyCircleBackground(it, colors)
         }
-        for (i in 0 until pinnedKeys.childCount) {
+        val childCount = pinnedKeys.childCount
+        for (i in 0 until childCount) {
             val child = pinnedKeys.getChildAt(i) as? ImageButton ?: continue
             child.imageTintList = android.content.res.ColorStateList.valueOf(colors.get(ColorType.KEY_TEXT))
-            if (i == 0) {
+            val isRightMost = if (layoutDirection == LAYOUT_DIRECTION_RTL) i == 0 else i == childCount - 1
+            if (isRightMost) {
                 applySpecialKeyCircleBackground(child, colors)
             } else {
                 colors.setColor(child.background, ColorType.TOOL_BAR_EXPAND_KEY_BACKGROUND)

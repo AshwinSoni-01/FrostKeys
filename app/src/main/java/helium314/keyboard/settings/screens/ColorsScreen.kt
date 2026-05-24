@@ -21,7 +21,6 @@ import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
@@ -60,6 +59,7 @@ import helium314.keyboard.settings.SettingsActivity
 import helium314.keyboard.latin.utils.Theme
 import helium314.keyboard.settings.contentTextDirectionStyle
 import helium314.keyboard.settings.dialogs.ColorPickerDialog
+import helium314.keyboard.settings.preferences.SettingsSwitch
 import helium314.keyboard.latin.utils.previewDark
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -204,7 +204,7 @@ fun ColorsScreen(
                             }
                     }
                     if (colorSetting.auto != null)
-                        Switch(colorSetting.auto, onCheckedChange = { checked ->
+                        SettingsSwitch(colorSetting.auto, onCheckedChange = { checked ->
                             val oldUserColors = KeyboardTheme.readUserColors(prefs, newThemeName.text)
                             val newUserColors = (oldUserColors + ColorSetting(colorSetting.name, checked, colorSetting.color))
                                 .reversed().distinctBy { it.displayName }

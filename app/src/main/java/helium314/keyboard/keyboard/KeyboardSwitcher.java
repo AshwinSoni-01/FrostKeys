@@ -399,6 +399,9 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
             mAiWritingToolsView.setVisibility(View.GONE);
             mAiWritingToolsView.onClose();
         }
+        if (mAccessPointMenuView != null) {
+            mAccessPointMenuView.setVisibility(View.GONE);
+        }
         updatePersistentEmojiRow();
         if (mCurrentInputView != null) mCurrentInputView.requestLayout();
     }

@@ -216,6 +216,10 @@
     <string name="enable_clipboard_history">Enable clipboard history</string>
     <!-- Description for enabling/disabling clipboard history mentioning that if disabled, clipboard content is pasted -->
     <string name="enable_clipboard_history_summary">If disabled, clipboard key will paste clipboard content if any</string>
+    <!-- Preferences item for showing screenshots and image clipboard entries in clipboard UI. -->
+    <string name="show_screenshots_in_clipboard">Show screenshots in clipboard</string>
+    <!-- Description for showing screenshots and image clipboard entries in clipboard UI. -->
+    <string name="show_screenshots_in_clipboard_summary">Show recent screenshot and image clips in clipboard history and the paste suggestion</string>
     <!-- Preferences item for controlling clipboard history retention time -->
     <string name="clipboard_history_retention_time">History retention time</string>
     <!-- Preferences item for showing pinned clipboard items first -->

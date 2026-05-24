@@ -11,6 +11,8 @@ import android.view.View;
 import android.view.ViewGroup;
 
 import helium314.keyboard.keyboard.Key;
+import helium314.keyboard.keyboard.KeyboardTheme;
+import helium314.keyboard.latin.R;
 import helium314.keyboard.latin.common.ColorType;
 import helium314.keyboard.latin.common.Colors;
 import helium314.keyboard.latin.common.CoordinateUtils;
@@ -50,7 +52,6 @@ public final class KeyPreviewChoreographer {
         }
         final Context context = placerView.getContext();
         keyPreviewView = new KeyPreviewView(context, null /* attrs */);
-        keyPreviewView.setBackgroundResource(mParams.mPreviewBackgroundResId);
         placerView.addView(keyPreviewView, ViewLayoutUtils.newLayoutParam(placerView, 0, 0));
         return keyPreviewView;
     }
@@ -85,6 +86,8 @@ public final class KeyPreviewChoreographer {
     private void placeKeyPreview(final Key key, final KeyPreviewView keyPreviewView,
             final KeyboardIconsSet iconsSet, final KeyDrawParams drawParams,
             final int fullKeyboardViewWidth, final int[] originCoords) {
+        final Colors colors = Settings.getValues().mColors;
+        keyPreviewView.setPreviewBackgroundResource(getPreviewBackgroundResId(colors));
         keyPreviewView.setPreviewVisual(key, iconsSet, drawParams);
         keyPreviewView.measure(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         mParams.setGeometry(keyPreviewView);
@@ -107,17 +110,31 @@ public final class KeyPreviewChoreographer {
         }
         final boolean hasPopupKeys = (key.getPopupKeys() != null);
         keyPreviewView.setPreviewBackground(hasPopupKeys, keyPreviewPosition);
-        final Colors colors = Settings.getValues().mColors;
         colors.setBackground(keyPreviewView, ColorType.KEY_PREVIEW_BACKGROUND);
 
-        // The key preview is placed vertically above the top edge of the parent key with an
-        // arbitrary offset.
-        final int previewY = key.getY() - previewHeight + key.getHeight() - mParams.mPreviewOffset
-                + CoordinateUtils.y(originCoords);
+        // The circular LXX preview has no tail padding, so float it above the key.
+        final boolean isCircularPreview = isCircularPreviewStyle(colors);
+        final int previewY = isCircularPreview
+                ? key.getY() - previewHeight - (int) (4 * keyPreviewView.getResources().getDisplayMetrics().density)
+                    + CoordinateUtils.y(originCoords)
+                : key.getY() - previewHeight + key.getHeight() - mParams.mPreviewOffset
+                    + CoordinateUtils.y(originCoords);
 
         ViewLayoutUtils.placeViewAt(keyPreviewView, previewX, previewY, previewWidth, previewHeight);
         keyPreviewView.setPivotX(previewWidth / 2.0f);
         keyPreviewView.setPivotY(previewHeight);
+    }
+
+    private int getPreviewBackgroundResId(final Colors colors) {
+        return isCircularPreviewStyle(colors)
+                ? R.drawable.keyboard_key_feedback_circle
+                : mParams.mPreviewBackgroundResId;
+    }
+
+    private static boolean isCircularPreviewStyle(final Colors colors) {
+        final String themeStyle = colors.getThemeStyle();
+        return KeyboardTheme.STYLE_ROUNDED.equals(themeStyle)
+                || KeyboardTheme.STYLE_CIRCLE.equals(themeStyle);
     }
 
     void showKeyPreview(final Key key, final KeyPreviewView keyPreviewView) {

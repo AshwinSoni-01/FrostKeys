@@ -79,6 +79,7 @@ fun PreferencesScreen(
         Settings.PREF_REMOVE_REDUNDANT_POPUPS,
         R.string.settings_category_clipboard_history,
         Settings.PREF_ENABLE_CLIPBOARD_HISTORY,
+        Settings.PREF_SHOW_SCREENSHOTS_IN_CLIPBOARD,
         if (clipboardHistoryEnabled) Settings.PREF_CLIPBOARD_HISTORY_RETENTION_TIME else null,
         if (clipboardHistoryEnabled) Settings.PREF_CLIPBOARD_HISTORY_PINNED_FIRST else null
     )
@@ -168,6 +169,11 @@ fun createPreferencesSettings(context: Context) = listOf(
     {
         val ctx = LocalContext.current
         SwitchPreference(it, Defaults.PREF_ENABLE_CLIPBOARD_HISTORY) { ClipboardDao.getInstance(ctx)?.clearNonPinned() }
+    },
+    Setting(context, Settings.PREF_SHOW_SCREENSHOTS_IN_CLIPBOARD,
+        R.string.show_screenshots_in_clipboard, R.string.show_screenshots_in_clipboard_summary)
+    {
+        SwitchPreference(it, Defaults.PREF_SHOW_SCREENSHOTS_IN_CLIPBOARD)
     },
     Setting(context, Settings.PREF_CLIPBOARD_HISTORY_RETENTION_TIME, R.string.clipboard_history_retention_time) { setting ->
         val ctx = LocalContext.current

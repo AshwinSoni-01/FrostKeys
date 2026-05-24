@@ -16,6 +16,17 @@
             android:layout_marginVertical="8dp"
             android:layout_marginStart="4dp"/>
 
+    <ImageView
+            android:id="@+id/clipboard_entry_image"
+            android:layout_width="42dp"
+            android:layout_height="42dp"
+            android:layout_marginStart="8dp"
+            android:layout_marginTop="6dp"
+            android:layout_marginBottom="6dp"
+            android:contentDescription="@string/show_screenshots_in_clipboard"
+            android:scaleType="centerCrop"
+            android:visibility="gone"/>
+
     <!-- Provide audio and haptic feedback by ourselves based on the keyboard settings.
          We just need to ignore the system's audio and haptic feedback settings. -->
     <TextView

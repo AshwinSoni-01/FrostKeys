@@ -29,5 +29,5 @@
     <!-- Normal keys. -->
     <item android:state_pressed="true"
           android:drawable="@drawable/btn_keyboard_key_pressed_rounded_base" />
-    <item android:drawable="@color/key_background_lxx_base" />
+    <item android:drawable="@android:color/transparent" />
 </selector>

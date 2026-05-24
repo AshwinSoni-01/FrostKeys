@@ -8,7 +8,9 @@
 <FrameLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="@dimen/config_suggestions_strip_height">
+    android:layout_height="@dimen/config_suggestions_strip_height"
+    android:clipChildren="false"
+    android:clipToPadding="false">
     <!-- To ensure that key preview popup is correctly placed when the current system locale is
          one of RTL locales, layoutDirection="ltr" is needed in the SDK version 17+. -->
     <helium314.keyboard.latin.suggestions.SuggestionStripView
@@ -17,6 +19,8 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:gravity="center_vertical"
+        android:clipChildren="false"
+        android:clipToPadding="false"
         style="?attr/suggestionStripViewStyle" />
     <LinearLayout
         android:id="@+id/emoji_tab_strip"

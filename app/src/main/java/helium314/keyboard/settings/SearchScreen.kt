@@ -117,6 +117,7 @@ fun <T: Any?> SearchScreen(
     title: @Composable () -> Unit,
     filteredItems: (String) -> List<T>,
     itemContent: @Composable (T) -> Unit,
+    itemKey: ((T) -> Any)? = null,
     icon: @Composable (() -> Unit)? = null,
     menu: List<Pair<String, () -> Unit>>? = null,
     content: @Composable (ColumnScope.() -> Unit)? = null,
@@ -201,8 +202,14 @@ fun <T: Any?> SearchScreen(
                         contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom)
                     ) { innerPadding ->
                         LazyColumn(contentPadding = innerPadding) {
-                            items(items) {
-                                itemContent(it)
+                            if (itemKey == null) {
+                                items(items) {
+                                    itemContent(it)
+                                }
+                            } else {
+                                items(items, key = itemKey) {
+                                    itemContent(it)
+                                }
                             }
                         }
                     }

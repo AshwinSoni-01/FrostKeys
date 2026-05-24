@@ -11,7 +11,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -26,6 +25,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import helium314.keyboard.latin.utils.Theme
 import helium314.keyboard.latin.utils.previewDark
+import helium314.keyboard.settings.preferences.SettingsSwitch
 
 // modified version of ListPickerDialog for selecting multiple items
 @Composable
@@ -67,7 +67,7 @@ fun <T: Any> MultiListPickerDialog(
                                 text = getItemName(item),
                                 modifier = Modifier.weight(1f),
                             )
-                            Switch(
+                            SettingsSwitch(
                                 checked = item in selected,
                                 onCheckedChange = {
                                     selected = if (it) selected + item else selected - item

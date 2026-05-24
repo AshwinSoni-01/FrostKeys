@@ -8,10 +8,17 @@
     android:layout_width="wrap_content"
     android:layout_height="match_parent"
     tools:ignore="RtlSymmetry">
+    <ImageView
+        android:id="@+id/clipboard_suggestion_preview"
+        android:layout_width="24dp"
+        android:layout_height="24dp"
+        android:layout_marginStart="8dp"
+        android:contentDescription="@string/spoken_clipboard_suggestion"
+        android:scaleType="centerCrop"
+        android:visibility="gone" />
     <TextView
         android:id="@+id/clipboard_suggestion_text"
-        android:layout_width="0dp"
-        android:layout_weight="1"
+        android:layout_width="wrap_content"
         android:layout_height="match_parent"
         android:drawablePadding="3dp"
         android:paddingHorizontal="12dp"

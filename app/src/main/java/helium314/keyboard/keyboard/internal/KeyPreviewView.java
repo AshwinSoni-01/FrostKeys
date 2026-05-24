@@ -17,6 +17,7 @@ import android.view.Gravity;
 import android.widget.TextView;
 
 import helium314.keyboard.keyboard.Key;
+import helium314.keyboard.keyboard.KeyboardTheme;
 import helium314.keyboard.keyboard.KeyboardTypeface;
 import helium314.keyboard.latin.R;
 import helium314.keyboard.latin.common.StringUtilsKt;
@@ -33,6 +34,8 @@ public class KeyPreviewView extends TextView {
 
     private final Rect mBackgroundPadding = new Rect();
     private static final HashSet<String> sNoScaleXTextSet = new HashSet<>();
+    private int mBackgroundResourceId;
+    private boolean mNeedsCircularTextCentering;
 
     public KeyPreviewView(final Context context, final AttributeSet attrs) {
         this(context, attrs, 0);
@@ -46,18 +49,33 @@ public class KeyPreviewView extends TextView {
     public void setPreviewVisual(final Key key, final KeyboardIconsSet iconsSet, final KeyDrawParams drawParams) {
         // What we show as preview should match what we show on a key top in onDraw().
         if (key.getIconName() != null) {
+            mNeedsCircularTextCentering = false;
+            setIncludeFontPadding(true);
+            updateCircularPreviewPadding();
             setCompoundDrawables(key.getPreviewIcon(iconsSet), null, null, null);
             setText(null);
             return;
         }
 
+        final String previewLabel = key.getPreviewLabel();
+        mNeedsCircularTextCentering = isCircularPreviewStyle() && !StringUtilsKt.isEmoji(previewLabel);
+        setIncludeFontPadding(!mNeedsCircularTextCentering);
+        updateCircularPreviewPadding();
         setCompoundDrawables(null, null, null, null);
         setTextColor(drawParams.mPreviewTextColor);
         setTextSize(TypedValue.COMPLEX_UNIT_PX, key.selectPreviewTextSize(drawParams)
                 * Settings.getValues().mFontSizeMultiplier);
-        KeyboardTypeface.applyToTextView(this, key.getPreviewLabel(), key.selectPreviewTypeface(drawParams));
+        KeyboardTypeface.applyToTextView(this, previewLabel, key.selectPreviewTypeface(drawParams));
         // TODO Should take care of temporaryShiftLabel here.
-        setTextAndScaleX(key.getPreviewLabel());
+        setTextAndScaleX(previewLabel);
+    }
+
+    public void setPreviewBackgroundResource(final int backgroundResourceId) {
+        if (mBackgroundResourceId == backgroundResourceId) {
+            return;
+        }
+        setBackgroundResource(backgroundResourceId);
+        mBackgroundResourceId = backgroundResourceId;
     }
 
     private void setTextAndScaleX(final String text) {
@@ -130,5 +148,49 @@ public class KeyPreviewView extends TextView {
         }
         final int hasPopupKeysState = hasPopupKeys ? STATE_HAS_POPUPKEYS : STATE_NORMAL;
         background.setState(KEY_PREVIEW_BACKGROUND_STATE_TABLE[position][hasPopupKeysState]);
+
+        if (isCircularPreviewStyle()) {
+            updateCircularPreviewPadding();
+        }
+    }
+
+    @Override
+    protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+        super.onMeasure(widthMeasureSpec, heightMeasureSpec);
+        if (isCircularPreviewStyle()) {
+            final int width = getMeasuredWidth();
+            final int height = getMeasuredHeight();
+            final int minDiameter = (int) (56 * getResources().getDisplayMetrics().density);
+            int diameter = Math.max(Math.max(width, height), minDiameter);
+            setMeasuredDimension(diameter, diameter);
+
+            setOutlineProvider(new android.view.ViewOutlineProvider() {
+                @Override
+                public void getOutline(android.view.View view, android.graphics.Outline outline) {
+                    outline.setOval(0, 0, view.getWidth(), view.getHeight());
+                }
+            });
+            setClipToOutline(true);
+        } else {
+            setOutlineProvider(null);
+            setClipToOutline(false);
+        }
+    }
+
+    private static boolean isCircularPreviewStyle() {
+        final String themeStyle = Settings.getValues().mColors.getThemeStyle();
+        return KeyboardTheme.STYLE_ROUNDED.equals(themeStyle)
+                || KeyboardTheme.STYLE_CIRCLE.equals(themeStyle);
+    }
+
+    private void updateCircularPreviewPadding() {
+        if (!isCircularPreviewStyle()) {
+            return;
+        }
+        final float density = getResources().getDisplayMetrics().density;
+        final int horizontalPadding = (int) (8 * density);
+        final int topPadding = (int) ((mNeedsCircularTextCentering ? 5 : 8) * density);
+        final int bottomPadding = (int) ((mNeedsCircularTextCentering ? 11 : 8) * density);
+        setPadding(horizontalPadding, topPadding, horizontalPadding, bottomPadding);
     }
 }

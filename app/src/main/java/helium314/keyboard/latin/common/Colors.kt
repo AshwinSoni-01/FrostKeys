@@ -275,7 +275,8 @@ class DynamicColors(context: Context, override val themeStyle: String, override 
     override fun get(color: ColorType): Int = when (color) {
         TOOL_BAR_KEY_ENABLED_BACKGROUND, EMOJI_CATEGORY_SELECTED, ACTION_KEY_BACKGROUND,
         CLIPBOARD_PIN, SHIFT_KEY_ICON, ENTER_KEY_BACKGROUND -> accent
-        AUTOFILL_BACKGROUND_CHIP, GESTURE_PREVIEW, POPUP_KEYS_BACKGROUND, MORE_SUGGESTIONS_BACKGROUND, KEY_PREVIEW_BACKGROUND -> adjustedBackground
+        AUTOFILL_BACKGROUND_CHIP, GESTURE_PREVIEW, POPUP_KEYS_BACKGROUND, MORE_SUGGESTIONS_BACKGROUND -> adjustedBackground
+        KEY_PREVIEW_BACKGROUND -> ColorUtils.setAlphaComponent(adjustedBackground, 245)
         TOOL_BAR_EXPAND_KEY_BACKGROUND -> if (!isNight) accent else doubleAdjustedBackground
         GESTURE_TRAIL -> gesture
         KEY_TEXT, SUGGESTION_AUTO_CORRECT, REMOVE_SUGGESTION_ICON, EMOJI_KEY_TEXT, KEY_PREVIEW_TEXT, POPUP_KEY_TEXT,
@@ -328,7 +329,7 @@ class DynamicColors(context: Context, override val themeStyle: String, override 
         EMOJI_CATEGORY_SELECTED, CLIPBOARD_PIN, SHIFT_KEY_ICON -> accentColorFilter
         REMOVE_SUGGESTION_ICON, EMOJI_CATEGORY, KEY_TEXT,
             KEY_ICON, ONE_HANDED_MODE_BUTTON, TOOL_BAR_KEY, TOOL_BAR_EXPAND_KEY -> keyTextFilter
-        KEY_PREVIEW_BACKGROUND -> adjustedBackgroundFilter
+        KEY_PREVIEW_BACKGROUND -> colorFilter(get(KEY_PREVIEW_BACKGROUND))
         ACTION_KEY_ICON -> actionKeyIconColorFilter
         else -> colorFilter(get(color))
     }
@@ -337,7 +338,7 @@ class DynamicColors(context: Context, override val themeStyle: String, override 
         if (view.background == null)
             view.setBackgroundColor(Color.WHITE) // set white to make the color filters work
         when (color) {
-            KEY_PREVIEW_BACKGROUND -> view.background.colorFilter = adjustedBackgroundFilter
+            KEY_PREVIEW_BACKGROUND -> view.background.colorFilter = getColorFilter(KEY_PREVIEW_BACKGROUND)
             FUNCTIONAL_KEY_BACKGROUND, KEY_BACKGROUND, MORE_SUGGESTIONS_WORD_BACKGROUND, SPACE_BAR_BACKGROUND, STRIP_BACKGROUND -> setColor(view.background, color)
             ONE_HANDED_MODE_BUTTON -> setColor(view.background, if (keyboardBackground == null) MAIN_BACKGROUND else STRIP_BACKGROUND)
             MORE_SUGGESTIONS_BACKGROUND -> view.background.colorFilter = backgroundFilter
@@ -491,7 +492,8 @@ class DefaultColors (
         SPECIAL_KEY_BACKGROUND -> specialKeyBackground
         ENTER_KEY_BACKGROUND -> enterKeyBackground
         AUTOFILL_BACKGROUND_CHIP -> if (themeStyle == STYLE_MATERIAL && !hasKeyBorders) background else adjustedBackground
-        GESTURE_PREVIEW, POPUP_KEYS_BACKGROUND, MORE_SUGGESTIONS_BACKGROUND, KEY_PREVIEW_BACKGROUND -> adjustedBackground
+        GESTURE_PREVIEW, POPUP_KEYS_BACKGROUND, MORE_SUGGESTIONS_BACKGROUND -> adjustedBackground
+        KEY_PREVIEW_BACKGROUND -> ColorUtils.setAlphaComponent(adjustedBackground, 245)
         TOOL_BAR_EXPAND_KEY_BACKGROUND, CLIPBOARD_SUGGESTION_BACKGROUND -> doubleAdjustedBackground
         GESTURE_TRAIL -> gesture
         KEY_TEXT, REMOVE_SUGGESTION_ICON, FUNCTIONAL_KEY_TEXT, KEY_ICON, EMOJI_KEY_TEXT,
@@ -546,7 +548,8 @@ class DefaultColors (
         if (view.background == null)
             view.setBackgroundColor(Color.WHITE) // set white to make the color filters work
         when (color) {
-            KEY_PREVIEW_BACKGROUND, POPUP_KEYS_BACKGROUND -> view.background.colorFilter = adjustedBackgroundFilter
+            KEY_PREVIEW_BACKGROUND -> view.background.colorFilter = getColorFilter(KEY_PREVIEW_BACKGROUND)
+            POPUP_KEYS_BACKGROUND -> view.background.colorFilter = adjustedBackgroundFilter
             FUNCTIONAL_KEY_BACKGROUND, KEY_BACKGROUND, MORE_SUGGESTIONS_WORD_BACKGROUND, SPACE_BAR_BACKGROUND, STRIP_BACKGROUND, CLIPBOARD_SUGGESTION_BACKGROUND -> setColor(view.background, color)
             ONE_HANDED_MODE_BUTTON -> setColor(view.background, if (keyboardBackground == null) MAIN_BACKGROUND else STRIP_BACKGROUND)
             MORE_SUGGESTIONS_BACKGROUND -> view.background.colorFilter = backgroundFilter
@@ -581,7 +584,7 @@ class DefaultColors (
         EMOJI_CATEGORY_SELECTED, CLIPBOARD_PIN, SHIFT_KEY_ICON -> accentColorFilter
         KEY_TEXT, KEY_ICON -> keyTextFilter
         REMOVE_SUGGESTION_ICON, EMOJI_CATEGORY, ONE_HANDED_MODE_BUTTON, TOOL_BAR_KEY, TOOL_BAR_EXPAND_KEY -> suggestionTextFilter
-        KEY_PREVIEW_BACKGROUND -> adjustedBackgroundFilter
+        KEY_PREVIEW_BACKGROUND -> colorFilter(get(KEY_PREVIEW_BACKGROUND))
         ACTION_KEY_ICON -> actionKeyIconColorFilter
         else -> colorFilter(get(color)) // create color filter (not great for performance, so the frequently used filters should be stored)
     }

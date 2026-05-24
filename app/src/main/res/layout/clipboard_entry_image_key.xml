@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    SPDX-License-Identifier: GPL-3.0-only
+-->
+<FrameLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+
+    <ImageView
+        android:id="@+id/clipboard_entry_image"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_margin="3dp"
+        android:scaleType="centerCrop"
+        android:contentDescription="@string/show_screenshots_in_clipboard"/>
+
+    <ImageView
+        android:id="@+id/clipboard_entry_pinned_icon"
+        android:contentDescription="@string/clipboard_history_pinned_first"
+        android:layout_width="@dimen/config_clipboard_pinned_icon_size"
+        android:layout_height="@dimen/config_clipboard_pinned_icon_size"
+        android:layout_gravity="top|end"
+        android:layout_margin="8dp"
+        android:visibility="gone"/>
+
+</FrameLayout>

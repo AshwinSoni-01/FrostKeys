@@ -30,5 +30,5 @@
     <!-- Normal keys. -->
     <item android:state_pressed="true"
           android:drawable="@color/key_background_lxx_base" />
-    <item android:drawable="@color/key_background_lxx_base" />
+    <item android:drawable="@android:color/transparent" />
 </selector>

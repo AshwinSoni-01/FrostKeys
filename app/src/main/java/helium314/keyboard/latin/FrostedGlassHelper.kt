@@ -169,6 +169,7 @@ object FrostedGlassHelper {
     @JvmStatic
     fun configureFrostedGlass(service: InputMethodService, inputView: View?, enable: Boolean) {
         val window = service.window?.window ?: return
+        constrainImeWindowToKeyboardBounds(service, window, inputView)
         val isBatterySaver = isBatterySaverMode(service)
         val shouldEnable = enable && !isBatterySaver
 
@@ -183,6 +184,28 @@ object FrostedGlassHelper {
         }
 
         applyDefaultBlur(service, window, inputView, shouldEnable)
+    }
+
+    private fun constrainImeWindowToKeyboardBounds(service: InputMethodService, window: Window, inputView: View?) {
+        service.updateSoftInputWindowLayoutParameters(inputView, true)
+
+        val params = window.attributes
+        var changed = false
+        if (params.width != WindowManager.LayoutParams.MATCH_PARENT) {
+            params.width = WindowManager.LayoutParams.MATCH_PARENT
+            changed = true
+        }
+        if (params.height != WindowManager.LayoutParams.WRAP_CONTENT) {
+            params.height = WindowManager.LayoutParams.WRAP_CONTENT
+            changed = true
+        }
+        if (params.gravity != Gravity.BOTTOM) {
+            params.gravity = Gravity.BOTTOM
+            changed = true
+        }
+        if (changed) {
+            window.attributes = params
+        }
     }
 
     private fun applySamsungSemBlur(window: Window, inputView: View?, enable: Boolean) {
@@ -280,28 +303,9 @@ object FrostedGlassHelper {
     }
 
     private fun applyDefaultBlur(service: InputMethodService, window: Window, inputView: View?, enable: Boolean) {
-        // --- GLOBAL LAYOUT FIX (Applies to ALL themes) ---
-        // 1. Force the IME window to wrap to keyboard content height
-        service.updateSoftInputWindowLayoutParameters(inputView, true)
-
-        // 2. Target the specific Window attributes to anchor at bottom
         val params = window.attributes
         var changed = false
 
-        if (params.width != WindowManager.LayoutParams.MATCH_PARENT) {
-            params.width = WindowManager.LayoutParams.MATCH_PARENT
-            changed = true
-        }
-        if (params.height != WindowManager.LayoutParams.WRAP_CONTENT) {
-            params.height = WindowManager.LayoutParams.WRAP_CONTENT
-            changed = true
-        }
-        if (params.gravity != Gravity.BOTTOM) {
-            params.gravity = Gravity.BOTTOM
-            changed = true
-        }
-
-        // 3. Fix Background Targeting: Set root window to transparent shape matching rounded corners.
         val radiusPx = Settings.readKeyboardCornerRadius(service.prefs()) * service.resources.displayMetrics.density
         val bgDrawable = android.graphics.drawable.GradientDrawable().apply {
             setColor(Color.TRANSPARENT)

@@ -169,17 +169,15 @@ class AccessPointMenuView @JvmOverloads constructor(
                         true
                     }
                     DragEvent.ACTION_DROP -> {
-                        for (i in 0 until grid.childCount) {
-                            grid.getChildAt(i).alpha = 1.0f
-                        }
                         if (draggedView != null) {
-                            draggedView.visibility = View.VISIBLE
                             val sourceIndex = grid.indexOfChild(draggedView)
                             val targetIndex = grid.indexOfChild(v)
-
-                            if (sourceIndex >= 0 && targetIndex >= 0 && sourceIndex != targetIndex) {
-                                // Defer view hierarchy modification to avoid ConcurrentModificationException during drag dispatch
-                                grid.post {
+                            grid.post {
+                                for (i in 0 until grid.childCount) {
+                                    grid.getChildAt(i).alpha = 1.0f
+                                }
+                                draggedView.visibility = View.VISIBLE
+                                if (sourceIndex >= 0 && targetIndex >= 0 && sourceIndex != targetIndex) {
                                     if (grid.indexOfChild(draggedView) == sourceIndex) { // Check if still in same state
                                         grid.removeView(draggedView)
                                         grid.addView(draggedView, targetIndex)
@@ -187,15 +185,23 @@ class AccessPointMenuView @JvmOverloads constructor(
                                     }
                                 }
                             }
+                        } else {
+                            grid.post {
+                                for (i in 0 until grid.childCount) {
+                                    grid.getChildAt(i).alpha = 1.0f
+                                }
+                            }
                         }
                         true
                     }
                     DragEvent.ACTION_DRAG_ENDED -> {
-                        for (i in 0 until grid.childCount) {
-                            grid.getChildAt(i).alpha = 1.0f
-                        }
-                        if (draggedView != null) {
-                            draggedView.visibility = View.VISIBLE
+                        grid.post {
+                            for (i in 0 until grid.childCount) {
+                                grid.getChildAt(i).alpha = 1.0f
+                            }
+                            if (draggedView != null) {
+                                draggedView.visibility = View.VISIBLE
+                            }
                         }
                         true
                     }

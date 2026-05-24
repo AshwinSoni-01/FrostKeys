@@ -302,10 +302,7 @@ public abstract class AndroidWordLevelSpellCheckerSession extends Session {
                         }
                     }
                     if (allWordsAreValid && !periodOnlyAtLastIndex) {
-                        return new SuggestionsInfo(SuggestionsInfo.RESULT_ATTR_LOOKS_LIKE_TYPO
-                                | SuggestionsInfo.RESULT_ATTR_HAS_RECOMMENDED_SUGGESTIONS,
-                                new String[] {
-                                        TextUtils.join(Constants.STRING_SPACE, splitText) });
+                        return AndroidSpellCheckerService.getTypoNoUiSuggestions();
                     }
                 }
                 return mService.isValidWord(mLocale, text) ?
@@ -326,34 +323,6 @@ public abstract class AndroidWordLevelSpellCheckerSession extends Session {
                 Log.i(TAG, "onGetSuggestionsInternal() : [" + text + "] is NOT a valid word");
             }
 
-            // unknown word -> don't show suggestions if switched off
-            if (!KtxKt.prefs(mService).getBoolean(Settings.PREF_SPELLCHECK_SUGGEST, Defaults.PREF_SPELLCHECK_SUGGEST))
-                return AndroidSpellCheckerService.getTypoNoUiSuggestions();
-
-            final Keyboard keyboard = mService.getKeyboardForLocale(mLocale);
-            final WordComposer composer = new WordComposer();
-            if (mLocale.getLanguage().equals("ko"))
-                composer.restartCombining("hangul");
-            final int[] codePoints = StringUtils.toCodePointArray(text);
-            final int[] coordinates;
-            coordinates = keyboard.getCoordinates(codePoints);
-            composer.setComposingWord(codePoints, coordinates);
-            // TODO: Don't gather suggestions if the limit is <= 0 unless necessary
-            final SuggestionResults suggestionResults = mService.getSuggestionResults(
-                    mLocale, composer.getComposedDataSnapshot(), ngramContext, keyboard);
-            final Result result = getResult(capitalizeType, mLocale, suggestionsLimit,
-                    mService.getRecommendedThreshold(), text, suggestionResults);
-            if (DebugFlags.DEBUG_ENABLED) {
-                if (result.mSuggestions != null && result.mSuggestions.length > 0) {
-                    final StringBuilder builder = new StringBuilder();
-                    for (String suggestion : result.mSuggestions) {
-                        builder.append(" [");
-                        builder.append(suggestion);
-                        builder.append("]");
-                    }
-                    Log.i(TAG, "onGetSuggestionsInternal() : Suggestions =" + builder);
-                }
-            }
             // Handle word not in dictionary.
             // This is called only once per unique word, so entering multiple
             // instances of the same word does not result in more than one call
@@ -361,15 +330,7 @@ public abstract class AndroidWordLevelSpellCheckerSession extends Session {
             // Also, upon changing the orientation of the device, this is called
             // again for every unique invalid word in the text box.
             StatsUtils.onInvalidWordIdentification(text);
-
-            final int flags =
-                    SuggestionsInfo.RESULT_ATTR_LOOKS_LIKE_TYPO
-                    | (result.mHasRecommendedSuggestions
-                            ? SuggestionsInfo.RESULT_ATTR_HAS_RECOMMENDED_SUGGESTIONS
-                            : 0);
-            final SuggestionsInfo retval = new SuggestionsInfo(flags, result.mSuggestions);
-            mSuggestionsCache.putSuggestionsToCache(text, result.mSuggestions, flags);
-            return retval;
+            return AndroidSpellCheckerService.getTypoNoUiSuggestions();
         } catch (RuntimeException e) {
             // Don't kill the keyboard if there is a bug in the spell checker
             Log.e(TAG, "Exception while spellchecking", e);

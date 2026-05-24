@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-only
 package helium314.keyboard.settings.screens
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -25,9 +30,16 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -39,7 +51,12 @@ import helium314.keyboard.latin.utils.JniUtils
 import helium314.keyboard.latin.utils.SubtypeLocaleUtils.displayName
 import helium314.keyboard.latin.utils.SubtypeSettings
 import helium314.keyboard.latin.utils.NextScreenIcon
+import helium314.keyboard.latin.utils.getActivity
+import helium314.keyboard.latin.utils.prefs
+import helium314.keyboard.latin.utils.locale
+import helium314.keyboard.latin.utils.Log
 import helium314.keyboard.settings.SearchSettingsScreen
+import helium314.keyboard.settings.SettingsActivity
 import helium314.keyboard.latin.utils.Theme
 import helium314.keyboard.settings.initPreview
 import helium314.keyboard.settings.preferences.Preference
@@ -184,60 +201,114 @@ private fun QuickSetupCard(
     onClickDictionaries: () -> Unit,
     onClickCloud: () -> Unit,
 ) {
+    val ctx = LocalContext.current
+    val b = (ctx.getActivity() as? SettingsActivity)?.prefChanged?.collectAsState()
+    if ((b?.value ?: 0) < 0)
+        Log.v("irrelevant", "stupid way to trigger recomposition on preference change")
+
+    val enabledSubtypes = remember(b?.value) { SubtypeSettings.getEnabledSubtypes(true) }
+
+    // Completion states:
+    val isGestureComplete = remember(b?.value) { JniUtils.sHaveGestureLib }
+    val isDictionaryComplete = remember(b?.value, enabledSubtypes) {
+        enabledSubtypes.isNotEmpty() && enabledSubtypes.all { subtype ->
+            val (userDicts, hasInternal) = getUserAndInternalDictionaries(ctx, subtype.locale())
+            hasInternal || userDicts.isNotEmpty()
+        }
+    }
+    val isCloudComplete = remember(b?.value) {
+        ctx.prefs().getBoolean("pref_enable_cloud_features", false)
+    }
+
+    val allStepsComplete = isGestureComplete && isDictionaryComplete && isCloudComplete
+
+    var isExpanded by rememberSaveable { mutableStateOf(false) }
+
+    val accentColor = if (allStepsComplete) Color(0xFF388E3C) else MaterialTheme.colorScheme.primary
+    val containerColor = if (allStepsComplete) Color(0xFF4CAF50).copy(alpha = 0.12f) else MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f)
+
     Card(
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f)
+            containerColor = containerColor
         ),
         modifier = Modifier
             .fillMaxWidth()
             .padding(16.dp)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(enabled = allStepsComplete) { isExpanded = !isExpanded }
+                .padding(16.dp)
+        ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Icon(
-                    painter = painterResource(R.drawable.ic_settings_about_wiki),
+                    painter = painterResource(if (allStepsComplete) R.drawable.ic_setup_check else R.drawable.ic_settings_about_wiki),
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
+                    tint = accentColor,
                     modifier = Modifier.size(24.dp)
                 )
                 Text(
-                    text = stringResource(R.string.quick_setup_title),
+                    text = if (allStepsComplete) "Setup is complete!" else stringResource(R.string.quick_setup_title),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
+                    color = accentColor,
+                    modifier = Modifier.weight(1f)
                 )
+                if (allStepsComplete) {
+                    Icon(
+                        painter = painterResource(R.drawable.ic_arrow_left),
+                        contentDescription = if (isExpanded) "Collapse" else "Expand",
+                        tint = accentColor,
+                        modifier = Modifier
+                            .size(24.dp)
+                            .rotate(if (isExpanded) 90f else -90f)
+                    )
+                }
             }
             Spacer(modifier = Modifier.height(6.dp))
             Text(
-                text = stringResource(R.string.quick_setup_desc),
+                text = if (allStepsComplete) "All essential settings have been successfully configured." else stringResource(R.string.quick_setup_desc),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            Spacer(modifier = Modifier.height(12.dp))
 
-            QuickSetupStep(
-                icon = R.drawable.ic_settings_gesture,
-                title = stringResource(R.string.quick_setup_gesture_title),
-                description = stringResource(R.string.quick_setup_gesture_desc),
-                onClick = onClickGestureTyping,
-            )
-            HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
-            QuickSetupStep(
-                icon = R.drawable.ic_dictionary,
-                title = stringResource(R.string.quick_setup_dict_title),
-                description = stringResource(R.string.quick_setup_dict_desc),
-                onClick = onClickDictionaries,
-            )
-            HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
-            QuickSetupStep(
-                icon = R.drawable.ic_settings_advanced,
-                title = stringResource(R.string.quick_setup_cloud_title),
-                description = stringResource(R.string.quick_setup_cloud_desc),
-                onClick = onClickCloud,
-            )
+            AnimatedVisibility(
+                visible = !allStepsComplete || isExpanded,
+                enter = expandVertically() + fadeIn(),
+                exit = shrinkVertically() + fadeOut()
+            ) {
+                Column {
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    QuickSetupStep(
+                        icon = R.drawable.ic_settings_gesture,
+                        title = stringResource(R.string.quick_setup_gesture_title),
+                        description = stringResource(R.string.quick_setup_gesture_desc),
+                        onClick = onClickGestureTyping,
+                        isComplete = isGestureComplete,
+                    )
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                    QuickSetupStep(
+                        icon = R.drawable.ic_dictionary,
+                        title = stringResource(R.string.quick_setup_dict_title),
+                        description = stringResource(R.string.quick_setup_dict_desc),
+                        onClick = onClickDictionaries,
+                        isComplete = isDictionaryComplete,
+                    )
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                    QuickSetupStep(
+                        icon = R.drawable.ic_settings_advanced,
+                        title = stringResource(R.string.quick_setup_cloud_title),
+                        description = stringResource(R.string.quick_setup_cloud_desc),
+                        onClick = onClickCloud,
+                        isComplete = isCloudComplete,
+                    )
+                }
+            }
         }
     }
 }
@@ -248,6 +319,7 @@ private fun QuickSetupStep(
     title: String,
     description: String,
     onClick: () -> Unit,
+    isComplete: Boolean = false,
 ) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -259,7 +331,7 @@ private fun QuickSetupStep(
         Icon(
             painter = painterResource(icon),
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.secondary,
+            tint = if (isComplete) Color(0xFF388E3C) else MaterialTheme.colorScheme.secondary,
             modifier = Modifier.size(20.dp)
         )
         Spacer(modifier = Modifier.width(12.dp))
@@ -267,15 +339,25 @@ private fun QuickSetupStep(
             Text(
                 text = title,
                 style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.SemiBold
+                fontWeight = FontWeight.SemiBold,
+                color = if (isComplete) Color(0xFF388E3C) else MaterialTheme.colorScheme.onSurface
             )
             Text(
                 text = description,
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = if (isComplete) Color(0xFF388E3C).copy(alpha = 0.8f) else MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
-        NextScreenIcon()
+        if (isComplete) {
+            Icon(
+                painter = painterResource(R.drawable.ic_setup_check),
+                contentDescription = "Complete",
+                tint = Color(0xFF388E3C),
+                modifier = Modifier.size(20.dp)
+            )
+        } else {
+            NextScreenIcon()
+        }
     }
 }
 

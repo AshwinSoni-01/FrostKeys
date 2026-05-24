@@ -3,15 +3,20 @@
 package helium314.keyboard.keyboard.clipboard
 
 import android.annotation.SuppressLint
+import android.graphics.Outline
 import android.graphics.Typeface
 import android.util.TypedValue
 import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
+import android.view.ViewOutlineProvider
 import android.widget.ImageView
 import android.widget.TextView
+import androidx.core.view.isGone
 import androidx.recyclerview.widget.RecyclerView
+import androidx.recyclerview.widget.StaggeredGridLayoutManager
+import coil.load
 import helium314.keyboard.latin.ClipboardHistoryEntry
 import helium314.keyboard.latin.ClipboardHistoryManager
 import helium314.keyboard.latin.R
@@ -31,10 +36,26 @@ class ClipboardAdapter(
     var itemTextColor = 0
     var itemTextSize = 0f
 
+    companion object {
+        private const val VIEW_TYPE_TEXT = 0
+        private const val VIEW_TYPE_IMAGE = 1
+    }
+
+    override fun getItemViewType(position: Int): Int {
+        val entry = getItem(position)
+        val imageClip = entry?.text?.let { ClipboardHistoryManager.decodeImageHistoryClip(it) }
+        return if (imageClip != null) VIEW_TYPE_IMAGE else VIEW_TYPE_TEXT
+    }
+
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
+        val layoutId = if (viewType == VIEW_TYPE_IMAGE) {
+            R.layout.clipboard_entry_image_key
+        } else {
+            R.layout.clipboard_entry_key
+        }
         val view = LayoutInflater.from(parent.context)
-                .inflate(R.layout.clipboard_entry_key, parent, false)
-        return ViewHolder(view)
+                .inflate(layoutId, parent, false)
+        return ViewHolder(parent, view)
     }
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
@@ -46,11 +67,13 @@ class ClipboardAdapter(
     override fun getItemCount() = clipboardHistoryManager?.getHistorySize() ?: 0
 
     inner class ViewHolder(
+            val parent: ViewGroup,
             view: View
     ) : RecyclerView.ViewHolder(view), View.OnClickListener, View.OnTouchListener, View.OnLongClickListener {
 
         private val pinnedIconView: ImageView
-        private val contentView: TextView
+        private val imageView: ImageView
+        private val contentView: TextView?
 
         init {
             view.apply {
@@ -65,7 +88,18 @@ class ClipboardAdapter(
                 visibility = View.GONE
                 setImageResource(pinnedIconResId)
             }
-            contentView = view.findViewById<TextView>(R.id.clipboard_entry_content).apply {
+            imageView = view.findViewById(R.id.clipboard_entry_image)
+            val cornerRadiusDp = Settings.getValues().mKeyboardCornerRadiusDp
+            if (cornerRadiusDp > 0) {
+                val cornerRadiusPx = cornerRadiusDp * view.resources.displayMetrics.density
+                imageView.outlineProvider = object : ViewOutlineProvider() {
+                    override fun getOutline(view: View, outline: Outline) {
+                        outline.setRoundRect(0, 0, view.width, view.height, cornerRadiusPx)
+                    }
+                }
+                imageView.clipToOutline = true
+            }
+            contentView = view.findViewById<TextView>(R.id.clipboard_entry_content)?.apply {
                 typeface = itemTypeFace
                 setTextColor(itemTextColor)
                 setTextSize(TypedValue.COMPLEX_UNIT_PX, itemTextSize)
@@ -77,7 +111,51 @@ class ClipboardAdapter(
 
         fun setContent(historyEntry: ClipboardHistoryEntry?) {
             itemView.tag = historyEntry?.id
-            contentView.text = historyEntry?.text?.take(1000) // truncate displayed text for performance reasons
+            val imageClip = historyEntry?.text?.let { ClipboardHistoryManager.decodeImageHistoryClip(it) }
+
+            // Adjust StaggeredGridLayoutManager parameters so it stays in one column
+            val lp = itemView.layoutParams
+            if (lp is StaggeredGridLayoutManager.LayoutParams) {
+                lp.isFullSpan = false
+            }
+
+            if (imageClip != null) {
+                imageView.isGone = false
+                imageView.load(imageClip.uri)
+                contentView?.text = imageClip.label
+
+                // Enforce perfectly square dimension
+                if (parent.width > 0) {
+                    val layoutManager = (parent as? RecyclerView)?.layoutManager
+                    val spanCount = when (layoutManager) {
+                        is StaggeredGridLayoutManager -> layoutManager.spanCount
+                        else -> 2
+                    }
+                    val itemWidth = (parent.width - parent.paddingLeft - parent.paddingRight) / spanCount
+                    if (lp != null) {
+                        lp.width = ViewGroup.LayoutParams.MATCH_PARENT
+                        lp.height = itemWidth
+                        itemView.layoutParams = lp
+                    }
+                } else {
+                    if (lp != null) {
+                        lp.width = ViewGroup.LayoutParams.MATCH_PARENT
+                        lp.height = ViewGroup.LayoutParams.WRAP_CONTENT
+                        itemView.layoutParams = lp
+                    }
+                }
+            } else {
+                imageView.isGone = true
+                imageView.setImageDrawable(null)
+                contentView?.text = historyEntry?.text?.take(1000) // truncate displayed text for performance reasons
+
+                // Reset text items back to standard wrap_content height
+                if (lp != null) {
+                    lp.width = ViewGroup.LayoutParams.MATCH_PARENT
+                    lp.height = ViewGroup.LayoutParams.WRAP_CONTENT
+                    itemView.layoutParams = lp
+                }
+            }
             pinnedIconView.visibility = if (historyEntry?.isPinned == true) View.VISIBLE else View.GONE
         }
 

@@ -148,6 +148,7 @@ object Defaults {
     const val PREF_TOUCHPAD_SENSITIVITY = 50
     const val PREF_TOUCHPAD_EDGE_SCROLL = true
     const val PREF_ENABLE_CLIPBOARD_HISTORY = true
+    const val PREF_SHOW_SCREENSHOTS_IN_CLIPBOARD = true
     const val PREF_CLIPBOARD_HISTORY_RETENTION_TIME = 10 // minutes
     const val PREF_CLIPBOARD_HISTORY_PINNED_FIRST = true
     const val PREF_ADD_TO_PERSONAL_DICTIONARY = false

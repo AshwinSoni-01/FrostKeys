@@ -123,14 +123,15 @@ public final class AndroidSpellCheckerService extends SpellCheckerService
      * @return the empty SuggestionsInfo with the appropriate flags set.
      */
     public static SuggestionsInfo getNotInDictEmptySuggestions(final boolean reportAsTypo) {
-        return new SuggestionsInfo(reportAsTypo ? SuggestionsInfo.RESULT_ATTR_LOOKS_LIKE_TYPO : 0,
-                EMPTY_STRING_ARRAY);
+        int flags = reportAsTypo ? SuggestionsInfo.RESULT_ATTR_LOOKS_LIKE_TYPO : 0;
+        if (reportAsTypo && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            flags |= SuggestionsInfo.RESULT_ATTR_DONT_SHOW_UI_FOR_SUGGESTIONS;
+        }
+        return new SuggestionsInfo(flags, EMPTY_STRING_ARRAY);
     }
+
     public static SuggestionsInfo getTypoNoUiSuggestions() {
-        return (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
-            ? new SuggestionsInfo(SuggestionsInfo.RESULT_ATTR_LOOKS_LIKE_TYPO | SuggestionsInfo.RESULT_ATTR_DONT_SHOW_UI_FOR_SUGGESTIONS,
-                EMPTY_STRING_ARRAY)
-           : new SuggestionsInfo(SuggestionsInfo.RESULT_ATTR_LOOKS_LIKE_TYPO, EMPTY_STRING_ARRAY); // should not happen unless user transfers settings to old phone
+        return getNotInDictEmptySuggestions(true);
     }
     /**
      * Returns an empty suggestionInfo with flags signaling the word is in the dictionary.
