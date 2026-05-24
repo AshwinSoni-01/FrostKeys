@@ -102,3 +102,9 @@ As a derivative work, KBoard is licensed under the **GNU General Public License 
 - **HeliBoard Team:** For the industry-leading open-source foundation.
 - **NGI Mobifree Fund:** Funding provided to the original HeliBoard project through [NLnet](https://nlnet.nl).
 - **AOSP / OpenBoard:** The ancestors of this project.
+
+---
+
+<p align="center">
+  Made with ❤️ by <a href="https://github.com/AshwinSoni-01">Ashwin Soni (Orion)</a>
+</p>
