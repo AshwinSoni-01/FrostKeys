@@ -41,9 +41,10 @@ data class FrostedLiveValues(
     val bgTransparency: Int,
     val colorBlend: Int,
     val saturation: Int,
-    val edgeContrast: Int,
     val specialVibrancy: Int,
-    val alphabetVibrancy: Int
+    val alphabetVibrancy: Int,
+    val dustEnabled: Boolean,
+    val dustAlpha: Float
 )
 
 @Serializable
@@ -201,9 +202,8 @@ private constructor(val themeId: Int, @JvmField val mStyleId: Int) {
                         val bgTransparency = livePreviewValues?.bgTransparency
                             ?: (if (isNight) prefs.getInt(Settings.PREF_FROSTED_BG_TRANSPARENCY_NIGHT, Defaults.PREF_FROSTED_BG_TRANSPARENCY_NIGHT)
                                 else prefs.getInt(Settings.PREF_FROSTED_BG_TRANSPARENCY, Defaults.PREF_FROSTED_BG_TRANSPARENCY))
-                        val edgeContrastVal = livePreviewValues?.edgeContrast
-                            ?: (if (isNight) prefs.getInt(Settings.PREF_FROSTED_EDGE_CONTRAST_NIGHT, Defaults.PREF_FROSTED_EDGE_CONTRAST_NIGHT)
-                                else prefs.getInt(Settings.PREF_FROSTED_EDGE_CONTRAST, Defaults.PREF_FROSTED_EDGE_CONTRAST))
+                        val edgeContrastVal = if (isNight) prefs.getInt(Settings.PREF_FROSTED_EDGE_CONTRAST_NIGHT, Defaults.PREF_FROSTED_EDGE_CONTRAST_NIGHT)
+                            else prefs.getInt(Settings.PREF_FROSTED_EDGE_CONTRAST, Defaults.PREF_FROSTED_EDGE_CONTRAST)
                         val specialVibrancyPref = livePreviewValues?.specialVibrancy
                             ?: (if (isNight) prefs.getInt(Settings.PREF_FROSTED_SPECIAL_VIBRANCY_NIGHT, Defaults.PREF_FROSTED_SPECIAL_VIBRANCY_NIGHT)
                                 else prefs.getInt(Settings.PREF_FROSTED_SPECIAL_VIBRANCY, Defaults.PREF_FROSTED_SPECIAL_VIBRANCY))

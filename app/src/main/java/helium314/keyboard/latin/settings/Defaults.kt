@@ -207,4 +207,8 @@ object Defaults {
     const val PREF_FROSTED_EDGE_CONTRAST_NIGHT = 38 // ~15%
     const val PREF_FROSTED_SPECIAL_VIBRANCY_NIGHT = 100
     const val PREF_FROSTED_ALPHABET_VIBRANCY_NIGHT = 100
+
+    const val PREF_FROSTED_DUST_ENABLED = true
+    const val PREF_FROSTED_DUST_ALPHA = 5f
+    const val PREF_FROSTED_DUST_ALPHA_NIGHT = 5f
 }

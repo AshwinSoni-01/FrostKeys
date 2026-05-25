@@ -82,6 +82,9 @@ public final class Settings implements SharedPreferences.OnSharedPreferenceChang
     public static final String PREF_FROSTED_EDGE_CONTRAST_NIGHT = "pref_frosted_edge_contrast_night";
     public static final String PREF_FROSTED_SPECIAL_VIBRANCY_NIGHT = "pref_frosted_special_vibrancy_night";
     public static final String PREF_FROSTED_ALPHABET_VIBRANCY_NIGHT = "pref_frosted_alphabet_vibrancy_night";
+    public static final String PREF_FROSTED_DUST_ENABLED = "pref_frosted_dust_enabled";
+    public static final String PREF_FROSTED_DUST_ALPHA = "pref_frosted_dust_alpha";
+    public static final String PREF_FROSTED_DUST_ALPHA_NIGHT = "pref_frosted_dust_alpha_night";
     public static final String PREF_FROSTED_GLASS_TRIGGER = "frosted_glass_trigger";
 
     public static final String PREF_CUSTOM_ICON_NAMES = "custom_icon_names";
@@ -258,6 +261,9 @@ public final class Settings implements SharedPreferences.OnSharedPreferenceChang
         add(PREF_FROSTED_EDGE_CONTRAST_NIGHT);
         add(PREF_FROSTED_SPECIAL_VIBRANCY_NIGHT);
         add(PREF_FROSTED_ALPHABET_VIBRANCY_NIGHT);
+        add(PREF_FROSTED_DUST_ENABLED);
+        add(PREF_FROSTED_DUST_ALPHA);
+        add(PREF_FROSTED_DUST_ALPHA_NIGHT);
         add(PREF_FROSTED_GLASS_TRIGGER);
     }};
 

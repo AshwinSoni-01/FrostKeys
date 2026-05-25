@@ -77,6 +77,7 @@ class AiWritingToolsView @JvmOverloads constructor(
     private var glowAnimator: ObjectAnimator? = null
     private var glowShiftAnimator: ValueAnimator? = null
     private lateinit var glowBorder: View
+    private lateinit var sparkleDust: SparkleDustView
     private var selectedTool: String? = null
     private var isGenerating = false
     private var generationSequence = 0L
@@ -416,6 +417,7 @@ class AiWritingToolsView @JvmOverloads constructor(
         indicatorContainer = findViewById(R.id.ll_page_indicators)
         copyButton = findViewById(R.id.btn_copy_text)
         glowBorder = findViewById(R.id.glow_border)
+        sparkleDust = findViewById(R.id.sparkle_dust)
 
         viewPager.adapter = AiOutputAdapter()
         viewPager.registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
@@ -638,9 +640,10 @@ class AiWritingToolsView @JvmOverloads constructor(
     }
 
     private fun startGlowAnimation() {
-        if (!::glowBorder.isInitialized) return
+        if (!::glowBorder.isInitialized || !::sparkleDust.isInitialized) return
 
         glowBorder.animate().cancel()
+        sparkleDust.animate().cancel()
         glowAnimator?.cancel()
         glowShiftAnimator?.cancel()
 
@@ -648,6 +651,10 @@ class AiWritingToolsView @JvmOverloads constructor(
         glowBorder.alpha = 0f
         glowBorder.bringToFront()
         glowBorder.setLayerType(View.LAYER_TYPE_HARDWARE, null)
+        sparkleDust.visibility = View.VISIBLE
+        sparkleDust.alpha = 0f
+        sparkleDust.bringToFront()
+        sparkleDust.setLayerType(View.LAYER_TYPE_HARDWARE, null)
 
         val shiftingGradient = FluidGlowGradientDrawable(
             createGlowGradientColors(),
@@ -661,6 +668,11 @@ class AiWritingToolsView @JvmOverloads constructor(
             repeatCount = ValueAnimator.INFINITE
             start()
         }
+
+        sparkleDust.animate()
+            .alpha(1f)
+            .setDuration(300)
+            .start()
 
         var lastFrameTime = 0L
         glowShiftAnimator = ValueAnimator.ofFloat(0f, 1f).apply {
@@ -686,11 +698,10 @@ class AiWritingToolsView @JvmOverloads constructor(
 
     private fun createGlowGradientColors(): IntArray {
         val colors = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            val isNight = KeyboardTheme.isDarkThemeActive(context)
             intArrayOf(
-                ContextCompat.getColor(context, if (isNight) android.R.color.system_accent1_200 else android.R.color.system_accent1_600),
-                ContextCompat.getColor(context, if (isNight) android.R.color.system_accent2_300 else android.R.color.system_accent2_500),
-                ContextCompat.getColor(context, if (isNight) android.R.color.system_accent3_200 else android.R.color.system_accent3_500)
+                ContextCompat.getColor(context, android.R.color.system_accent1_600),
+                ContextCompat.getColor(context, android.R.color.system_accent2_500),
+                ContextCompat.getColor(context, android.R.color.system_accent3_500)
             )
         } else {
             val keyboardColors = Settings.getValues().mColors
@@ -706,10 +717,9 @@ class AiWritingToolsView @JvmOverloads constructor(
 
     private fun polishGlowColor(color: Int): Int {
         val hsl = FloatArray(3)
-        val isNight = KeyboardTheme.isDarkThemeActive(context)
         ColorUtils.colorToHSL(color, hsl)
-        hsl[1] = (hsl[1] * if (isNight) 1.35f else 1.24f).coerceIn(0.46f, 1f)
-        hsl[2] = if (isNight) hsl[2].coerceIn(0.6f, 0.86f) else hsl[2].coerceIn(0.4f, 0.66f)
+        hsl[1] = (hsl[1] * 1.24f).coerceIn(0.46f, 1f)
+        hsl[2] = hsl[2].coerceIn(0.4f, 0.66f)
         return ColorUtils.setAlphaComponent(ColorUtils.HSLToColor(hsl), 255)
     }
 
@@ -727,7 +737,24 @@ class AiWritingToolsView @JvmOverloads constructor(
             glowBorder.visibility = View.GONE
             glowBorder.background = null
             glowBorder.setLayerType(View.LAYER_TYPE_NONE, null)
+            if (::sparkleDust.isInitialized) {
+                sparkleDust.animate().cancel()
+                sparkleDust.alpha = 0f
+                sparkleDust.visibility = View.GONE
+                sparkleDust.setLayerType(View.LAYER_TYPE_NONE, null)
+            }
             return
+        }
+
+        if (::sparkleDust.isInitialized) {
+            sparkleDust.animate()
+                .alpha(0f)
+                .setDuration(300)
+                .withEndAction {
+                    sparkleDust.visibility = View.GONE
+                    sparkleDust.setLayerType(View.LAYER_TYPE_NONE, null)
+                }
+                .start()
         }
 
         glowBorder.animate()
@@ -747,7 +774,6 @@ private class FluidGlowGradientDrawable(
     private val cornerRadius: Float
 ) : Drawable() {
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val sparklePaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val rect = RectF()
     private val clipPath = Path()
     private val fluidPalette = buildFluidPalette(colors)
@@ -768,15 +794,6 @@ private class FluidGlowGradientDrawable(
             xDrift = 0.20f + Random.nextFloat() * 0.28f,
             yDrift = 0.20f + Random.nextFloat() * 0.26f,
             radius = 0.20f + Random.nextFloat() * 0.16f
-        )
-    }
-    private val sparkles = List(10) {
-        Sparkle(
-            x = Random.nextFloat(),
-            y = Random.nextFloat(),
-            phase = Random.nextFloat() * FULL_TURN,
-            speed = 0.7f + Random.nextFloat() * 1.35f,
-            size = 0.9f + Random.nextFloat() * 1.8f
         )
     }
 
@@ -820,7 +837,6 @@ private class FluidGlowGradientDrawable(
         for (blob in blobs) {
             drawBlob(canvas, blob, turn, width, height)
         }
-        drawSparkles(canvas, turn, width, height)
 
         canvas.restore()
     }
@@ -846,27 +862,6 @@ private class FluidGlowGradientDrawable(
         )
         canvas.drawCircle(x, y, radius, paint)
         paint.shader = null
-    }
-
-    private fun drawSparkles(canvas: Canvas, turn: Float, width: Float, height: Float) {
-        sparklePaint.shader = null
-        sparklePaint.color = Color.WHITE
-
-        for (sparkle in sparkles) {
-            val twinkle = ((sin(turn * sparkle.speed + sparkle.phase) + 1f) * 0.5f)
-            if (twinkle < 0.42f) continue
-
-            val driftX = sin(turn * 0.41f + sparkle.phase) * width * 0.018f
-            val driftY = cos(turn * 0.36f + sparkle.phase) * height * 0.018f
-            val x = rect.left + sparkle.x * width + driftX
-            val y = rect.top + sparkle.y * height + driftY
-            val size = sparkle.size * (0.72f + twinkle * 0.58f)
-            sparklePaint.alpha = (44f * twinkle * twinkle).toInt().coerceIn(0, 72)
-
-            canvas.drawCircle(x, y, size, sparklePaint)
-            canvas.drawLine(x - size * 2.2f, y, x + size * 2.2f, y, sparklePaint)
-            canvas.drawLine(x, y - size * 2.2f, x, y + size * 2.2f, sparklePaint)
-        }
     }
 
     private fun withAlpha(color: Int, alpha: Int): Int {
@@ -907,7 +902,6 @@ private class FluidGlowGradientDrawable(
 
     override fun setAlpha(alpha: Int) {
         paint.alpha = alpha.coerceIn(0, 255)
-        sparklePaint.alpha = alpha.coerceIn(0, 255)
         invalidateSelf()
     }
 
@@ -934,13 +928,5 @@ private class FluidGlowGradientDrawable(
         val xDrift: Float,
         val yDrift: Float,
         val radius: Float
-    )
-
-    private data class Sparkle(
-        val x: Float,
-        val y: Float,
-        val phase: Float,
-        val speed: Float,
-        val size: Float
     )
 }

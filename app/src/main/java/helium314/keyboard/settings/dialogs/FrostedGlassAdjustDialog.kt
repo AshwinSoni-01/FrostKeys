@@ -50,14 +50,15 @@ private data class FrostedProfileSnapshot(
     val bgTransparency: Int,
     val colorBlend: Int,
     val saturation: Int,
-    val edgeContrast: Int,
     val specialVibrancy: Int,
-    val alphabetVibrancy: Int
+    val alphabetVibrancy: Int,
+    val dustAlpha: Float
 )
 
 private data class FrostedSettingsSnapshot(
     val light: FrostedProfileSnapshot,
-    val dark: FrostedProfileSnapshot
+    val dark: FrostedProfileSnapshot,
+    val dustEnabled: Boolean
 )
 
 @Composable
@@ -73,6 +74,7 @@ fun FrostedGlassAdjustDialog(
 
     // 1. Snapshot the initial state when the dialog opens
     val initialSnapshot = remember {
+        val legacyDustAlpha = prefs.getFloat(Settings.PREF_FROSTED_DUST_ALPHA, Defaults.PREF_FROSTED_DUST_ALPHA)
         FrostedSettingsSnapshot(
             light = FrostedProfileSnapshot(
                 blurRadius = prefs.getInt(Settings.PREF_FROSTED_BLUR_RADIUS, Defaults.PREF_FROSTED_BLUR_RADIUS),
@@ -80,9 +82,9 @@ fun FrostedGlassAdjustDialog(
                 bgTransparency = prefs.getInt(Settings.PREF_FROSTED_BG_TRANSPARENCY, Defaults.PREF_FROSTED_BG_TRANSPARENCY),
                 colorBlend = prefs.getInt(Settings.PREF_FROSTED_COLOR_BLEND, Defaults.PREF_FROSTED_COLOR_BLEND),
                 saturation = prefs.getInt(Settings.PREF_FROSTED_SATURATION, Defaults.PREF_FROSTED_SATURATION),
-                edgeContrast = prefs.getInt(Settings.PREF_FROSTED_EDGE_CONTRAST, Defaults.PREF_FROSTED_EDGE_CONTRAST),
                 specialVibrancy = prefs.getInt(Settings.PREF_FROSTED_SPECIAL_VIBRANCY, Defaults.PREF_FROSTED_SPECIAL_VIBRANCY),
-                alphabetVibrancy = prefs.getInt(Settings.PREF_FROSTED_ALPHABET_VIBRANCY, Defaults.PREF_FROSTED_ALPHABET_VIBRANCY)
+                alphabetVibrancy = prefs.getInt(Settings.PREF_FROSTED_ALPHABET_VIBRANCY, Defaults.PREF_FROSTED_ALPHABET_VIBRANCY),
+                dustAlpha = legacyDustAlpha.coerceIn(1f, 10f)
             ),
             dark = FrostedProfileSnapshot(
                 blurRadius = prefs.getInt(Settings.PREF_FROSTED_BLUR_RADIUS_NIGHT, Defaults.PREF_FROSTED_BLUR_RADIUS_NIGHT),
@@ -90,10 +92,14 @@ fun FrostedGlassAdjustDialog(
                 bgTransparency = prefs.getInt(Settings.PREF_FROSTED_BG_TRANSPARENCY_NIGHT, Defaults.PREF_FROSTED_BG_TRANSPARENCY_NIGHT),
                 colorBlend = prefs.getInt(Settings.PREF_FROSTED_COLOR_BLEND_NIGHT, Defaults.PREF_FROSTED_COLOR_BLEND_NIGHT),
                 saturation = prefs.getInt(Settings.PREF_FROSTED_SATURATION_NIGHT, Defaults.PREF_FROSTED_SATURATION_NIGHT),
-                edgeContrast = prefs.getInt(Settings.PREF_FROSTED_EDGE_CONTRAST_NIGHT, Defaults.PREF_FROSTED_EDGE_CONTRAST_NIGHT),
                 specialVibrancy = prefs.getInt(Settings.PREF_FROSTED_SPECIAL_VIBRANCY_NIGHT, Defaults.PREF_FROSTED_SPECIAL_VIBRANCY_NIGHT),
-                alphabetVibrancy = prefs.getInt(Settings.PREF_FROSTED_ALPHABET_VIBRANCY_NIGHT, Defaults.PREF_FROSTED_ALPHABET_VIBRANCY_NIGHT)
-            )
+                alphabetVibrancy = prefs.getInt(Settings.PREF_FROSTED_ALPHABET_VIBRANCY_NIGHT, Defaults.PREF_FROSTED_ALPHABET_VIBRANCY_NIGHT),
+                dustAlpha = prefs.getFloat(
+                    Settings.PREF_FROSTED_DUST_ALPHA_NIGHT,
+                    legacyDustAlpha
+                ).coerceIn(1f, 10f)
+            ),
+            dustEnabled = prefs.getBoolean(Settings.PREF_FROSTED_DUST_ENABLED, Defaults.PREF_FROSTED_DUST_ENABLED)
         )
     }
 
@@ -101,16 +107,20 @@ fun FrostedGlassAdjustDialog(
     var snapshot by remember { mutableStateOf(initialSnapshot) }
     var isSaved by remember { mutableStateOf(false) }
 
-    fun applyLivePreview(profile: FrostedProfileSnapshot) {
+    fun applyLivePreview(
+        profile: FrostedProfileSnapshot,
+        dustEnabled: Boolean = snapshot.dustEnabled
+    ) {
         KeyboardTheme.livePreviewValues = FrostedLiveValues(
             blurRadius = profile.blurRadius,
             keyTransparency = profile.keyTransparency,
             bgTransparency = profile.bgTransparency,
             colorBlend = profile.colorBlend,
             saturation = profile.saturation,
-            edgeContrast = profile.edgeContrast,
             specialVibrancy = profile.specialVibrancy,
-            alphabetVibrancy = profile.alphabetVibrancy
+            alphabetVibrancy = profile.alphabetVibrancy,
+            dustEnabled = dustEnabled,
+            dustAlpha = profile.dustAlpha.coerceIn(1f, 10f)
         )
         LatinIME.getInstance()?.requestFrostedLivePreviewRefresh()
     }
@@ -122,17 +132,18 @@ fun FrostedGlassAdjustDialog(
             .putInt(Settings.PREF_FROSTED_BG_TRANSPARENCY, values.light.bgTransparency)
             .putInt(Settings.PREF_FROSTED_COLOR_BLEND, values.light.colorBlend)
             .putInt(Settings.PREF_FROSTED_SATURATION, values.light.saturation)
-            .putInt(Settings.PREF_FROSTED_EDGE_CONTRAST, values.light.edgeContrast)
             .putInt(Settings.PREF_FROSTED_SPECIAL_VIBRANCY, values.light.specialVibrancy)
             .putInt(Settings.PREF_FROSTED_ALPHABET_VIBRANCY, values.light.alphabetVibrancy)
+            .putFloat(Settings.PREF_FROSTED_DUST_ALPHA, values.light.dustAlpha.coerceIn(1f, 10f))
             .putInt(Settings.PREF_FROSTED_BLUR_RADIUS_NIGHT, values.dark.blurRadius)
             .putInt(Settings.PREF_FROSTED_KEY_TRANSPARENCY_NIGHT, values.dark.keyTransparency)
             .putInt(Settings.PREF_FROSTED_BG_TRANSPARENCY_NIGHT, values.dark.bgTransparency)
             .putInt(Settings.PREF_FROSTED_COLOR_BLEND_NIGHT, values.dark.colorBlend)
             .putInt(Settings.PREF_FROSTED_SATURATION_NIGHT, values.dark.saturation)
-            .putInt(Settings.PREF_FROSTED_EDGE_CONTRAST_NIGHT, values.dark.edgeContrast)
             .putInt(Settings.PREF_FROSTED_SPECIAL_VIBRANCY_NIGHT, values.dark.specialVibrancy)
             .putInt(Settings.PREF_FROSTED_ALPHABET_VIBRANCY_NIGHT, values.dark.alphabetVibrancy)
+            .putFloat(Settings.PREF_FROSTED_DUST_ALPHA_NIGHT, values.dark.dustAlpha.coerceIn(1f, 10f))
+            .putBoolean(Settings.PREF_FROSTED_DUST_ENABLED, values.dustEnabled)
             .apply()
     }
 
@@ -153,6 +164,13 @@ fun FrostedGlassAdjustDialog(
         }
 
         applyLivePreview(newProfile)
+    }
+
+    fun updateSparklesEnabled(enabled: Boolean) {
+        val newSnapshot = snapshot.copy(dustEnabled = enabled)
+        snapshot = newSnapshot
+        val profile = if (activeProfile == "light") newSnapshot.light else newSnapshot.dark
+        applyLivePreview(profile, enabled)
     }
 
     // Current profile view for easier slider binding
@@ -335,7 +353,7 @@ fun FrostedGlassAdjustDialog(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(vertical = 8.dp)
+                                .padding(vertical = 12.dp)
                                 .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f), shape = MaterialTheme.shapes.medium)
                                 .padding(12.dp),
                             verticalAlignment = Alignment.CenterVertically,
@@ -503,6 +521,43 @@ fun FrostedGlassAdjustDialog(
                             )
                         }
 
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = stringResource(R.string.pref_frosted_dust_enabled_title),
+                                style = MaterialTheme.typography.bodyMedium,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Switch(
+                                checked = snapshot.dustEnabled,
+                                onCheckedChange = { checked ->
+                                    updateSparklesEnabled(checked)
+                                }
+                            )
+                        }
+
+                        Column(modifier = Modifier.padding(vertical = 8.dp)) {
+                            Text(
+                                text = "${stringResource(R.string.pref_frosted_dust_alpha_title)}: ${
+                                    String.format(java.util.Locale.US, "%.1f", currentValues.dustAlpha)
+                                }",
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                            Slider(
+                                value = currentValues.dustAlpha,
+                                onValueChange = { newValue ->
+                                    updateCurrentProfile { it.copy(dustAlpha = newValue.coerceIn(1f, 10f)) }
+                                },
+                                valueRange = 1f..10f,
+                                enabled = snapshot.dustEnabled
+                            )
+                        }
+
                         Spacer(modifier = Modifier.height(12.dp))
 
                         Row(
@@ -512,31 +567,44 @@ fun FrostedGlassAdjustDialog(
                         ) {
                             OutlinedButton(
                                 onClick = {
-                                    updateCurrentProfile { 
-                                        if (activeProfile == "light") {
-                                            it.copy(
-                                                blurRadius = Defaults.PREF_FROSTED_BLUR_RADIUS,
-                                                keyTransparency = Defaults.PREF_FROSTED_KEY_TRANSPARENCY,
-                                                bgTransparency = Defaults.PREF_FROSTED_BG_TRANSPARENCY,
-                                                colorBlend = Defaults.PREF_FROSTED_COLOR_BLEND,
-                                                saturation = Defaults.PREF_FROSTED_SATURATION,
-                                                edgeContrast = Defaults.PREF_FROSTED_EDGE_CONTRAST,
-                                                specialVibrancy = Defaults.PREF_FROSTED_SPECIAL_VIBRANCY,
-                                                alphabetVibrancy = Defaults.PREF_FROSTED_ALPHABET_VIBRANCY
-                                            )
-                                        } else {
-                                            it.copy(
-                                                blurRadius = Defaults.PREF_FROSTED_BLUR_RADIUS_NIGHT,
-                                                keyTransparency = Defaults.PREF_FROSTED_KEY_TRANSPARENCY_NIGHT,
-                                                bgTransparency = Defaults.PREF_FROSTED_BG_TRANSPARENCY_NIGHT,
-                                                colorBlend = Defaults.PREF_FROSTED_COLOR_BLEND_NIGHT,
-                                                saturation = Defaults.PREF_FROSTED_SATURATION_NIGHT,
-                                                edgeContrast = Defaults.PREF_FROSTED_EDGE_CONTRAST_NIGHT,
-                                                specialVibrancy = Defaults.PREF_FROSTED_SPECIAL_VIBRANCY_NIGHT,
-                                                alphabetVibrancy = Defaults.PREF_FROSTED_ALPHABET_VIBRANCY_NIGHT
-                                            )
-                                        }
+                                    val resetProfile = if (activeProfile == "light") {
+                                        FrostedProfileSnapshot(
+                                            blurRadius = Defaults.PREF_FROSTED_BLUR_RADIUS,
+                                            keyTransparency = Defaults.PREF_FROSTED_KEY_TRANSPARENCY,
+                                            bgTransparency = Defaults.PREF_FROSTED_BG_TRANSPARENCY,
+                                            colorBlend = Defaults.PREF_FROSTED_COLOR_BLEND,
+                                            saturation = Defaults.PREF_FROSTED_SATURATION,
+                                            specialVibrancy = Defaults.PREF_FROSTED_SPECIAL_VIBRANCY,
+                                            alphabetVibrancy = Defaults.PREF_FROSTED_ALPHABET_VIBRANCY,
+                                            dustAlpha = Defaults.PREF_FROSTED_DUST_ALPHA
+                                        )
+                                    } else {
+                                        FrostedProfileSnapshot(
+                                            blurRadius = Defaults.PREF_FROSTED_BLUR_RADIUS_NIGHT,
+                                            keyTransparency = Defaults.PREF_FROSTED_KEY_TRANSPARENCY_NIGHT,
+                                            bgTransparency = Defaults.PREF_FROSTED_BG_TRANSPARENCY_NIGHT,
+                                            colorBlend = Defaults.PREF_FROSTED_COLOR_BLEND_NIGHT,
+                                            saturation = Defaults.PREF_FROSTED_SATURATION_NIGHT,
+                                            specialVibrancy = Defaults.PREF_FROSTED_SPECIAL_VIBRANCY_NIGHT,
+                                            alphabetVibrancy = Defaults.PREF_FROSTED_ALPHABET_VIBRANCY_NIGHT,
+                                            dustAlpha = Defaults.PREF_FROSTED_DUST_ALPHA_NIGHT
+                                        )
                                     }
+                                    snapshot = if (activeProfile == "light") {
+                                        snapshot.copy(
+                                            light = resetProfile,
+                                            dustEnabled = Defaults.PREF_FROSTED_DUST_ENABLED
+                                        )
+                                    } else {
+                                        snapshot.copy(
+                                            dark = resetProfile,
+                                            dustEnabled = Defaults.PREF_FROSTED_DUST_ENABLED
+                                        )
+                                    }
+                                    applyLivePreview(
+                                        resetProfile,
+                                        Defaults.PREF_FROSTED_DUST_ENABLED
+                                    )
                                 }
                             ) {
                                 Text(stringResource(R.string.button_reset))
