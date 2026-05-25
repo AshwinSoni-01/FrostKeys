@@ -27,18 +27,22 @@
         android:orientation="horizontal"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
+        android:paddingTop="6dp"
+        android:paddingBottom="6dp"
         style="?attr/suggestionStripViewStyle" />
+
     <HorizontalScrollView
         android:id="@+id/clipboard_strip_scroll_view"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         style="?attr/suggestionStripViewStyle"
-        android:scrollbarThumbHorizontal="@color/toolbar_scrollbar" >
+        android:scrollbarThumbHorizontal="@color/toolbar_scrollbar">
+
         <LinearLayout
             android:id="@+id/clipboard_strip"
             android:layout_width="wrap_content"
             android:layout_height="match_parent"
-            android:layout_gravity="end" >
+            android:layout_gravity="end">
             <!-- empty view to move buttons to the right -->
             <View
                 android:layout_width="0dp"
@@ -46,4 +50,5 @@
                 android:layout_weight="1" />
         </LinearLayout>
     </HorizontalScrollView>
+
 </FrameLayout>

@@ -36,6 +36,7 @@ import helium314.keyboard.latin.R;
 import helium314.keyboard.latin.common.ColorType;
 import helium314.keyboard.latin.common.Colors;
 import helium314.keyboard.latin.common.Constants;
+import helium314.keyboard.latin.common.KeyBackgroundUtils;
 import helium314.keyboard.latin.common.StringUtilsKt;
 import helium314.keyboard.latin.settings.Settings;
 import helium314.keyboard.latin.suggestions.MoreSuggestions;
@@ -101,6 +102,7 @@ public class KeyboardView extends View {
     @NonNull
     private final Paint mPaint = new Paint();
     private final Paint.FontMetrics mFontMetrics = new Paint.FontMetrics();
+    private final Rect mEmojiLabelBounds = new Rect();
 
     public KeyboardView(final Context context, final AttributeSet attrs) {
         this(context, attrs, R.attr.keyboardViewStyle);
@@ -421,7 +423,7 @@ public class KeyboardView extends View {
                 }
 
                 final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
-                paint.setColor(mColors.get(colorType));
+                paint.setColor(KeyBackgroundUtils.fillColorFor(mColors, colorType));
 
                 canvas.translate(bgX, bgY);
                 if (isCircleStyle) {
@@ -434,7 +436,7 @@ public class KeyboardView extends View {
                     if (isSpaceBar) {
                         final float yOffset = (bgHeight - targetBgHeight) * 0.5f;
                         final float spaceRadius = targetBgHeight * 0.5f;
-                        canvas.drawRoundRect((float) 0, yOffset, (float) bgWidth, yOffset + targetBgHeight, spaceRadius,
+                        canvas.drawRoundRect(0f, yOffset, bgWidth, yOffset + targetBgHeight, spaceRadius,
                                 spaceRadius, paint);
                     } else {
                         final float centerX = bgWidth * 0.5f;
@@ -443,11 +445,9 @@ public class KeyboardView extends View {
                     }
                 } else if (isSpaceBar) {
                     final float spaceRadius = bgHeight * 0.5f;
-                    canvas.drawRoundRect((float) 0, (float) 0, (float) bgWidth, (float) bgHeight, spaceRadius,
-                            spaceRadius, paint);
+                    canvas.drawRoundRect(0f, 0f, bgWidth, bgHeight, spaceRadius, spaceRadius, paint);
                 } else {
-                    canvas.drawRoundRect((float) 0, (float) 0, (float) bgWidth, (float) bgHeight, bgWidth * 0.5f,
-                            bgWidth * 0.5f, paint);
+                    canvas.drawRoundRect(0f, 0f, bgWidth, bgHeight, bgWidth * 0.5f, bgWidth * 0.5f, paint);
                 }
                 canvas.translate(-bgX, -bgY);
                 return;
@@ -499,6 +499,24 @@ public class KeyboardView extends View {
         return topY;
     }
 
+    private void fitEmojiLabelTextSize(@NonNull final Paint paint, @NonNull final String label,
+            final int keyWidth, final int keyHeight) {
+        paint.getFontMetrics(mFontMetrics);
+        paint.getTextBounds(label, 0, label.length(), mEmojiLabelBounds);
+        final float textWidth = Math.max(paint.measureText(label), mEmojiLabelBounds.width());
+        final float textHeight = Math.max(mFontMetrics.descent - mFontMetrics.ascent,
+                mEmojiLabelBounds.height());
+        if (textWidth <= 0f || textHeight <= 0f) {
+            return;
+        }
+        final float maxWidth = keyWidth * 0.90f;
+        final float maxHeight = keyHeight * 0.88f;
+        final float scale = Math.min(1f, Math.min(maxWidth / textWidth, maxHeight / textHeight));
+        if (scale < 1f) {
+            paint.setTextSize(paint.getTextSize() * scale);
+        }
+    }
+
     // Draw key top visuals.
     protected void onDrawKeyTopVisuals(@NonNull final Key key, @NonNull final Canvas canvas,
             @NonNull final Paint paint, @NonNull final KeyDrawParams params) {
@@ -514,6 +532,7 @@ public class KeyboardView extends View {
         float labelX = centerX;
         float labelBaseline = centerY;
         final String label = key.getLabel();
+        final boolean isEmojiLabel = label != null && StringUtilsKt.isEmoji(label);
         final String hintLabel = key.getHintLabel();
         final boolean isCircleStyle = mColors.getThemeStyle().equals(STYLE_CIRCLE);
         boolean isTopRowNumberHintStacking = false;
@@ -528,12 +547,28 @@ public class KeyboardView extends View {
 
         if (label != null) {
             paint.setTypeface(KeyboardTypeface.resolve(label, key.selectTypeface(params)));
+            final String drawingLabel = isEmojiLabel
+                    ? KeyboardTypeface.labelForDrawing(label, paint.getTypeface())
+                    : label;
             paint.setTextSize(key.selectTextSize(params) * mFontSizeMultiplier);
-            final float labelCharHeight = TypefaceUtils.getReferenceCharHeight(paint);
-            final float labelCharWidth = TypefaceUtils.getReferenceCharWidth(paint);
+            if (isEmojiLabel) {
+                fitEmojiLabelTextSize(paint, drawingLabel, keyWidth, keyHeight);
+            }
+            final float labelCharHeight;
+            final float labelCharWidth;
+            if (isEmojiLabel) {
+                paint.getFontMetrics(mFontMetrics);
+                labelCharHeight = mFontMetrics.descent - mFontMetrics.ascent;
+                labelCharWidth = Math.max(paint.measureText(drawingLabel), 1f);
+            } else {
+                labelCharHeight = TypefaceUtils.getReferenceCharHeight(paint);
+                labelCharWidth = TypefaceUtils.getReferenceCharWidth(paint);
+            }
 
             // Vertical label text alignment.
-            labelBaseline = centerY + labelCharHeight / 2.0f;
+            labelBaseline = isEmojiLabel
+                    ? centerY - (mFontMetrics.ascent + mFontMetrics.descent) / 2.0f
+                    : centerY + labelCharHeight / 2.0f;
 
             if (isTopRowNumberHintStacking) {
                 Paint tempPaint = new Paint(paint);
@@ -576,7 +611,7 @@ public class KeyboardView extends View {
                 } else
                     width = keyWidth;
                 final float ratio = Math.min(1.0f,
-                        (width * MAX_LABEL_RATIO) / TypefaceUtils.getStringWidth(label, paint));
+                        (width * MAX_LABEL_RATIO) / TypefaceUtils.getStringWidth(drawingLabel, paint));
                 if (key.needsAutoScale()) {
                     final float autoSize = paint.getTextSize() * ratio;
                     paint.setTextSize(autoSize);
@@ -586,7 +621,7 @@ public class KeyboardView extends View {
             }
 
             if (key.isEnabled()) {
-                if (StringUtilsKt.isEmoji(label))
+                if (isEmojiLabel)
                     paint.setColor(key.selectTextColor(params) | 0xFF000000); // ignore alpha for emojis (though
                                                                               // actually color isn't applied anyway and
                                                                               // we could just set white)
@@ -612,7 +647,7 @@ public class KeyboardView extends View {
                 paint.clearShadowLayer();
             }
             blendAlpha(paint, params.mAnimAlpha);
-            canvas.drawText(label, 0, label.length(), labelX, labelBaseline, paint);
+            canvas.drawText(drawingLabel, 0, drawingLabel.length(), labelX, labelBaseline, paint);
             // Turn off drop shadow and reset x-scale.
             paint.clearShadowLayer();
             paint.setTextScaleX(1.0f);

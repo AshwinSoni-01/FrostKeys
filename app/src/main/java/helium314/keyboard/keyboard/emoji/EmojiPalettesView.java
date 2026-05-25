@@ -117,7 +117,7 @@ public final class EmojiPalettesView extends LinearLayout
         mColors.setBackground(iconView, ColorType.STRIP_BACKGROUND);
         mColors.setColor(iconView, ColorType.EMOJI_CATEGORY);
         iconView.setScaleType(ImageView.ScaleType.FIT_CENTER);
-        final int iconPadding = (int) (10 * getContext().getResources().getDisplayMetrics().density);
+        final int iconPadding = (int) (6 * getContext().getResources().getDisplayMetrics().density);
         iconView.setPadding(iconPadding, iconPadding, iconPadding, iconPadding);
         iconView.setImageResource(mEmojiCategory.getCategoryTabIcon(categoryId));
         iconView.setContentDescription(mEmojiCategory.getAccessibilityDescription(categoryId));
@@ -564,7 +564,7 @@ public final class EmojiPalettesView extends LinearLayout
                     getContext().getTheme().resolveAttribute(android.R.attr.colorAccent, typedValue, true);
                     int accentColor = typedValue.data;
                     ((TabImageView) current).setSelectedCategory(true, accentColor);
-                    
+
                     // Set contrasting color for the icon so it's visible on the accent circle
                     double y = (299 * android.graphics.Color.red(accentColor) + 587 * android.graphics.Color.green(accentColor) + 114 * android.graphics.Color.blue(accentColor)) / 1000.0;
                     int contrastColor = y >= 128 ? android.graphics.Color.BLACK : android.graphics.Color.WHITE;

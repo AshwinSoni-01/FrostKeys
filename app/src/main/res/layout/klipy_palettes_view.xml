@@ -11,7 +11,8 @@
     android:layout_gravity="bottom"
     android:orientation="vertical"
     android:visibility="gone"
-    android:background="@android:color/transparent">
+    android:background="@android:color/transparent"
+    android:paddingTop="6dp">
 
     <!-- Search Bar Row -->
     <LinearLayout
@@ -20,8 +21,9 @@
         android:layout_height="48dp"
         android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:paddingHorizontal="8dp"
-        android:paddingTop="8dp"
+        android:paddingStart="6dp"
+        android:paddingEnd="6dp"
+        android:paddingTop="0dp"
         android:paddingBottom="4dp">
 
         <FrameLayout
@@ -32,7 +34,8 @@
             android:paddingHorizontal="12dp"
             android:background="@drawable/klipy_search_bar_ripple_bg"
             android:clickable="true"
-            android:focusable="true">
+            android:focusable="false"
+            android:focusableInTouchMode="false">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -84,7 +87,8 @@
         android:layout_height="40dp"
         android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:paddingHorizontal="4dp">
+        android:paddingStart="6dp"
+        android:paddingEnd="6dp">
 
         <ImageButton
             android:id="@+id/klipyBackButton"
@@ -157,7 +161,10 @@
     <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1">
+        android:layout_weight="1"
+        android:clipToPadding="false"
+        android:paddingStart="6dp"
+        android:paddingEnd="6dp">
 
         <androidx.viewpager2.widget.ViewPager2
             android:id="@+id/klipyViewPager"

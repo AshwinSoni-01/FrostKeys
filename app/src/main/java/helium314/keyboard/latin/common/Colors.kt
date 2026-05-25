@@ -634,6 +634,18 @@ class AllColors(private val colorMap: EnumMap<ColorType, Int>, override val them
     private fun getColorFilter(color: ColorType) = colorFilters.getOrPut(color) { colorFilter(get(color)) }
 }
 
+object KeyBackgroundUtils {
+    @JvmStatic
+    @ColorInt
+    fun fillColorFor(colors: Colors, color: ColorType): Int {
+        if (colors.hasKeyBorders) return colors.get(color)
+        return when (color) {
+            KEY_BACKGROUND, FUNCTIONAL_KEY_BACKGROUND -> Color.TRANSPARENT
+            else -> colors.get(color)
+        }
+    }
+}
+
 private fun colorFilter(color: Int, mode: BlendModeCompat = BlendModeCompat.MODULATE): ColorFilter {
     // using !! for the color filter because null is only returned for unsupported blend modes, which are not used
     return BlendModeColorFilterCompat.createBlendModeColorFilterCompat(color, mode)!!

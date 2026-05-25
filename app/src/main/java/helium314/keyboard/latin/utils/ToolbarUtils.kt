@@ -2,7 +2,9 @@
 package helium314.keyboard.latin.utils
 
 import android.content.Context
+import android.content.ClipData
 import android.content.SharedPreferences
+import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageButton
 import android.widget.ImageView
@@ -21,12 +23,26 @@ import kotlinx.coroutines.launch
 import java.util.EnumMap
 import java.util.Locale
 
+const val MAX_PINNED_TOOLBAR_KEYS = 5
+const val TOOLBAR_DRAG_CLIP_LABEL = "KBoardToolbarKey"
+
+enum class ToolbarDragSource {
+    ACCESS_POINT_MENU,
+    PINNED_ROW,
+}
+
+data class ToolbarDragState(
+    val key: ToolbarKey,
+    val source: ToolbarDragSource,
+    val sourceView: View? = null,
+)
+
 fun createToolbarKey(context: Context, key: ToolbarKey): ImageButton {
     val button = ImageButton(context, null, R.attr.suggestionWordStyle)
     button.scaleType = ImageView.ScaleType.CENTER
     button.tag = key
     button.contentDescription = key.name.lowercase().getStringResourceOrName("", context)
-    setToolbarButtonActivatedState(button)
+    updateToolbarButtonActivatedState(button)
     button.setImageDrawable(KeyboardIconsSet.instance.getNewDrawable(key.name, context))
     return button
 }
@@ -40,11 +56,11 @@ fun setToolbarButtonsActivatedStateOnPrefChange(buttonsGroup: ViewGroup, key: St
 
     GlobalScope.launch {
         delay(10) // need to wait until SettingsValues are reloaded
-        buttonsGroup.forEach { if (it is ImageButton) setToolbarButtonActivatedState(it) }
+        buttonsGroup.forEach { if (it is ImageButton) updateToolbarButtonActivatedState(it) }
     }
 }
 
-private fun setToolbarButtonActivatedState(button: ImageButton) {
+fun updateToolbarButtonActivatedState(button: ImageButton) {
     button.isActivated = when (button.tag) {
         INCOGNITO -> button.context.prefs().getBoolean(Settings.PREF_ALWAYS_INCOGNITO_MODE, Defaults.PREF_ALWAYS_INCOGNITO_MODE)
         ONE_HANDED -> Settings.getValues().mOneHandedModeEnabled
@@ -133,6 +149,8 @@ val defaultPinnedToolbarPref = entries.filterNot { it == CLOSE_HISTORY }.joinToS
     it.name + Separators.KV + false
 }
 
+val defaultPersistentToolbarKey = VOICE.name
+
 val defaultClipboardToolbarPref by lazy {
     val default = listOf(CLEAR_CLIPBOARD, UP, DOWN, LEFT, RIGHT, UNDO, CUT, COPY, PASTE, SELECT_WORD, CLOSE_HISTORY)
     val others = entries.filterNot { it in default }
@@ -170,11 +188,35 @@ private fun upgradeToolbarPref(prefs: SharedPreferences, pref: String, default: 
 
 fun getEnabledToolbarKeys(prefs: SharedPreferences) = getEnabledToolbarKeys(prefs, Settings.PREF_TOOLBAR_KEYS, defaultToolbarPref)
 
-fun getPinnedToolbarKeys(prefs: SharedPreferences) = getEnabledToolbarKeys(prefs, Settings.PREF_PINNED_TOOLBAR_KEYS, defaultPinnedToolbarPref)
+fun getPinnedToolbarKeys(prefs: SharedPreferences, excludedKey: ToolbarKey? = null) =
+    getEnabledToolbarKeys(prefs, Settings.PREF_PINNED_TOOLBAR_KEYS, defaultPinnedToolbarPref)
+        .filterNot { it == excludedKey }
+        .take(MAX_PINNED_TOOLBAR_KEYS)
 
 fun getEnabledClipboardToolbarKeys(prefs: SharedPreferences) = getEnabledToolbarKeys(prefs, Settings.PREF_CLIPBOARD_TOOLBAR_KEYS, defaultClipboardToolbarPref)
 
-fun addPinnedKey(prefs: SharedPreferences, key: ToolbarKey) {
+fun getToolbarKeyFromDragData(localState: Any?, clipData: ClipData?): ToolbarKey? {
+    (localState as? ToolbarDragState)?.let { return it.key }
+    val keyName = clipData?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.text?.toString()
+    return runCatching { ToolbarKey.valueOf(keyName ?: "") }.getOrNull()
+}
+
+fun getPersistentToolbarKey(prefs: SharedPreferences): ToolbarKey {
+    val stored = prefs.getString(Settings.PREF_PERSISTENT_TOOLBAR_KEY, Defaults.PREF_PERSISTENT_TOOLBAR_KEY)
+    val key = runCatching { ToolbarKey.valueOf(stored ?: "") }.getOrNull()
+    if (key != null && key != CLOSE_HISTORY) return key
+
+    prefs.edit { putString(Settings.PREF_PERSISTENT_TOOLBAR_KEY, defaultPersistentToolbarKey) }
+    return VOICE
+}
+
+fun addPinnedKey(prefs: SharedPreferences, key: ToolbarKey): Boolean {
+    val persistentKey = getPersistentToolbarKey(prefs)
+    if (key == persistentKey) return false
+
+    val enabledKeys = getPinnedToolbarKeys(prefs, persistentKey)
+    if (key !in enabledKeys && enabledKeys.size >= MAX_PINNED_TOOLBAR_KEYS) return false
+
     // remove the existing version of this key and add the enabled one after the last currently enabled key
     val string = prefs.getString(Settings.PREF_PINNED_TOOLBAR_KEYS, defaultPinnedToolbarPref)!!
     val keys = string.split(Separators.ENTRY).toMutableList()
@@ -182,6 +224,33 @@ fun addPinnedKey(prefs: SharedPreferences, key: ToolbarKey) {
     val lastEnabledIndex = keys.indexOfLast { it.endsWith("true") }
     keys.add(lastEnabledIndex + 1, key.name + Separators.KV + "true")
     prefs.edit { putString(Settings.PREF_PINNED_TOOLBAR_KEYS, keys.joinToString(Separators.ENTRY)) }
+    return true
+}
+
+fun pinToolbarKeyAt(prefs: SharedPreferences, key: ToolbarKey, index: Int): List<ToolbarKey> {
+    val persistentKey = getPersistentToolbarKey(prefs)
+    if (key == persistentKey || key == CLOSE_HISTORY) return getPinnedToolbarKeys(prefs, persistentKey)
+
+    val pinnedKeys = getPinnedToolbarKeys(prefs, persistentKey).toMutableList()
+    pinnedKeys.remove(key)
+    pinnedKeys.add(index.coerceIn(0, pinnedKeys.size), key)
+    return setPinnedToolbarKeys(prefs, pinnedKeys)
+}
+
+fun setPinnedToolbarKeys(prefs: SharedPreferences, keys: List<ToolbarKey>): List<ToolbarKey> {
+    val persistentKey = getPersistentToolbarKey(prefs)
+    val pinnedKeys = keys
+        .filterNot { it == CLOSE_HISTORY || it == persistentKey }
+        .distinct()
+        .take(MAX_PINNED_TOOLBAR_KEYS)
+    val result = (
+            pinnedKeys.map { it.name + Separators.KV + true } +
+                    entries
+                        .filterNot { it == CLOSE_HISTORY || it in pinnedKeys }
+                        .map { it.name + Separators.KV + false }
+            ).joinToString(Separators.ENTRY)
+    prefs.edit { putString(Settings.PREF_PINNED_TOOLBAR_KEYS, result) }
+    return pinnedKeys
 }
 
 fun removePinnedKey(prefs: SharedPreferences, key: ToolbarKey) {

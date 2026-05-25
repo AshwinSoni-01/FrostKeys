@@ -11,6 +11,7 @@
     android:orientation="vertical"
     android:visibility="gone"
     android:background="@android:color/transparent"
+    android:paddingTop="6dp"
     style="?attr/clipboardHistoryViewStyle">
 
     <FrameLayout

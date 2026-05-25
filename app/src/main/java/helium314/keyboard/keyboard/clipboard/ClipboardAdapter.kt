@@ -26,6 +26,7 @@ import helium314.keyboard.latin.ClipboardHistoryEntry
 import helium314.keyboard.latin.ClipboardHistoryManager
 import helium314.keyboard.latin.R
 import helium314.keyboard.latin.common.ColorType
+import helium314.keyboard.latin.common.KeyBackgroundUtils
 import helium314.keyboard.latin.settings.Settings
 import androidx.core.graphics.ColorUtils
 
@@ -116,8 +117,8 @@ class ClipboardAdapter(
 
         private fun createRoundedClipboardEntryBackground(view: View): StateListDrawable {
             val colors = Settings.getValues().mColors
-            val normalColor = colors.get(ColorType.KEY_BACKGROUND)
-            val pressedColor = pressedEntryColor(normalColor)
+            val normalColor = KeyBackgroundUtils.fillColorFor(colors, ColorType.KEY_BACKGROUND)
+            val pressedColor = pressedEntryColor(colors.get(ColorType.KEY_BACKGROUND))
             val radius = ROUNDED_ENTRY_RADIUS_DP * view.resources.displayMetrics.density
             return StateListDrawable().apply {
                 addState(intArrayOf(android.R.attr.state_pressed), roundedRectDrawable(pressedColor, radius))

@@ -7,8 +7,9 @@
     android:background="@android:color/transparent"
     android:clipChildren="false"
     android:clipToPadding="false"
-    android:paddingHorizontal="8dp"
-    android:paddingTop="0dp">
+    android:paddingTop="6dp"
+    android:paddingStart="6dp"
+    android:paddingEnd="6dp">
 
     <LinearLayout
         android:layout_width="match_parent"

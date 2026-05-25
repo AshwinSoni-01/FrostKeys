@@ -21,15 +21,24 @@ import helium314.keyboard.keyboard.internal.KeyboardIconsSet
 import helium314.keyboard.keyboard.KeyboardTypeface
 import helium314.keyboard.latin.AudioAndHapticFeedbackManager
 import helium314.keyboard.latin.R
+import helium314.keyboard.latin.common.ColorType
 import helium314.keyboard.latin.common.Constants
 import helium314.keyboard.event.HapticEvent
 import helium314.keyboard.latin.settings.Settings
 import helium314.keyboard.latin.utils.prefs
 import helium314.keyboard.latin.utils.ResourceUtils
+import helium314.keyboard.latin.utils.TOOLBAR_DRAG_CLIP_LABEL
+import helium314.keyboard.latin.utils.ToolbarDragSource
+import helium314.keyboard.latin.utils.ToolbarDragState
 import helium314.keyboard.latin.utils.ToolbarKey
+import helium314.keyboard.latin.utils.ToolbarMode
 import helium314.keyboard.latin.utils.getCodeForToolbarKey
 import helium314.keyboard.latin.utils.getEnabledToolbarKeys
+import helium314.keyboard.latin.utils.getPersistentToolbarKey
+import helium314.keyboard.latin.utils.getPinnedToolbarKeys
 import helium314.keyboard.latin.utils.getStringResourceOrName
+import helium314.keyboard.latin.utils.getToolbarKeyFromDragData
+import helium314.keyboard.latin.utils.removePinnedKey
 
 class AccessPointMenuView @JvmOverloads constructor(
     context: Context,
@@ -39,10 +48,18 @@ class AccessPointMenuView @JvmOverloads constructor(
 
     private var keyboardActionListener: KeyboardActionListener = KeyboardActionListener.EMPTY_LISTENER
     private val grid: GridLayout
+    private var accessDropPreviewView: View? = null
+    private var accessDropPreviewIndex = -1
+    private var ownGridDragIndex = -1
+    private val dragTargetScreenLocation = IntArray(2)
+    private val gridScreenLocation = IntArray(2)
 
     init {
         LayoutInflater.from(context).inflate(R.layout.access_point_menu, this, true)
         grid = findViewById(R.id.access_point_grid)
+        val dropPinnedKeyListener = View.OnDragListener { target, event -> onPinnedKeyDropFromStrip(target, event) }
+        setOnDragListener(dropPinnedKeyListener)
+        grid.setOnDragListener(dropPinnedKeyListener)
     }
 
     fun setKeyboardActionListener(listener: KeyboardActionListener) {
@@ -52,9 +69,7 @@ class AccessPointMenuView @JvmOverloads constructor(
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         val settings = Settings.getValues()
         val abcHeight = ResourceUtils.getKeyboardHeight(resources, settings)
-        val persistentEmojiEnabled = context.prefs().getBoolean(Settings.PREF_PERSISTENT_EMOJI_ROW, helium314.keyboard.latin.settings.Defaults.PREF_PERSISTENT_EMOJI_ROW)
-        val emojiRowHeight = if (persistentEmojiEnabled) (41 * resources.displayMetrics.density).toInt() else 0
-        val finalHeight = abcHeight + emojiRowHeight + paddingTop + paddingBottom
+        val finalHeight = abcHeight + paddingTop + paddingBottom
         val constrainedHeightSpec = MeasureSpec.makeMeasureSpec(finalHeight, MeasureSpec.EXACTLY)
         super.onMeasure(widthMeasureSpec, constrainedHeightSpec)
         setMeasuredDimension(MeasureSpec.getSize(widthMeasureSpec), finalHeight)
@@ -63,7 +78,10 @@ class AccessPointMenuView @JvmOverloads constructor(
     fun populateMenu() {
         grid.removeAllViews()
         val prefs = context.prefs()
-        val enabledKeys = getEnabledToolbarKeys(prefs)
+        val persistentKey = getPersistentToolbarKey(prefs)
+        val pinnedRowEnabled = Settings.getValues().mToolbarMode != ToolbarMode.HIDDEN
+        val pinnedKeys = if (pinnedRowEnabled) getPinnedToolbarKeys(prefs, persistentKey).toSet() else emptySet()
+        val enabledKeys = getEnabledToolbarKeys(prefs).filterNot { it == persistentKey || it in pinnedKeys }
 
         val inflater = LayoutInflater.from(context)
         for (key in enabledKeys) {
@@ -88,11 +106,11 @@ class AccessPointMenuView @JvmOverloads constructor(
                         iconView.layoutParams = lp
                     }
                     drawable.setColor(android.graphics.Color.WHITE)
-                    colors.setColor(drawable, helium314.keyboard.latin.common.ColorType.KEY_BACKGROUND)
+                    colors.setColor(drawable, ColorType.KEY_BACKGROUND)
                     iconView.background = drawable
                 } else {
                     val keyboardViewAttr = context.obtainStyledAttributes(null, R.styleable.KeyboardView, R.attr.keyboardViewStyle, R.style.KeyboardView)
-                    iconView.background = colors.selectAndColorDrawable(keyboardViewAttr, helium314.keyboard.latin.common.ColorType.KEY_BACKGROUND)
+                    iconView.background = colors.selectAndColorDrawable(keyboardViewAttr, ColorType.KEY_BACKGROUND)
                     keyboardViewAttr.recycle()
                 }
                 val labelView = tile.findViewById<TextView>(R.id.menu_tile_label)
@@ -140,31 +158,32 @@ class AccessPointMenuView @JvmOverloads constructor(
 
             tile.setOnLongClickListener { v ->
                 AudioAndHapticFeedbackManager.getInstance().performHapticFeedback(v, HapticEvent.KEY_LONG_PRESS)
-                val clipData = ClipData.newPlainText("ToolbarKey", key.name)
+                val clipData = ClipData.newPlainText(TOOLBAR_DRAG_CLIP_LABEL, key.name)
                 val shadow = DragShadowBuilder(v)
                 v.visibility = View.INVISIBLE
-                v.startDragAndDrop(clipData, shadow, v, 0)
+                v.startDragAndDrop(clipData, shadow, ToolbarDragState(key, ToolbarDragSource.ACCESS_POINT_MENU, v), 0)
                 true
             }
 
             tile.setOnDragListener { v, event ->
-                val draggedView = event.localState as? View
+                val dragState = event.localState as? ToolbarDragState
+                val draggedView = dragState?.sourceView ?: event.localState as? View
+                val ownGridDraggedView = draggedView?.takeIf {
+                    dragState?.source == ToolbarDragSource.ACCESS_POINT_MENU && it.parent === grid
+                }
                 when (event.action) {
-                    DragEvent.ACTION_DRAG_STARTED -> true
+                    DragEvent.ACTION_DRAG_STARTED -> getToolbarKeyFromDragData(event.localState, event.clipData) != null
                     DragEvent.ACTION_DRAG_ENTERED -> {
-                        if (draggedView != null && draggedView != v) {
-                            v.alpha = 0.5f
+                        if (ownGridDraggedView != null && ownGridDraggedView != v) {
+                            previewOwnGridMove(ownGridDraggedView, grid.indexOfChild(v))
+                        } else if (dragState?.source == ToolbarDragSource.PINNED_ROW) {
+                            previewPinnedKeyInAccessMenu(dragState.key, grid.indexOfChild(v))
                         }
                         true
                     }
                     DragEvent.ACTION_DRAG_LOCATION -> {
-                        if (draggedView != null) {
-                            for (i in 0 until grid.childCount) {
-                                val child = grid.getChildAt(i)
-                                if (child != draggedView) {
-                                    child.alpha = if (child == v) 0.5f else 1.0f
-                                }
-                            }
+                        if (dragState?.source == ToolbarDragSource.PINNED_ROW) {
+                            previewPinnedKeyInAccessMenu(dragState.key, grid.indexOfChild(v))
                         }
                         true
                     }
@@ -173,22 +192,16 @@ class AccessPointMenuView @JvmOverloads constructor(
                         true
                     }
                     DragEvent.ACTION_DROP -> {
-                        if (draggedView != null) {
-                            val sourceIndex = grid.indexOfChild(draggedView)
-                            val targetIndex = grid.indexOfChild(v)
+                        if (ownGridDraggedView != null) {
                             grid.post {
                                 for (i in 0 until grid.childCount) {
                                     grid.getChildAt(i).alpha = 1.0f
                                 }
-                                draggedView.visibility = View.VISIBLE
-                                if (sourceIndex >= 0 && targetIndex >= 0 && sourceIndex != targetIndex) {
-                                    if (grid.indexOfChild(draggedView) == sourceIndex) { // Check if still in same state
-                                        grid.removeView(draggedView)
-                                        grid.addView(draggedView, targetIndex)
-                                        saveToolbarKeyOrder(grid)
-                                    }
-                                }
+                                ownGridDraggedView.visibility = View.VISIBLE
+                                saveToolbarKeyOrder(grid)
                             }
+                        } else if (dragState?.source == ToolbarDragSource.PINNED_ROW) {
+                            commitPinnedKeyDropToAccess(dragState.key)
                         } else {
                             grid.post {
                                 for (i in 0 until grid.childCount) {
@@ -206,6 +219,10 @@ class AccessPointMenuView @JvmOverloads constructor(
                             if (draggedView != null) {
                                 draggedView.visibility = View.VISIBLE
                             }
+                            ownGridDragIndex = -1
+                            if (dragState?.source == ToolbarDragSource.PINNED_ROW) {
+                                clearAccessDropPreview()
+                            }
                         }
                         true
                     }
@@ -215,6 +232,114 @@ class AccessPointMenuView @JvmOverloads constructor(
 
             grid.addView(tile)
         }
+    }
+
+    private fun onPinnedKeyDropFromStrip(target: View, event: DragEvent): Boolean {
+        val dragState = event.localState as? ToolbarDragState ?: return false
+        if (dragState.source != ToolbarDragSource.PINNED_ROW) return false
+        return when (event.action) {
+            DragEvent.ACTION_DRAG_STARTED -> true
+            DragEvent.ACTION_DRAG_ENTERED -> {
+                alpha = 0.92f
+                true
+            }
+            DragEvent.ACTION_DRAG_LOCATION -> {
+                previewPinnedKeyInAccessMenu(dragState.key, accessDropIndexFromEvent(target, event))
+                true
+            }
+            DragEvent.ACTION_DRAG_EXITED -> {
+                alpha = 1.0f
+                true
+            }
+            DragEvent.ACTION_DROP -> {
+                alpha = 1.0f
+                commitPinnedKeyDropToAccess(dragState.key)
+                true
+            }
+            DragEvent.ACTION_DRAG_ENDED -> {
+                alpha = 1.0f
+                clearAccessDropPreview()
+                true
+            }
+            else -> true
+        }
+    }
+
+    private fun commitPinnedKeyDropToAccess(key: ToolbarKey) {
+        removePinnedKey(context.prefs(), key)
+        accessDropPreviewView?.let { if (it.parent === grid) saveToolbarKeyOrder(grid) }
+        clearAccessDropPreview()
+        populateMenu()
+        AudioAndHapticFeedbackManager.getInstance().performHapticFeedback(this, HapticEvent.KEY_PRESS)
+    }
+
+    private fun previewPinnedKeyInAccessMenu(key: ToolbarKey, index: Int) {
+        val preview = accessDropPreviewView ?: createAccessDropPreviewTile(key).also {
+            accessDropPreviewView = it
+        }
+        val targetIndex = index.coerceIn(0, grid.childCount)
+        if (preview.parent === grid && accessDropPreviewIndex == targetIndex) return
+        accessDropPreviewIndex = targetIndex
+        if (preview.parent !== grid) {
+            grid.addView(preview, targetIndex)
+            return
+        }
+        moveGridChildToIndex(preview, targetIndex)
+    }
+
+    private fun clearAccessDropPreview() {
+        accessDropPreviewView?.let {
+            if (it.parent === grid) grid.removeView(it)
+        }
+        accessDropPreviewView = null
+        accessDropPreviewIndex = -1
+    }
+
+    private fun previewOwnGridMove(child: View, index: Int) {
+        val targetIndex = index.coerceIn(0, grid.childCount - 1)
+        if (ownGridDragIndex == targetIndex) return
+        ownGridDragIndex = targetIndex
+        moveGridChildToIndex(child, targetIndex)
+    }
+
+    private fun moveGridChildToIndex(child: View, index: Int) {
+        val currentIndex = grid.indexOfChild(child)
+        val targetIndex = index.coerceIn(0, grid.childCount - 1)
+        if (currentIndex < 0 || currentIndex == targetIndex) return
+        grid.removeView(child)
+        grid.addView(child, targetIndex)
+    }
+
+    private fun accessDropIndexFromEvent(target: View, event: DragEvent): Int {
+        target.getLocationOnScreen(dragTargetScreenLocation)
+        grid.getLocationOnScreen(gridScreenLocation)
+        val xInGrid = event.x + dragTargetScreenLocation[0] - gridScreenLocation[0]
+        val yInGrid = event.y + dragTargetScreenLocation[1] - gridScreenLocation[1]
+        for (i in 0 until grid.childCount) {
+            val child = grid.getChildAt(i)
+            if (xInGrid >= child.left.toFloat() && xInGrid <= child.right.toFloat()
+                && yInGrid >= child.top.toFloat() && yInGrid <= child.bottom.toFloat()
+            ) {
+                return i
+            }
+        }
+        return grid.childCount
+    }
+
+    private fun createAccessDropPreviewTile(key: ToolbarKey): View {
+        val tile = LayoutInflater.from(context).inflate(R.layout.menu_tile_item, grid, false)
+        tile.tag = key
+        tile.alpha = 0.42f
+        tile.isClickable = false
+        tile.isFocusable = false
+        val iconView = tile.findViewById<ImageButton>(R.id.menu_tile_icon)
+        val labelView = tile.findViewById<TextView>(R.id.menu_tile_label)
+        val keyboardTextColor = Settings.getValues().mColors.get(helium314.keyboard.latin.common.ColorType.KEY_TEXT)
+        applyKeyTextIcon(iconView, KeyboardIconsSet.instance.getNewDrawable(key.name, context), keyboardTextColor)
+        labelView.text = key.name.lowercase().getStringResourceOrName("", context)
+        labelView.setTextColor(keyboardTextColor)
+        KeyboardTypeface.applyToTextView(labelView)
+        return tile
     }
 
     private fun saveToolbarKeyOrder(grid: GridLayout) {
@@ -263,15 +388,15 @@ class AccessPointMenuView @JvmOverloads constructor(
                     val lp = iconView.layoutParams
                     lp.width = android.view.ViewGroup.LayoutParams.MATCH_PARENT
                     iconView.layoutParams = lp
-                }
-                drawable.setColor(android.graphics.Color.WHITE)
-                colors.setColor(drawable, helium314.keyboard.latin.common.ColorType.KEY_BACKGROUND)
-                iconView.background = drawable
-            } else {
+            }
+            drawable.setColor(android.graphics.Color.WHITE)
+            colors.setColor(drawable, ColorType.KEY_BACKGROUND)
+            iconView.background = drawable
+        } else {
                 val lp = iconView.layoutParams
                 lp.width = android.view.ViewGroup.LayoutParams.MATCH_PARENT
                 iconView.layoutParams = lp
-                iconView.background = colors.selectAndColorDrawable(keyboardViewAttr, helium314.keyboard.latin.common.ColorType.KEY_BACKGROUND)
+                iconView.background = colors.selectAndColorDrawable(keyboardViewAttr, ColorType.KEY_BACKGROUND)
             }
 
             val labelView = tile.findViewById<TextView>(R.id.menu_tile_label)

@@ -362,9 +362,9 @@
     <!-- Title of the setting to set the toolbar mode -->
     <string name="toolbar_mode">Toolbar mode</string>
     <!-- Option to set the toolbar mode to show an expandable toolbar -->
-    <string name="toolbar_mode_expandable" tools:keep="@string/toolbar_mode_expandable">Toolbar keys and suggestions</string>
+    <string name="toolbar_mode_expandable" tools:keep="@string/toolbar_mode_expandable">Pinned buttons and suggestions</string>
     <!-- Option to set the toolbar mode to show the toolbar keys only -->
-    <string name="toolbar_mode_toolbar_keys" tools:keep="@string/toolbar_mode_toolbar_keys">Toolbar keys only</string>
+    <string name="toolbar_mode_toolbar_keys" tools:keep="@string/toolbar_mode_toolbar_keys">Pinned buttons only</string>
     <!-- Option to set the toolbar mode to show the suggestions strip only -->
     <string name="toolbar_mode_suggestion_strip" tools:keep="@string/toolbar_mode_suggestion_strip">Suggestions only</string>
     <!-- Option to set the toolbar mode to hidden -->
@@ -372,7 +372,7 @@
     <!-- Option to hide clipboard and emoji toolbars when main toolbar is hidden -->
     <string name="toolbar_hiding_global">Hide clipboard and emoji toolbars too</string>
     <!-- Title of the setting to set toolbar keys -->
-    <string name="toolbar_keys">Select toolbar keys</string>
+    <string name="toolbar_keys">Select access point menu buttons</string>
     <!-- Names of the toolbar keys-->
     <string name="paste" tools:keep="@string/paste" translatable="false">@android:string/paste</string>
     <string name="copy" tools:keep="@string/copy" translatable="false">@android:string/copy</string>
@@ -405,11 +405,13 @@
     <!-- Title of the setting to set clipboard toolbar keys -->
     <string name="clipboard_toolbar_keys">Select clipboard toolbar keys</string>
     <!-- Title of the setting to set pinned toolbar keys -->
-    <string name="pinned_toolbar_keys">Select pinned toolbar keys</string>
+    <string name="pinned_toolbar_keys">Select pinned toolbar buttons</string>
+    <!-- Title of the setting to choose the fixed right-side toolbar button -->
+    <string name="persistent_toolbar_key">Persistent toolbar button</string>
     <!-- Title of the setting to quick-pin toolbar keys -->
-    <string name="quick_pin_toolbar_keys">Pin toolbar key on long press</string>
+    <string name="quick_pin_toolbar_keys">Quick-pin from expanded toolbar</string>
     <!-- Description of the setting to quick-pin toolbar keys -->
-    <string name="quick_pin_toolbar_keys_summary">This will disable other long press actions for toolbar keys that are not pinned</string>
+    <string name="quick_pin_toolbar_keys_summary">Long-pressing expanded toolbar keys pins them instead of running their alternate actions</string>
     <!-- Title of the setting to show "..." as hints for more functionality on long-press -->
     <string name="show_popup_hints">Show functional hints</string>
     <!-- Description of the show_popup_hints setting -->
@@ -965,7 +967,7 @@ New dictionary:
     <!-- Title of the setting for variable toolbar direction -->
     <string name="var_toolbar_direction">Variable toolbar direction</string>
     <!-- Description of the variable toolbar direction setting -->
-    <string name="var_toolbar_direction_summary">Reverse direction when a right-to-left keyboard subtype is selected</string>
+    <string name="var_toolbar_direction_summary">Reverse toolbar and pinned row direction when a right-to-left keyboard subtype is selected</string>
     <!-- Title of the settings for adjusting the language swipe gesture distance -->
     <string name="prefs_language_swipe_distance">Switch language swipe distance</string>
     <!-- Title of the setting to customize toolbar key codes -->

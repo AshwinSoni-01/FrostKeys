@@ -24,7 +24,7 @@ import helium314.keyboard.settings.dialogs.ReorderDialog
 import helium314.keyboard.settings.GetIconOrEmpty
 
 @Composable
-fun ReorderSwitchPreference(setting: Setting, default: String) {
+fun ReorderSwitchPreference(setting: Setting, default: String, maxChecked: Int? = null) {
     var showDialog by rememberSaveable { mutableStateOf(false) }
     Preference(
         name = setting.title,
@@ -38,9 +38,20 @@ fun ReorderSwitchPreference(setting: Setting, default: String) {
             val both = it.split(Separators.KV)
             KeyAndState(both.first(), both.last().toBoolean())
         }
+        if (maxChecked != null) {
+            var checkedCount = 0
+            items.forEach {
+                if (it.state)
+                    it.state = checkedCount++ < maxChecked
+            }
+        }
         ReorderDialog(
             onConfirmed = { reorderedItems ->
-                val value = reorderedItems.joinToString(Separators.ENTRY) { it.name + Separators.KV + it.state }
+                var checkedCount = 0
+                val value = reorderedItems.joinToString(Separators.ENTRY) {
+                    val state = it.state && (maxChecked == null || checkedCount++ < maxChecked)
+                    it.name + Separators.KV + state
+                }
                 prefs.edit { putString(setting.key, value) }
                 KeyboardSwitcher.getInstance().setThemeNeedsReload()
             },
@@ -59,7 +70,12 @@ fun ReorderSwitchPreference(setting: Setting, default: String) {
                     Text(actualText, Modifier.weight(1f))
                     SettingsSwitch(
                         checked = checked,
-                        onCheckedChange = { item.state = it; checked = it }
+                        onCheckedChange = onCheckedChange@{ newChecked ->
+                            if (newChecked && maxChecked != null && items.count { item -> item.state } >= maxChecked)
+                                return@onCheckedChange
+                            item.state = newChecked
+                            checked = newChecked
+                        }
                     )
                 }
             },

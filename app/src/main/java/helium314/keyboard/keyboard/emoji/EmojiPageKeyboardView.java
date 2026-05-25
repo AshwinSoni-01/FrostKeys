@@ -9,9 +9,11 @@ package helium314.keyboard.keyboard.emoji;
 import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.res.TypedArray;
+import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.PorterDuff;
 import android.graphics.PorterDuffXfermode;
+import android.graphics.drawable.Drawable;
 import android.os.Handler;
 import android.util.AttributeSet;
 import android.widget.LinearLayout;
@@ -135,6 +137,13 @@ public final class EmojiPageKeyboardView extends KeyboardView implements
         final Paint layerPaint = new Paint();
         layerPaint.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.SRC_OVER));
         mPopupKeysPlacerView.setLayerType(LAYER_TYPE_HARDWARE, layerPaint);
+    }
+
+    @Override
+    protected void onDrawKeyBackground(@NonNull final Key key, @NonNull final Canvas canvas,
+            @NonNull final Drawable background) {
+        // Emoji glyphs already carry their own shape/color. Drawing key bubbles behind them looks
+        // inconsistent across emoji fonts, so the emoji page keeps the keys visually transparent.
     }
 
     private void installPopupKeysPlacerView(final boolean uninstall) {

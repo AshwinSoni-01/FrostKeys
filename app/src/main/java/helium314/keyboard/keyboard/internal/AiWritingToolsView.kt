@@ -150,6 +150,8 @@ class AiWritingToolsView @JvmOverloads constructor(
 
             if (isNight) {
                 holder.useButton.setTextColor(Color.WHITE)
+            } else {
+                holder.useButton.setTextColor(Color.BLACK)
             }
             KeyboardTypeface.applyToTextView(holder.useButton)
 
@@ -307,6 +309,7 @@ class AiWritingToolsView @JvmOverloads constructor(
 
         copyButton.apply {
             alpha = if (isEnabled) 1.0f else disabledAlpha
+            setTextColor(if (isNight) Color.WHITE else Color.BLACK)
             val isRoundedStyle = colors.themeStyle == KeyboardTheme.STYLE_ROUNDED || colors.themeStyle == KeyboardTheme.STYLE_CIRCLE
             if (isRoundedStyle) {
                 val shape = android.graphics.drawable.GradientDrawable()
@@ -371,6 +374,9 @@ class AiWritingToolsView @JvmOverloads constructor(
         for (id in buttonsToFix) {
             findViewById<Button>(id)?.let {
                 KeyboardTypeface.applyToTextView(it)
+                if (id == R.id.btn_copy_text) {
+                    it.setTextColor(if (ResourceUtils.isNight(context.resources)) Color.WHITE else Color.BLACK)
+                }
             }
         }
         findViewById<ImageButton>(R.id.btn_delete_ai)?.let {

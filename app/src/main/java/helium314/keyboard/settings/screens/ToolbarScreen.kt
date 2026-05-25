@@ -16,6 +16,8 @@ import helium314.keyboard.keyboard.KeyboardSwitcher
 import helium314.keyboard.latin.R
 import helium314.keyboard.latin.settings.Defaults
 import helium314.keyboard.latin.settings.Settings
+import helium314.keyboard.latin.utils.MAX_PINNED_TOOLBAR_KEYS
+import helium314.keyboard.latin.utils.ToolbarKey
 import helium314.keyboard.latin.utils.Log
 import helium314.keyboard.latin.utils.ToolbarMode
 import helium314.keyboard.latin.utils.getActivity
@@ -48,19 +50,14 @@ fun ToolbarScreen(
         Settings.PREF_TOOLBAR_MODE,
         if (toolbarMode == ToolbarMode.HIDDEN) Settings.PREF_TOOLBAR_HIDING_GLOBAL else null,
         if (toolbarMode != ToolbarMode.HIDDEN) Settings.PREF_TOOLBAR_SWIPE_DOWN_TO_HIDE else null,
+        if (toolbarMode != ToolbarMode.HIDDEN) Settings.PREF_TOOLBAR_KEYS else null,
         when (toolbarMode) {
-             ToolbarMode.EXPANDABLE, ToolbarMode.TOOLBAR_KEYS -> Settings.PREF_TOOLBAR_KEYS
-             else -> null
-        },
-        when (toolbarMode) {
-            ToolbarMode.EXPANDABLE, ToolbarMode.SUGGESTION_STRIP -> Settings.PREF_PINNED_TOOLBAR_KEYS
+            ToolbarMode.EXPANDABLE, ToolbarMode.TOOLBAR_KEYS -> Settings.PREF_PINNED_TOOLBAR_KEYS
             else -> null
         },
+        if (toolbarMode != ToolbarMode.HIDDEN) Settings.PREF_PERSISTENT_TOOLBAR_KEY else null,
         if (clipboardToolbarVisible) Settings.PREF_CLIPBOARD_TOOLBAR_KEYS else null,
         if (clipboardToolbarVisible) Settings.PREF_TOOLBAR_CUSTOM_KEY_CODES else null,
-        if (toolbarMode == ToolbarMode.EXPANDABLE) Settings.PREF_QUICK_PIN_TOOLBAR_KEYS else null,
-        if (toolbarMode == ToolbarMode.EXPANDABLE) Settings.PREF_AUTO_SHOW_TOOLBAR else null,
-        if (toolbarMode == ToolbarMode.EXPANDABLE) Settings.PREF_AUTO_HIDE_TOOLBAR else null,
         if (toolbarMode != ToolbarMode.HIDDEN) Settings.PREF_VARIABLE_TOOLBAR_DIRECTION else null,
     )
     SearchSettingsScreen(
@@ -95,7 +92,17 @@ fun createToolbarSettings(context: Context) = listOf(
         ReorderSwitchPreference(it, Defaults.PREF_TOOLBAR_KEYS)
     },
     Setting(context, Settings.PREF_PINNED_TOOLBAR_KEYS, R.string.pinned_toolbar_keys) {
-        ReorderSwitchPreference(it, Defaults.PREF_PINNED_TOOLBAR_KEYS)
+        ReorderSwitchPreference(it, Defaults.PREF_PINNED_TOOLBAR_KEYS, maxChecked = MAX_PINNED_TOOLBAR_KEYS)
+    },
+    Setting(context, Settings.PREF_PERSISTENT_TOOLBAR_KEY, R.string.persistent_toolbar_key) { setting ->
+        val ctx = LocalContext.current
+        ListPreference(
+            setting,
+            ToolbarKey.entries
+                .filterNot { it == ToolbarKey.CLOSE_HISTORY }
+                .map { it.name.lowercase().getStringResourceOrName("", ctx) to it.name },
+            Defaults.PREF_PERSISTENT_TOOLBAR_KEY
+        )
     },
     Setting(context, Settings.PREF_CLIPBOARD_TOOLBAR_KEYS, R.string.clipboard_toolbar_keys) {
         ReorderSwitchPreference(it, Defaults.PREF_CLIPBOARD_TOOLBAR_KEYS)
@@ -111,19 +118,6 @@ fun createToolbarSettings(context: Context) = listOf(
                 key = it.key,
                 onDismissRequest = { showDialog = false }
             )
-    },
-    Setting(context, Settings.PREF_QUICK_PIN_TOOLBAR_KEYS,
-        R.string.quick_pin_toolbar_keys, R.string.quick_pin_toolbar_keys_summary)
-    {
-        SwitchPreference(it, Defaults.PREF_QUICK_PIN_TOOLBAR_KEYS) { KeyboardSwitcher.getInstance().setThemeNeedsReload() }
-    },
-    Setting(context, Settings.PREF_AUTO_SHOW_TOOLBAR, R.string.auto_show_toolbar, R.string.auto_show_toolbar_summary)
-    {
-        SwitchPreference(it, Defaults.PREF_AUTO_SHOW_TOOLBAR)
-    },
-    Setting(context, Settings.PREF_AUTO_HIDE_TOOLBAR, R.string.auto_hide_toolbar, R.string.auto_hide_toolbar_summary)
-    {
-        SwitchPreference(it, Defaults.PREF_AUTO_HIDE_TOOLBAR)
     },
     Setting(context, Settings.PREF_VARIABLE_TOOLBAR_DIRECTION,
         R.string.var_toolbar_direction, R.string.var_toolbar_direction_summary)

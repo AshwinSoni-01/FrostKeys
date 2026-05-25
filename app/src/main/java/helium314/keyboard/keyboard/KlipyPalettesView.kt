@@ -344,15 +344,7 @@ class KlipyPalettesView @JvmOverloads constructor(
             setOnFocusChangeListener { _, hasFocus ->
                 isCursorVisible = isSearchMode && hasFocus
             }
-            installTapAnimation(this)
-            setOnClickListener { clickedView ->
-                performTapFeedback(clickedView)
-                if (!isSearchMode) {
-                    enterSearchMode(moveCursorToEnd = false)
-                } else {
-                    updateSearchQueryUI()
-                }
-            }
+            installSearchTapTarget(this, moveCursorToEnd = false)
             setOnEditorActionListener { _, actionId, event ->
                 val isEnterUp = event?.keyCode == KeyEvent.KEYCODE_ENTER && event.action == KeyEvent.ACTION_UP
                 if (actionId == EditorInfo.IME_ACTION_SEARCH || isEnterUp) {
@@ -402,22 +394,25 @@ class KlipyPalettesView @JvmOverloads constructor(
 
     private fun loadMoreResults() {
         if (isLoadingMore || !hasMorePages || searchQuery.isBlank()) return
+        val tabAtRequest = currentTab
         isLoadingMore = true
         currentPage++
 
         viewScope.launch {
             try {
                 val (results, hasMore) = withContext(Dispatchers.IO) {
-                    fetchSearchResults(searchQuery, currentPage)
+                    fetchSearchResults(searchQuery, currentPage, tabAtRequest)
                 }
 
                 hasMorePages = hasMore
 
                 if (results.isNotEmpty()) {
-                    val currentList = if (currentTab == KlipyHistoryDao.TYPE_GIF) lastGifSearch else lastStickerSearch
+                    val currentList = if (tabAtRequest == KlipyHistoryDao.TYPE_GIF) lastGifSearch else lastStickerSearch
                     currentList.addAll(results)
-                    val activeAdapter = if (currentTab == KlipyHistoryDao.TYPE_GIF) gifsAdapter else stickersAdapter
-                    activeAdapter.updateItems(currentList.toList())
+                    if (currentTab == tabAtRequest) {
+                        val activeAdapter = if (tabAtRequest == KlipyHistoryDao.TYPE_GIF) gifsAdapter else stickersAdapter
+                        activeAdapter.updateItems(currentList.toList())
+                    }
                 }
             } finally {
                 isLoadingMore = false
@@ -576,17 +571,17 @@ class KlipyPalettesView @JvmOverloads constructor(
     }
 
     private fun selectGifsTab() {
-        onTabSelected(KlipyHistoryDao.TYPE_GIF)
         if (viewPager.currentItem != 0) {
-            viewPager.setCurrentItem(0, true)
+            viewPager.setCurrentItem(0, false)
         }
+        onTabSelected(KlipyHistoryDao.TYPE_GIF)
     }
 
     private fun selectStickersTab() {
-        onTabSelected(KlipyHistoryDao.TYPE_STICKER)
         if (viewPager.currentItem != 1) {
-            viewPager.setCurrentItem(1, true)
+            viewPager.setCurrentItem(1, false)
         }
+        onTabSelected(KlipyHistoryDao.TYPE_STICKER)
     }
 
     private fun normalizeTab(tab: String): String {
@@ -650,6 +645,7 @@ class KlipyPalettesView @JvmOverloads constructor(
 
         isSearchActive = true
         searchQuery = query
+        val tabAtRequest = currentTab
         updateSearchQueryUI()
         currentPage = 1
         hasMorePages = true
@@ -660,10 +656,10 @@ class KlipyPalettesView @JvmOverloads constructor(
         searchJob?.cancel()
         searchJob = viewScope.launch {
             val (results, hasMore) = withContext(Dispatchers.IO) {
-                fetchSearchResults(query, 1)
+                fetchSearchResults(query, 1, tabAtRequest)
             }
 
-            if (currentTab == KlipyHistoryDao.TYPE_GIF) {
+            if (tabAtRequest == KlipyHistoryDao.TYPE_GIF) {
                 lastGifSearch.clear()
                 lastGifSearch.addAll(results)
             } else {
@@ -673,11 +669,13 @@ class KlipyPalettesView @JvmOverloads constructor(
 
             hasMorePages = hasMore
 
+            if (currentTab != tabAtRequest) return@launch
+
             loadingIndicator.visibility = View.GONE
-            val activeAdapter = if (currentTab == KlipyHistoryDao.TYPE_GIF) gifsAdapter else stickersAdapter
+            val activeAdapter = if (tabAtRequest == KlipyHistoryDao.TYPE_GIF) gifsAdapter else stickersAdapter
             activeAdapter.updateItems(results)
 
-            val activeRecyclerView = if (currentTab == KlipyHistoryDao.TYPE_GIF) gifsRecyclerView else stickersRecyclerView
+            val activeRecyclerView = if (tabAtRequest == KlipyHistoryDao.TYPE_GIF) gifsRecyclerView else stickersRecyclerView
             activeRecyclerView.scrollToPosition(0)
 
             if (results.isEmpty()) {
@@ -689,9 +687,9 @@ class KlipyPalettesView @JvmOverloads constructor(
         }
     }
 
-    private fun fetchSearchResults(query: String, page: Int = 1): Pair<List<KlipyItem>, Boolean> {
+    private fun fetchSearchResults(query: String, page: Int = 1, tab: String = currentTab): Pair<List<KlipyItem>, Boolean> {
         val apiKey = CloudManager.getKlipyApiKey(context)
-        val endpoint = if (currentTab == KlipyHistoryDao.TYPE_GIF) "gifs" else "stickers"
+        val endpoint = if (tab == KlipyHistoryDao.TYPE_GIF) "gifs" else "stickers"
 
         val encodedQuery = try {
             java.net.URLEncoder.encode(query, "UTF-8").replace("+", "%20")
@@ -759,7 +757,7 @@ class KlipyPalettesView @JvmOverloads constructor(
                 }
 
                 val hasMore = rawList.size >= 24
-                val sendAsGif = currentTab == KlipyHistoryDao.TYPE_GIF && !shouldSendGifsAsStickers()
+                val sendAsGif = tab == KlipyHistoryDao.TYPE_GIF && !shouldSendGifsAsStickers()
 
                 val items = rawList.mapNotNull { item ->
                     val gifPreviewUrl = item.file.sm?.gif?.url?.takeIf { it.isNotBlank() }
@@ -808,13 +806,7 @@ class KlipyPalettesView @JvmOverloads constructor(
         setFeedbackClickListener(findViewById(R.id.tabStickers)) {
             selectStickersTab()
         }
-        setFeedbackClickListener(findViewById(R.id.dummySearchBox)) {
-            if (!isSearchMode) {
-                enterSearchMode(moveCursorToEnd = true)
-            } else {
-                focusSearchEditText(moveCursorToEnd = true)
-            }
-        }
+        installSearchTapTarget(findViewById(R.id.dummySearchBox), moveCursorToEnd = true)
         setFeedbackClickListener(findViewById(R.id.clearSearchButton)) {
             setSearchText("", 0)
             if (isSearchMode) {
@@ -844,6 +836,52 @@ class KlipyPalettesView @JvmOverloads constructor(
                 performSearch("")
             } else {
                 keyboardActionListener.onCodeInput(KeyCode.ALPHA, Constants.NOT_A_COORDINATE, Constants.NOT_A_COORDINATE, false)
+            }
+        }
+    }
+
+    @SuppressLint("ClickableViewAccessibility")
+    private fun installSearchTapTarget(view: View?, moveCursorToEnd: Boolean) {
+        if (view == null) return
+        view.setOnTouchListener { touchedView, event ->
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    if (!isSearchMode) {
+                        performTapFeedback(touchedView)
+                        enterSearchMode(moveCursorToEnd)
+                        return@setOnTouchListener true
+                    }
+                    if (touchedView.isEnabled) {
+                        touchedView.animate().cancel()
+                        touchedView.animate()
+                            .scaleX(TAP_SCALE)
+                            .scaleY(TAP_SCALE)
+                            .alpha(TAP_ALPHA)
+                            .setDuration(TAP_PRESS_DURATION_MS)
+                            .start()
+                    }
+                }
+                MotionEvent.ACTION_UP,
+                MotionEvent.ACTION_CANCEL,
+                MotionEvent.ACTION_OUTSIDE -> {
+                    touchedView.animate().cancel()
+                    touchedView.animate()
+                        .scaleX(1f)
+                        .scaleY(1f)
+                        .alpha(1f)
+                        .setDuration(TAP_RELEASE_DURATION_MS)
+                        .start()
+                }
+            }
+            false
+        }
+        view.setOnClickListener { clickedView ->
+            performTapFeedback(clickedView)
+            if (!isSearchMode) {
+                enterSearchMode(moveCursorToEnd)
+            } else {
+                focusSearchEditText(moveCursorToEnd)
+                updateSearchQueryUI()
             }
         }
     }
