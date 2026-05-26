@@ -1382,12 +1382,6 @@ public class LatinIME extends InputMethodService implements
         }
 
         // This call happens whether our view is displayed or not, but if it's not then
-        // we should
-        // not attempt recorrection. This is true even with a hardware keyboard
-        // connected: if the
-        // view is not displayed we have no means of showing suggestions anyway, and if
-        // it is then
-        // we want to show suggestions anyway.
         final SettingsValues settingsValues = mSettings.getCurrent();
         if (isInputViewShown()
                 && mInputLogic.onUpdateSelection(oldSelStart, oldSelEnd, newSelStart, newSelEnd,
@@ -1727,6 +1721,14 @@ public class LatinIME extends InputMethodService implements
     // should
     // completely replace #onCodeInput.
     public void onEvent(@NonNull final Event event) {
+        if (event.getKeyCode() == KeyCode.ALPHA) {
+            final KeyboardSwitcher switcher = KeyboardSwitcher.getInstance();
+            if (switcher.isShowingEmojiPalettes() || switcher.isShowingKlipyPalettes()
+                    || switcher.isShowingClipboardHistory() || switcher.isShowingAiWritingTools()) {
+                switcher.setAlphabetKeyboard();
+                return;
+            }
+        }
         if (KeyCode.VOICE_INPUT == event.getKeyCode()) {
             mRichImm.switchToShortcutIme(this);
         }
@@ -2053,9 +2055,7 @@ public class LatinIME extends InputMethodService implements
         if (keyCode == KeyEvent.KEYCODE_BACK && mKeyboardSwitcher.isShowingKlipyPalettes()) {
             final KlipyPalettesView klipyView = mKeyboardSwitcher.getKlipyPalettesView();
             if (klipyView != null) {
-                if (klipyView.isSearchMode()) {
-                    klipyView.exitSearchMode();
-                } else {
+                if (!klipyView.handleBackPress()) {
                     mKeyboardSwitcher.setAlphabetKeyboard();
                 }
                 return true;

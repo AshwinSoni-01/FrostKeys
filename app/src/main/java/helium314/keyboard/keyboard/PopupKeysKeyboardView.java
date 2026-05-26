@@ -323,6 +323,12 @@ public class PopupKeysKeyboardView extends KeyboardView implements PopupKeysPane
         return true;
     }
 
+    @Override
+    public void invalidateKey(final Key key) {
+        super.invalidateKey(key);
+        invalidate();
+    }
+
     /**
      * {@inheritDoc}
      */

@@ -20,10 +20,12 @@ import android.graphics.Paint.Align;
 import android.graphics.Typeface;
 import android.util.AttributeSet;
 import android.view.ContextThemeWrapper;
+import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.PopupWindow;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -125,6 +127,8 @@ public final class MainKeyboardView extends KeyboardView implements DrawingProxy
     private final int mLanguageOnSpacebarHorizontalMargin;
 
     private MainKeyboardAccessibilityDelegate mAccessibilityDelegate;
+
+    private PopupWindow mPopupWindow;
 
     public MainKeyboardView(final Context context, final AttributeSet attrs) {
         this(context, attrs, R.attr.mainKeyboardViewStyle);
@@ -351,6 +355,10 @@ public final class MainKeyboardView extends KeyboardView implements DrawingProxy
             Log.w(TAG, "Cannot find android.R.id.content view to add DrawingPreviewPlacerView");
             return;
         }
+        final ViewGroup parent = (ViewGroup) mDrawingPreviewPlacerView.getParent();
+        if (parent != null) {
+            parent.removeView(mDrawingPreviewPlacerView);
+        }
         windowContentView.addView(mDrawingPreviewPlacerView);
     }
 
@@ -471,6 +479,10 @@ public final class MainKeyboardView extends KeyboardView implements DrawingProxy
     @Override
     protected void onDetachedFromWindow() {
         super.onDetachedFromWindow();
+        final ViewGroup parent = (ViewGroup) mDrawingPreviewPlacerView.getParent();
+        if (parent != null) {
+            parent.removeView(mDrawingPreviewPlacerView);
+        }
         mDrawingPreviewPlacerView.removeAllViews();
     }
 
@@ -543,8 +555,41 @@ public final class MainKeyboardView extends KeyboardView implements DrawingProxy
         PointerTracker.setReleasedKeyGraphicsToAllKeys();
         // Dismiss sliding key input preview that may be being showed.
         mSlidingKeyInputDrawingPreview.dismissSlidingKeyInputPreview();
-        panel.showInParent(mDrawingPreviewPlacerView);
+        showFloatingPopup(panel);
         mPopupKeysPanel = panel;
+    }
+
+    private void showFloatingPopup(final PopupKeysPanel panel) {
+        final View container = panel.getContainerView();
+        final int popupX = Math.round(container.getX());
+        final int popupY = Math.round(container.getY());
+        if (container.getParent() instanceof ViewGroup) {
+            ((ViewGroup) container.getParent()).removeView(container);
+        }
+        container.setX(0f);
+        container.setY(0f);
+
+        if (mPopupWindow != null) {
+            mPopupWindow.dismiss();
+        }
+        final PopupWindow window = new PopupWindow(
+                container,
+                container.getMeasuredWidth(),
+                container.getMeasuredHeight(),
+                false
+        );
+        window.setTouchable(true);
+        window.setOutsideTouchable(false);
+        window.setClippingEnabled(false);
+        window.setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(Color.TRANSPARENT));
+
+        mPopupWindow = window;
+        window.setOnDismissListener(() -> {
+            if (mPopupWindow == window) {
+                mPopupWindow = null;
+            }
+        });
+        window.showAtLocation(getRootView(), Gravity.NO_GRAVITY, popupX, popupY);
     }
 
     public boolean isShowingPopupKeysPanel() {
@@ -559,6 +604,10 @@ public final class MainKeyboardView extends KeyboardView implements DrawingProxy
     @Override
     public void onDismissPopupKeysPanel() {
         if (isShowingPopupKeysPanel()) {
+            if (mPopupWindow != null) {
+                mPopupWindow.dismiss();
+                mPopupWindow = null;
+            }
             mPopupKeysPanel.removeFromParent();
             mPopupKeysPanel = null;
         }

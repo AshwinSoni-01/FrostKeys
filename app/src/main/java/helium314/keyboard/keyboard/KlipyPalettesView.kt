@@ -829,14 +829,12 @@ class KlipyPalettesView @JvmOverloads constructor(
             clearCurrentHistory()
         }
         setFeedbackClickListener(findViewById(R.id.klipyBackButton)) {
-            if (isSearchMode) {
-                exitSearchMode(triggerSearch = false)
-            } else if (isSearchActive) {
-                setSearchText("", 0)
-                performSearch("")
-            } else {
-                keyboardActionListener.onCodeInput(KeyCode.ALPHA, Constants.NOT_A_COORDINATE, Constants.NOT_A_COORDINATE, false)
+            if (!handleBackPress()) {
+                KeyboardSwitcher.getInstance().setAlphabetKeyboard()
             }
+        }
+        setFeedbackClickListener(findViewById(R.id.klipySearchBackButton)) {
+            handleBackPress()
         }
     }
 
@@ -945,6 +943,15 @@ class KlipyPalettesView @JvmOverloads constructor(
             if (backButton != null) {
                 colors.setColor(backButton, ColorType.FUNCTIONAL_KEY_TEXT)
                 backButton.background = createBackButtonBackground(colors)
+                backButton.setPadding(0, 0, 0, 0)
+                backButton.scaleType = ImageView.ScaleType.CENTER
+            }
+            val searchBackButton = findViewById<ImageButton>(R.id.klipySearchBackButton)
+            if (searchBackButton != null) {
+                colors.setColor(searchBackButton, ColorType.FUNCTIONAL_KEY_TEXT)
+                searchBackButton.background = createBackButtonBackground(colors)
+                searchBackButton.setPadding(0, 0, 0, 0)
+                searchBackButton.scaleType = ImageView.ScaleType.CENTER
             }
             val tabGifs = findViewById<TextView>(R.id.tabGifs)
             if (tabGifs != null) {
@@ -1079,16 +1086,65 @@ class KlipyPalettesView @JvmOverloads constructor(
         loadHistory()
     }
 
+    fun handleBackPress(): Boolean {
+        if (isSearchMode) {
+            exitSearchMode(triggerSearch = false)
+            return true
+        } else if (isSearchActive) {
+            setSearchText("", 0)
+            performSearch("")
+            return true
+        }
+        return false
+    }
+
+    private fun swapKeyboardToKlipy(enter: Boolean) {
+        val switcher = KeyboardSwitcher.getInstance()
+        val keyboardView = switcher.mainKeyboardView ?: return
+        val wrapper = switcher.wrapperView as? ViewGroup ?: return
+        val placeholder = findViewById<View>(R.id.bottom_row_keyboard) ?: return
+
+        val currentParent = keyboardView.parent as? ViewGroup
+        if (enter) {
+            if (currentParent != this) {
+                currentParent?.removeView(keyboardView)
+                val index = indexOfChild(placeholder)
+                if (index >= 0) {
+                    addView(keyboardView, index)
+                } else {
+                    addView(keyboardView)
+                }
+                placeholder.visibility = View.GONE
+            }
+            keyboardView.layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            )
+            keyboardView.visibility = View.VISIBLE
+            switcher.stripContainer?.visibility = View.GONE
+        } else {
+            if (currentParent == this) {
+                removeView(keyboardView)
+                wrapper.addView(keyboardView, 0)
+                placeholder.visibility = View.GONE
+            }
+            keyboardView.visibility = View.GONE
+            switcher.stripContainer?.visibility = View.GONE
+        }
+    }
+
     private fun enterSearchMode(moveCursorToEnd: Boolean = true) {
         isSearchMode = true
         gifsAdapter.setAnimationsRunning(false)
         stickersAdapter.setAnimationsRunning(false)
         findViewById<View>(R.id.klipyHeader)?.visibility = View.GONE
+        findViewById<View>(R.id.klipySearchBackButton)?.visibility = View.VISIBLE
         viewPager.visibility = View.GONE
         emptyState.visibility = View.GONE
         hideClearHistoryConfirmation()
         clearHistoryButton.visibility = View.GONE
-        findViewById<MainKeyboardView>(R.id.bottom_row_keyboard)?.visibility = View.VISIBLE
+
+        swapKeyboardToKlipy(enter = true)
         focusSearchEditText(moveCursorToEnd)
         updateSearchQueryUI()
         currentSearchKeyboardElementId = KeyboardId.ELEMENT_ALPHABET
@@ -1103,15 +1159,15 @@ class KlipyPalettesView @JvmOverloads constructor(
             searchEditText.clearFocus()
         }
         findViewById<View>(R.id.klipyHeader)?.visibility = View.VISIBLE
+        findViewById<View>(R.id.klipySearchBackButton)?.visibility = View.GONE
         viewPager.visibility = View.VISIBLE
         gifsAdapter.setAnimationsRunning(true)
         stickersAdapter.setAnimationsRunning(true)
         showClearHistoryButton()
         updateSearchQueryUI()
 
-        mainListener?.let {
-            PointerTracker.setKeyboardActionListener(it)
-        }
+        swapKeyboardToKlipy(enter = false)
+        KeyboardSwitcher.getInstance().mainKeyboardView?.setKeyboardActionListener(mainListener)
 
         if (triggerSearch) {
             performSearch(searchQuery)
@@ -1121,14 +1177,18 @@ class KlipyPalettesView @JvmOverloads constructor(
     }
 
     private fun updateSearchKeyboard() {
-        val keyboardView = findViewById<MainKeyboardView>(R.id.bottom_row_keyboard)
+        val switcher = KeyboardSwitcher.getInstance()
+        val keyboardView = switcher.mainKeyboardView ?: return
         keyboardView.setKeyboardActionListener(searchKeyboardListener)
         PointerTracker.switchTo(keyboardView)
-        val kls = keyboardLayoutSet ?: KeyboardLayoutSet.Builder.buildEmojiClipBottomRow(context, mainEditorInfo).also {
-            keyboardLayoutSet = it
+        when (currentSearchKeyboardElementId) {
+            KeyboardId.ELEMENT_ALPHABET -> switcher.setAlphabetKeyboard()
+            KeyboardId.ELEMENT_ALPHABET_MANUAL_SHIFTED -> switcher.setAlphabetManualShiftedKeyboard()
+            KeyboardId.ELEMENT_ALPHABET_SHIFT_LOCKED -> switcher.setAlphabetShiftLockedKeyboard()
+            KeyboardId.ELEMENT_SYMBOLS -> switcher.setSymbolsKeyboard()
+            KeyboardId.ELEMENT_SYMBOLS_SHIFTED -> switcher.setSymbolsShiftedKeyboard()
+            else -> switcher.setAlphabetKeyboard()
         }
-        val keyboard = kls.getKeyboard(currentSearchKeyboardElementId)
-        keyboardView.setKeyboard(keyboard)
     }
 
     private fun updateSearchQueryUI() {
@@ -1270,8 +1330,11 @@ class KlipyPalettesView @JvmOverloads constructor(
                 }
                 updateSearchKeyboard()
             }
-            KeyCode.SYMBOL -> {
-                currentSearchKeyboardElementId = KeyboardId.ELEMENT_SYMBOLS
+            KeyCode.SYMBOL, KeyCode.SYMBOL_ALPHA -> {
+                currentSearchKeyboardElementId = when (currentSearchKeyboardElementId) {
+                    KeyboardId.ELEMENT_SYMBOLS, KeyboardId.ELEMENT_SYMBOLS_SHIFTED -> KeyboardId.ELEMENT_ALPHABET
+                    else -> KeyboardId.ELEMENT_SYMBOLS
+                }
                 updateSearchKeyboard()
             }
             KeyCode.ALPHA -> {
@@ -1330,7 +1393,7 @@ class KlipyPalettesView @JvmOverloads constructor(
 
         override fun onEndBatchInput(batchPointers: InputPointers?) {
             if (batchPointers == null) return
-            val keyboard = findViewById<MainKeyboardView>(R.id.bottom_row_keyboard)?.keyboard
+            val keyboard = KeyboardSwitcher.getInstance().mainKeyboardView?.keyboard
             getLatinIME()?.getKlipySearchGestureSuggestion(
                 batchPointers,
                 keyboard,
@@ -1346,6 +1409,27 @@ class KlipyPalettesView @JvmOverloads constructor(
                     }
                 }
             )
+        }
+
+        override fun onMoveDeletePointer(steps: Int) {
+            if (!isSearchMode || !::searchEditText.isInitialized) return
+            val text = searchEditText.text ?: return
+            val cursorEnd = searchEditText.selectionEnd.coerceIn(0, text.length)
+            val cursorStart = searchEditText.selectionStart.coerceIn(0, text.length)
+            // On first swipe step, anchor the end at the cursor position and move start left
+            val newStart = (cursorStart + steps).coerceIn(0, text.length)
+            if (newStart > cursorEnd) return
+            searchEditText.setSelection(newStart, cursorEnd)
+        }
+
+        override fun onUpWithDeletePointerActive() {
+            if (!isSearchMode || !::searchEditText.isInitialized) return
+            val selStart = searchEditText.selectionStart
+            val selEnd = searchEditText.selectionEnd
+            if (selStart < 0 || selEnd < 0 || selStart >= selEnd) return
+            searchEditText.text.delete(selStart, selEnd)
+            searchEditText.setSelection(selStart)
+            syncSearchQueryFromField()
         }
 
         override fun onCancelBatchInput() {

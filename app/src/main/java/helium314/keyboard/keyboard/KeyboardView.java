@@ -423,7 +423,7 @@ public class KeyboardView extends View {
                 }
 
                 final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
-                paint.setColor(KeyBackgroundUtils.fillColorFor(mColors, colorType));
+                paint.setColor(KeyBackgroundUtils.fillColorFor(mColors, colorType, key.isPressed() || key.isLocked()));
 
                 canvas.translate(bgX, bgY);
                 if (isCircleStyle) {

@@ -19,6 +19,13 @@ import android.view.ViewGroup;
 import android.view.inputmethod.EditorInfo;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.ImageButton;
+import android.graphics.drawable.RippleDrawable;
+import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.InsetDrawable;
+import android.content.res.ColorStateList;
+import androidx.core.graphics.ColorUtils;
+
 
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.LinearLayoutManager;
@@ -131,7 +138,22 @@ public final class EmojiPalettesView extends LinearLayout
     public void initialize() { // needs to be delayed for access to EmojiTabStrip, which is not a child of this view
         if (initialized) return;
         mEmojiCategory.initialize();
-        mTabStrip = (LinearLayout) KeyboardSwitcher.getInstance().getEmojiTabStrip();
+        final View tabStripView = KeyboardSwitcher.getInstance().getEmojiTabStrip();
+        mTabStrip = (LinearLayout) tabStripView.findViewById(R.id.emoji_tab_strip);
+        final ImageButton backButton = tabStripView.findViewById(R.id.emoji_back_button);
+        if (backButton != null) {
+            mColors.setColor(backButton, ColorType.FUNCTIONAL_KEY_TEXT);
+            backButton.setBackground(createBackButtonBackground(mColors));
+            backButton.setPadding(0, 0, 0, 0);
+            backButton.setScaleType(ImageView.ScaleType.CENTER);
+            backButton.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    AudioAndHapticFeedbackManager.getInstance().performHapticAndAudioFeedback(KeyCode.NOT_SPECIFIED, v, HapticEvent.KEY_PRESS);
+                    mKeyboardActionListener.onCodeInput(KeyCode.ALPHA, NOT_A_COORDINATE, NOT_A_COORDINATE, false);
+                }
+            });
+        }
         if (Settings.getValues().mSecondaryStripVisible) {
             for (final EmojiCategory.CategoryProperties properties : mEmojiCategory.getShownCategories()) {
                 addTab(mTabStrip, properties.mCategoryId);
@@ -610,6 +632,29 @@ public final class EmojiPalettesView extends LinearLayout
             sDictionaryFacilitator.closeDictionaries();
             sDictionaryFacilitator = null;
         }
+    }
+
+    private RippleDrawable createBackButtonBackground(final Colors colors) {
+        final GradientDrawable circle = new GradientDrawable();
+        circle.setShape(GradientDrawable.OVAL);
+        circle.setColor(android.graphics.Color.WHITE);
+        colors.setColor(circle, ColorType.SPECIAL_KEY_BACKGROUND);
+
+        final ColorStateList rippleColor = ColorStateList.valueOf(
+            ColorUtils.setAlphaComponent(colors.get(ColorType.FUNCTIONAL_KEY_TEXT), 0x33)
+        );
+
+        final float density = getContext().getResources().getDisplayMetrics().density;
+        final int horizontalInset = (int) (3 * density);
+        final int verticalInset = (int) (3 * density);
+
+        final InsetDrawable content = new InsetDrawable(
+            circle, horizontalInset, verticalInset, horizontalInset, verticalInset
+        );
+
+        return new RippleDrawable(
+            rippleColor, content, content.getConstantState() != null ? content.getConstantState().newDrawable().mutate() : null
+        );
     }
 
     private static class TabImageView extends ImageView {

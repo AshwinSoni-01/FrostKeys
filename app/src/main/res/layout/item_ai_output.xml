@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@drawable/bg_ai_output"
@@ -48,4 +47,30 @@
         android:textColor="#FFFFFF"
         android:elevation="0dp"
         android:stateListAnimator="@null" />
+
+    <View
+        android:id="@+id/applied_feedback_overlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:clickable="false"
+        android:focusable="false"
+        android:importantForAccessibility="no"
+        android:visibility="gone" />
+
+    <ImageView
+        android:id="@+id/applied_feedback_check"
+        android:layout_width="72dp"
+        android:layout_height="72dp"
+        android:layout_gravity="center"
+        android:alpha="0"
+        android:clickable="false"
+        android:contentDescription="@null"
+        android:focusable="false"
+        android:importantForAccessibility="no"
+        android:padding="16dp"
+        android:scaleType="center"
+        android:scaleX="0.86"
+        android:scaleY="0.86"
+        android:src="@drawable/ic_check_small"
+        android:visibility="gone" />
 </FrameLayout>

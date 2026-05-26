@@ -856,7 +856,7 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
     }
 
     private fun createToolbarPillBackground(colors: Colors): Drawable {
-        val verticalInset = 4.dpToPx(resources)
+        val verticalInset = 6.dpToPx(resources) // (46dp strip - 40dp layout) / 2 + 3dp circle inset = 6dp
         val horizontalInset = 2.dpToPx(resources)
         val contentHeight = resources.getDimensionPixelSize(R.dimen.config_suggestions_strip_height) - (verticalInset * 2)
         val cornerRadius = when (colors.themeStyle) {

@@ -259,21 +259,33 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
     // when a keyboard layout set doesn't get reloaded in LatinIME.onStartInputViewInternal().
     public void resetKeyboardStateToAlphabet(final int currentAutoCapsState,
             @Nullable final RecapitalizeMode currentRecapitalizeState) {
+        if (isShowingAiWritingTools()) {
+            return;
+        }
         mState.onResetKeyboardStateToAlphabet(currentAutoCapsState, currentRecapitalizeState);
     }
 
     public void onPressKey(final int code, final boolean isSinglePointer,
             final int currentAutoCapsState, @Nullable final RecapitalizeMode currentRecapitalizeState) {
+        if (isShowingKlipyPalettes() || isShowingEmojiPalettes() || isShowingClipboardHistory() || isShowingAiWritingTools()) {
+            return;
+        }
         mState.onPressKey(code, isSinglePointer, currentAutoCapsState, currentRecapitalizeState);
     }
 
     public void onReleaseKey(final int code, final boolean withSliding,
             final int currentAutoCapsState, @Nullable final RecapitalizeMode currentRecapitalizeState) {
+        if (isShowingKlipyPalettes() || isShowingEmojiPalettes() || isShowingClipboardHistory() || isShowingAiWritingTools()) {
+            return;
+        }
         mState.onReleaseKey(code, withSliding, currentAutoCapsState, currentRecapitalizeState);
     }
 
     public void onFinishSlidingInput(final int currentAutoCapsState,
             @Nullable final RecapitalizeMode currentRecapitalizeState) {
+        if (isShowingKlipyPalettes() || isShowingEmojiPalettes() || isShowingClipboardHistory() || isShowingAiWritingTools()) {
+            return;
+        }
         mState.onFinishSlidingInput(currentAutoCapsState, currentRecapitalizeState);
     }
 
@@ -350,7 +362,9 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
             @NonNull final SettingsValues settingsValues,
             @NonNull final KeyboardSwitchState toggleState) {
         final int visibility = isImeSuppressedByHardwareKeyboard(settingsValues, toggleState) ? View.GONE : View.VISIBLE;
-        final int stripVisibility = mLatinIME.hasSuggestionStripView()? View.VISIBLE : View.GONE;
+        final boolean klipySearchActive = mKlipyPalettesView != null && mKlipyPalettesView.isSearchMode();
+        final int stripVisibility = klipySearchActive ? View.GONE
+                : (mLatinIME.hasSuggestionStripView()? View.VISIBLE : View.GONE);
         mStripContainer.setVisibility(stripVisibility);
         PointerTracker.switchTo(mKeyboardView);
         mKeyboardView.setVisibility(visibility);
@@ -361,8 +375,10 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
         mEmojiPalettesView.setVisibility(View.GONE);
         mEmojiPalettesView.stopEmojiPalettes();
         if (mKlipyPalettesView != null) {
-            mKlipyPalettesView.setVisibility(View.GONE);
-            mKlipyPalettesView.stopKlipyPalettes();
+            if (!mKlipyPalettesView.isSearchMode()) {
+                mKlipyPalettesView.setVisibility(View.GONE);
+                mKlipyPalettesView.stopKlipyPalettes();
+            }
         }
         mEmojiTabStripView.setVisibility(View.GONE);
         mClipboardStripScrollView.setVisibility(View.GONE);
@@ -376,9 +392,10 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
         if (mAccessPointMenuView != null) {
             mAccessPointMenuView.setVisibility(View.GONE);
         }
-        setKeyboardPanelOffsets(false);
+        setKeyboardPanelOffsets(mKlipyPalettesView != null && mKlipyPalettesView.isSearchMode());
         updatePersistentEmojiRow();
     }
+
 
     // Implements {@link KeyboardState.SwitchActions}.
     @Override
@@ -703,6 +720,9 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
     // Future method for requesting an updating to the shift state.
     @Override
     public void requestUpdatingShiftState(final int autoCapsFlags, @Nullable final RecapitalizeMode recapitalizeMode) {
+        if (isShowingKlipyPalettes() || isShowingEmojiPalettes() || isShowingClipboardHistory() || isShowingAiWritingTools()) {
+            return;
+        }
         if (DEBUG_ACTION) {
             Log.d(TAG, "requestUpdatingShiftState: "
                     + " autoCapsFlags=" + CapsModeUtils.flagsToString(autoCapsFlags)
@@ -782,12 +802,18 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
         // Reload the entire keyboard, and switch to the previous layout
         final boolean wasEmoji = isShowingEmojiPalettes();
         final boolean wasClipboard = isShowingClipboardHistory();
+        final boolean wasAiTools = isShowingAiWritingTools();
+        final boolean wasKlipy = isShowingKlipyPalettes();
         loadKeyboard(mLatinIME.getCurrentInputEditorInfo(), Settings.getValues(),
                 mLatinIME.getCurrentAutoCapsState(), mLatinIME.getCurrentRecapitalizeState(), null);
         if (wasEmoji) {
             setEmojiKeyboard();
         } else if (wasClipboard) {
             setClipboardKeyboard();
+        } else if (wasAiTools) {
+            setAiToolsKeyboard();
+        } else if (wasKlipy) {
+            setKlipyKeyboard();
         }
     }
 
@@ -851,6 +877,9 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
      */
     public void onEvent(final Event event, final int currentAutoCapsState,
             @Nullable final RecapitalizeMode currentRecapitalizeState) {
+        if (isShowingKlipyPalettes() || isShowingEmojiPalettes() || isShowingClipboardHistory() || isShowingAiWritingTools()) {
+            return;
+        }
         mState.onEvent(event, currentAutoCapsState, currentRecapitalizeState);
     }
 
@@ -871,23 +900,23 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
     }
 
     public boolean isShowingEmojiPalettes() {
-        return mEmojiPalettesView != null && mEmojiPalettesView.isShown();
+        return mEmojiPalettesView != null && mEmojiPalettesView.getVisibility() == View.VISIBLE;
     }
 
     public boolean isShowingClipboardHistory() {
-        return mClipboardHistoryView != null && mClipboardHistoryView.isShown();
+        return mClipboardHistoryView != null && mClipboardHistoryView.getVisibility() == View.VISIBLE;
     }
 
     public boolean isShowingAiWritingTools() {
-        return mAiWritingToolsView != null && mAiWritingToolsView.isShown();
+        return mAiWritingToolsView != null && mAiWritingToolsView.getVisibility() == View.VISIBLE;
     }
 
     public boolean isShowingAccessPointMenu() {
-        return mAccessPointMenuView != null && mAccessPointMenuView.isShown();
+        return mAccessPointMenuView != null && mAccessPointMenuView.getVisibility() == View.VISIBLE;
     }
 
     public boolean isShowingKlipyPalettes() {
-        return mKlipyPalettesView != null && mKlipyPalettesView.isShown();
+        return mKlipyPalettesView != null && mKlipyPalettesView.getVisibility() == View.VISIBLE;
     }
 
     public boolean isShowingPopupKeysPanel() {
@@ -1022,7 +1051,7 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
         if (mAccessPointMenuView != null) {
             mAccessPointMenuView.setKeyboardActionListener(mLatinIME.mKeyboardActionListener);
         }
-        mEmojiTabStripView = mCurrentInputView.findViewById(R.id.emoji_tab_strip);
+        mEmojiTabStripView = mCurrentInputView.findViewById(R.id.emoji_tab_strip_container);
         mClipboardStripView = mCurrentInputView.findViewById(R.id.clipboard_strip);
         mClipboardStripScrollView = mCurrentInputView.findViewById(R.id.clipboard_strip_scroll_view);
         mSuggestionStripView = mCurrentInputView.findViewById(R.id.suggestion_strip_view);

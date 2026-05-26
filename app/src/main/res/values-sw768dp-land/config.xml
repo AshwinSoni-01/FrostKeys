@@ -35,7 +35,7 @@
     <fraction name="config_key_shifted_letter_hint_ratio_lxx">24%</fraction>
     <fraction name="config_language_on_spacebar_text_ratio">30.00%</fraction>
 
-    <dimen name="config_suggestions_strip_height">40dp</dimen>
+    <dimen name="config_suggestions_strip_height">50dp</dimen>
     <dimen name="config_suggestions_strip_edge_key_width">54dp</dimen>
     <fraction name="config_min_more_suggestions_width">50%</fraction>
 

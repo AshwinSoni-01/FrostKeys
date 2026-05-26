@@ -1,5 +1,7 @@
 package helium314.keyboard.keyboard.internal
 
+import android.animation.Animator
+import android.animation.AnimatorListenerAdapter
 import android.animation.ObjectAnimator
 import android.animation.ValueAnimator
 import android.annotation.SuppressLint
@@ -70,21 +72,31 @@ class AiWritingToolsView @JvmOverloads constructor(
     private var inputConnection: InputConnection? = null
     private var userText: String = ""
     private var aiVariations: List<String> = emptyList()
+    private var isReplacingSelection = false
+    private var isExecutingReplacement = false
 
     private lateinit var viewPager: ViewPager2
     private lateinit var indicatorContainer: LinearLayout
     private lateinit var copyButton: Button
     private var glowAnimator: ObjectAnimator? = null
     private var glowShiftAnimator: ValueAnimator? = null
+    private var sparkleFadeAnimator: ValueAnimator? = null
     private lateinit var glowBorder: View
     private lateinit var sparkleDust: SparkleDustView
     private var selectedTool: String? = null
     private var isGenerating = false
     private var generationSequence = 0L
+    private var resultRevealGeneration = 0L
+    private val revealedResultPositions = mutableSetOf<Int>()
 
     companion object {
         private const val DELIMITER = "---VAR---"
         private const val GLOW_FRAME_INTERVAL_MS = 33L
+        private const val MIN_RESULT_ANIMATION_MS = 4_000L
+        private const val GLOW_FADE_OUT_MS = 1_200L
+        private const val TEXT_REVEAL_FRAME_MS = 22L
+        private const val TEXT_REVEAL_FADE_IN_MS = 600L
+        private const val APPLIED_CHECK_START_SCALE = 0.86f
         private val AI_PROMPTS = mapOf(
             "Fix Grammar" to "Fix all grammar, punctuation, and spelling errors in the following text. Keep the original style.",
             "Proofread" to "Carefully proofread the following text for grammar, spelling, clarity, and flow. Suggest improvements while keeping the original intent.",
@@ -103,9 +115,126 @@ class AiWritingToolsView @JvmOverloads constructor(
     }
 
     private inner class AiOutputAdapter : RecyclerView.Adapter<AiOutputAdapter.ViewHolder>() {
+        private var appliedPosition: Int = RecyclerView.NO_POSITION
         inner class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
             val textView: TextView = view.findViewById(R.id.tv_ai_output)
             val useButton: Button = view.findViewById(R.id.btn_use_this)
+            private val appliedOverlay: View = view.findViewById(R.id.applied_feedback_overlay)
+            private val appliedCheck: ImageView = view.findViewById(R.id.applied_feedback_check)
+            private var revealRunnable: Runnable? = null
+
+            fun cancelTextReveal() {
+                revealRunnable?.let { textView.removeCallbacks(it) }
+                revealRunnable = null
+                textView.animate().cancel()
+                textView.alpha = 1f
+            }
+
+            fun resetAppliedFeedback() {
+                appliedOverlay.animate().cancel()
+                appliedCheck.animate().cancel()
+                appliedOverlay.alpha = 0f
+                appliedOverlay.visibility = View.GONE
+                appliedOverlay.background = null
+                appliedCheck.alpha = 0f
+                appliedCheck.scaleX = APPLIED_CHECK_START_SCALE
+                appliedCheck.scaleY = APPLIED_CHECK_START_SCALE
+                appliedCheck.visibility = View.GONE
+                appliedCheck.background = null
+            }
+
+            fun playAppliedFeedback(accentColor: Int) {
+                resetAppliedFeedback()
+
+                appliedOverlay.background = createAppliedOverlayBackground(accentColor)
+                appliedCheck.background = createAppliedCheckBackground(accentColor)
+                appliedOverlay.visibility = View.VISIBLE
+                appliedCheck.visibility = View.VISIBLE
+                appliedOverlay.bringToFront()
+                appliedCheck.bringToFront()
+
+                appliedOverlay.animate()
+                    .alpha(0.24f)
+                    .setStartDelay(0L)
+                    .setDuration(240L)
+                    .withEndAction {
+                        appliedOverlay.animate()
+                            .alpha(0f)
+                            .setStartDelay(1_100L)
+                            .setDuration(1_400L)
+                            .withEndAction {
+                                appliedOverlay.visibility = View.GONE
+                                appliedOverlay.background = null
+                            }
+                            .start()
+                    }
+                    .start()
+
+                appliedCheck.animate()
+                    .alpha(1f)
+                    .scaleX(1.04f)
+                    .scaleY(1.04f)
+                    .setStartDelay(60L)
+                    .setDuration(280L)
+                    .withEndAction {
+                        appliedCheck.animate()
+                            .alpha(0f)
+                            .scaleX(0.96f)
+                            .scaleY(0.96f)
+                            .setStartDelay(1_000L)
+                            .setDuration(900L)
+                            .withEndAction {
+                                appliedCheck.visibility = View.GONE
+                                appliedCheck.background = null
+                                appliedCheck.scaleX = APPLIED_CHECK_START_SCALE
+                                appliedCheck.scaleY = APPLIED_CHECK_START_SCALE
+                            }
+                            .start()
+                    }
+                    .start()
+            }
+
+            fun revealText(fullText: String) {
+                cancelTextReveal()
+
+                val totalCodePoints = fullText.codePointCount(0, fullText.length)
+                if (totalCodePoints <= 0) {
+                    textView.text = fullText
+                    return
+                }
+
+                var visibleCodePoints = 0
+                val step = textRevealStep(totalCodePoints)
+                textView.text = ""
+                textView.alpha = 0f
+                textView.animate()
+                    .alpha(1f)
+                    .setDuration(TEXT_REVEAL_FADE_IN_MS)
+                    .start()
+
+                val runnable = object : Runnable {
+                    override fun run() {
+                        if (!textView.isAttachedToWindow) {
+                            textView.text = fullText
+                            textView.alpha = 1f
+                            revealRunnable = null
+                            return
+                        }
+
+                        visibleCodePoints = (visibleCodePoints + step).coerceAtMost(totalCodePoints)
+                        val endIndex = fullText.offsetByCodePoints(0, visibleCodePoints)
+                        textView.text = fullText.substring(0, endIndex)
+
+                        if (visibleCodePoints < totalCodePoints) {
+                            textView.postDelayed(this, TEXT_REVEAL_FRAME_MS)
+                        } else {
+                            revealRunnable = null
+                        }
+                    }
+                }
+                revealRunnable = runnable
+                textView.postDelayed(runnable, TEXT_REVEAL_FRAME_MS)
+            }
         }
 
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
@@ -131,7 +260,19 @@ class AiWritingToolsView @JvmOverloads constructor(
             val isPlaceholder = text.contains("Please write something first") ||
                                text.contains("Select a tool above")
 
-            holder.textView.text = text
+            holder.cancelTextReveal()
+            holder.resetAppliedFeedback()
+            val shouldRevealText = resultRevealGeneration == generationSequence &&
+                    !isThinking &&
+                    !isError &&
+                    !isPlaceholder &&
+                    text.isNotBlank() &&
+                    revealedResultPositions.add(position)
+            if (shouldRevealText) {
+                holder.revealText(text)
+            } else {
+                holder.textView.text = text
+            }
             val style = if (isPlaceholder) android.graphics.Typeface.ITALIC else android.graphics.Typeface.NORMAL
             KeyboardTypeface.applyToTextView(holder.textView, text, android.graphics.Typeface.defaultFromStyle(style))
 
@@ -148,10 +289,18 @@ class AiWritingToolsView @JvmOverloads constructor(
                 holder.textView.setTextColor(color)
             }
 
+            val isApplied = position == appliedPosition
+
             if (isNight) {
                 holder.useButton.setTextColor(Color.WHITE)
             } else {
                 holder.useButton.setTextColor(Color.BLACK)
+            }
+            // Update button text: "Applied" for the chosen card, "Use this" for others
+            if (isApplied) {
+                holder.useButton.text = context.getString(R.string.ai_applied)
+            } else {
+                holder.useButton.text = context.getString(R.string.ai_use_this)
             }
             KeyboardTypeface.applyToTextView(holder.useButton)
 
@@ -164,70 +313,129 @@ class AiWritingToolsView @JvmOverloads constructor(
                         // VIRTUAL_KEY haptic feedback
                         view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
                         onReplaceClicked(textToUse)
+                        holder.playAppliedFeedback(Settings.getValues().mColors.get(ColorType.ACTION_KEY_BACKGROUND))
+                        // Update applied state without triggering a full rebind on currentPos,
+                        // which would call resetAppliedFeedback() and kill the animation.
+                        // Instead, update the button text directly on the live holder.
+                        val oldApplied = appliedPosition
+                        appliedPosition = currentPos
+                        holder.useButton.text = context.getString(R.string.ai_applied)
+                        KeyboardTypeface.applyToTextView(holder.useButton)
+                        // Only notify the old position to reset its button text back to "Use this"
+                        if (oldApplied != RecyclerView.NO_POSITION && oldApplied != currentPos) {
+                            notifyItemChanged(oldApplied)
+                        }
                     }
                 }
             }
         }
 
+        override fun onViewRecycled(holder: ViewHolder) {
+            holder.cancelTextReveal()
+            holder.resetAppliedFeedback()
+            super.onViewRecycled(holder)
+        }
+
         override fun getItemCount(): Int = 3
+
+        fun resetAppliedPosition() {
+            val old = appliedPosition
+            appliedPosition = RecyclerView.NO_POSITION
+            if (old != RecyclerView.NO_POSITION) {
+                notifyItemChanged(old)
+            }
+        }
     }
 
-    private inner class RepeatListener(
-        private val initialInterval: Int,
-        private val normalInterval: Int,
-        private val clickListener: OnClickListener
-    ) : OnTouchListener {
-        private val handler = Handler(Looper.getMainLooper())
-        private var touchedView: View? = null
-        private var repeatCount = 0
+    private fun textRevealStep(totalCodePoints: Int): Int {
+        return when {
+            totalCodePoints <= 220 -> 1
+            totalCodePoints <= 600 -> 2
+            else -> 3
+        }
+    }
 
-        private val runnable = object : Runnable {
+    private fun createAppliedOverlayBackground(accentColor: Int): GradientDrawable {
+        return GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            cornerRadius = 20.dpToPx(resources).toFloat()
+            setColor(ColorUtils.setAlphaComponent(accentColor, 120))
+        }
+    }
+
+    private fun createAppliedCheckBackground(accentColor: Int): GradientDrawable {
+        return GradientDrawable().apply {
+            shape = GradientDrawable.OVAL
+            setColor(ColorUtils.setAlphaComponent(accentColor, 220))
+        }
+    }
+
+    private inner class DeleteTouchListener : OnTouchListener {
+        private val handler = Handler(Looper.getMainLooper())
+        private var mStartX = 0f
+        private var mInHorizontalSwipe = false
+        private val stepWidth = 12.dpToPx(resources).toFloat()
+        private var repeatCount = 0
+        private var isPressedState = false
+
+        private val repeatRunnable = object : Runnable {
             override fun run() {
-                touchedView?.let {
-                    if (it.isAttachedToWindow && it.isEnabled) {
-                        repeatCount++
-                        it.tag = repeatCount
-                        clickListener.onClick(it)
-                        handler.postDelayed(this, normalInterval.toLong())
-                    } else {
-                        handler.removeCallbacks(this)
-                    }
+                if (!mInHorizontalSwipe && isPressedState && ::keyboardActionListener.isInitialized) {
+                    repeatCount++
+                    keyboardActionListener.onPressKey(KeyCode.DELETE, repeatCount, true, HapticEvent.KEY_REPEAT)
+                    keyboardActionListener.onCodeInput(KeyCode.DELETE, Constants.NOT_A_COORDINATE, Constants.NOT_A_COORDINATE, true)
+                    keyboardActionListener.onReleaseKey(KeyCode.DELETE, false)
+                    handler.postDelayed(this, 50)
                 }
             }
         }
 
         override fun onTouch(v: View, event: MotionEvent): Boolean {
+            if (!::keyboardActionListener.isInitialized) return false
             when (event.action) {
                 MotionEvent.ACTION_DOWN -> {
-                    handler.removeCallbacks(runnable)
-                    touchedView = v
+                    handler.removeCallbacks(repeatRunnable)
+                    mStartX = event.x
+                    mInHorizontalSwipe = false
+                    isPressedState = true
                     v.isPressed = true
                     repeatCount = 0
-                    v.tag = repeatCount
-                    clickListener.onClick(v)
-                    handler.postDelayed(runnable, initialInterval.toLong())
+
+                    keyboardActionListener.onPressKey(KeyCode.DELETE, 0, true, HapticEvent.KEY_PRESS)
+                    keyboardActionListener.onCodeInput(KeyCode.DELETE, Constants.NOT_A_COORDINATE, Constants.NOT_A_COORDINATE, false)
+                    keyboardActionListener.onReleaseKey(KeyCode.DELETE, false)
+
+                    handler.postDelayed(repeatRunnable, 400)
                     return true
                 }
                 MotionEvent.ACTION_MOVE -> {
-                    if (touchedView != null && !isPointInView(v, event.x, event.y)) {
-                        handler.removeCallbacks(runnable)
-                        v.isPressed = false
-                        touchedView = null
+                    if (isPressedState) {
+                        val dX = event.x - mStartX
+                        val steps = (dX / stepWidth).toInt()
+                        if (steps != 0) {
+                            if (!mInHorizontalSwipe) {
+                                handler.removeCallbacks(repeatRunnable)
+                                mInHorizontalSwipe = true
+                            }
+                            mStartX += steps * stepWidth
+                            keyboardActionListener.onMoveDeletePointer(steps)
+                        }
                     }
                     return true
                 }
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                    handler.removeCallbacks(runnable)
+                    handler.removeCallbacks(repeatRunnable)
                     v.isPressed = false
-                    touchedView = null
+                    isPressedState = false
+                    if (mInHorizontalSwipe) {
+                        mInHorizontalSwipe = false
+                        keyboardActionListener.onUpWithDeletePointerActive()
+                    }
+                    updateButtonStates()
                     return true
                 }
             }
             return false
-        }
-
-        private fun isPointInView(view: View, x: Float, y: Float): Boolean {
-            return x >= 0 && x <= view.width && y >= 0 && y <= view.height
         }
     }
 
@@ -463,13 +671,8 @@ class AiWritingToolsView @JvmOverloads constructor(
         }
 
         val deleteBtn = findViewById<ImageButton>(R.id.btn_delete_ai)
-        val deleteClickListener = OnClickListener { view ->
-            val isRepeat = (view.tag as? Int ?: 0) > 0
-            deleteOneCharacter(view, isRepeat)
-            updateButtonStates()
-        }
         deleteBtn.isLongClickable = false
-        deleteBtn.setOnTouchListener(RepeatListener(400, 50, deleteClickListener))
+        deleteBtn.setOnTouchListener(DeleteTouchListener())
 
         copyButton.setOnClickListener { view ->
             AudioAndHapticFeedbackManager.getInstance().performHapticAndAudioFeedback(KeyCode.NOT_SPECIFIED, view, HapticEvent.KEY_PRESS)
@@ -513,18 +716,26 @@ class AiWritingToolsView @JvmOverloads constructor(
 
     fun onOpen(connection: InputConnection?) {
         this.inputConnection = connection
+        if (isExecutingReplacement) {
+            updateButtonStates(connection)
+            return
+        }
         val selectedText = connection?.getSelectedText(0)?.toString()
         if (!selectedText.isNullOrBlank()) {
             this.userText = selectedText
+            this.isReplacingSelection = true
         } else {
             val extracted = connection?.getExtractedText(ExtractedTextRequest(), 0)
             this.userText = extracted?.text?.toString() ?: ""
+            this.isReplacingSelection = false
         }
         // Pad with empty variations on open
         aiVariations = listOf("", "", "")
         selectedTool = null
         isGenerating = false
         generationSequence++
+        resultRevealGeneration = 0L
+        revealedResultPositions.clear()
         viewPager.adapter?.notifyDataSetChanged()
         updateIndicators(0)
         updateButtonStates(connection)
@@ -535,6 +746,7 @@ class AiWritingToolsView @JvmOverloads constructor(
         inputConnection = null
         isGenerating = false
         generationSequence++
+        isExecutingReplacement = false
         stopGlowAnimation()
     }
 
@@ -549,26 +761,7 @@ class AiWritingToolsView @JvmOverloads constructor(
         }
     }
 
-    private fun deleteOneCharacter(view: View, isRepeat: Boolean) {
-        val ic = inputConnection ?: getLatinIME()?.currentInputConnection ?: return
-        val selectedText = ic.getSelectedText(0)
-        val beforeCursor = ic.getTextBeforeCursor(2, 0)?.toString().orEmpty()
-        if (selectedText.isNullOrEmpty() && beforeCursor.isEmpty()) return
 
-        AudioAndHapticFeedbackManager.getInstance().performHapticAndAudioFeedback(
-            KeyCode.DELETE,
-            view,
-            if (isRepeat) HapticEvent.KEY_REPEAT else HapticEvent.KEY_PRESS
-        )
-
-        if (!selectedText.isNullOrEmpty()) {
-            ic.commitText("", 1)
-            return
-        }
-
-        val deleteLength = Character.charCount(beforeCursor.codePointBefore(beforeCursor.length))
-        ic.deleteSurroundingText(deleteLength, 0)
-    }
 
     private fun onToolClicked(toolName: String, prompt: String) {
         if (isGenerating) return
@@ -579,7 +772,11 @@ class AiWritingToolsView @JvmOverloads constructor(
         isGenerating = true
         generationSequence++
         val requestGeneration = generationSequence
+        val generationStartedAtMs = SystemClock.uptimeMillis()
         selectedTool = toolName
+        resultRevealGeneration = 0L
+        revealedResultPositions.clear()
+        (viewPager.adapter as? AiOutputAdapter)?.resetAppliedPosition()
 
         // Show thinking in all 3 pages or just first? User wants strictly 3 pages.
         aiVariations = listOf("Thinking...", "", "")
@@ -590,32 +787,49 @@ class AiWritingToolsView @JvmOverloads constructor(
         startGlowAnimation()
 
         GeminiService.generateText(context, prompt, userText) { result, exception ->
-            if (requestGeneration != generationSequence || inputConnection == null || !isAttachedToWindow) {
-                return@generateText
-            }
-            isGenerating = false
-            stopGlowAnimation()
-            if (exception != null) {
-                aiVariations = listOf("Error: ${exception.message}", "", "")
-                copyButton.isEnabled = false
-            } else if (result != null) {
-                val rawVariations = result.split(DELIMITER)
-                    .map { it.trim() }
-                    .filter { it.isNotBlank() }
-
-                // Pad to exactly 3
-                val padded = mutableListOf<String>()
-                padded.addAll(rawVariations.take(3))
-                while (padded.size < 3) {
-                    padded.add(if (padded.isEmpty()) "No variations returned." else "")
+            val showResponse = Runnable {
+                if (requestGeneration != generationSequence || inputConnection == null || !isAttachedToWindow) {
+                    return@Runnable
                 }
-                aiVariations = padded
-                copyButton.isEnabled = true
+                isGenerating = false
+                stopGlowAnimation()
+                if (exception != null) {
+                    resultRevealGeneration = 0L
+                    revealedResultPositions.clear()
+                    aiVariations = listOf("Error: ${exception.message}", "", "")
+                    copyButton.isEnabled = false
+                } else if (result != null) {
+                    val rawVariations = result.split(DELIMITER)
+                        .map { it.trim() }
+                        .filter { it.isNotBlank() }
+
+                    // Pad to exactly 3
+                    val padded = mutableListOf<String>()
+                    padded.addAll(rawVariations.take(3))
+                    while (padded.size < 3) {
+                        padded.add(if (padded.isEmpty()) "No variations returned." else "")
+                    }
+                    resultRevealGeneration = requestGeneration
+                    revealedResultPositions.clear()
+                    aiVariations = padded
+                    copyButton.isEnabled = true
+                }
+                updateButtonStates()
+                viewPager.adapter?.notifyDataSetChanged()
+                viewPager.setCurrentItem(0, false)
+                updateIndicators(0)
             }
-            updateButtonStates()
-            viewPager.adapter?.notifyDataSetChanged()
-            viewPager.setCurrentItem(0, false)
-            updateIndicators(0)
+
+            val remainingAnimationMs = if (exception == null && result != null) {
+                MIN_RESULT_ANIMATION_MS - (SystemClock.uptimeMillis() - generationStartedAtMs)
+            } else {
+                0L
+            }
+            if (remainingAnimationMs > 0L) {
+                postDelayed(showResponse, remainingAnimationMs)
+            } else {
+                showResponse.run()
+            }
         }
     }
 
@@ -623,11 +837,23 @@ class AiWritingToolsView @JvmOverloads constructor(
         if (text.isNotBlank() && text != "Thinking...") {
             val ic = inputConnection ?: getLatinIME()?.currentInputConnection
             if (ic != null) {
-                // 1. Select all text in the input field
-                ic.performContextMenuAction(android.R.id.selectAll)
-
-                // 2. Overwrite the selection with AI text
-                ic.commitText(text, 1)
+                isExecutingReplacement = true
+                ic.beginBatchEdit()
+                try {
+                    if (isReplacingSelection) {
+                        // Replace only the selected text in Android
+                        ic.commitText(text, 1)
+                    } else {
+                        // Replace the entire field content
+                        val before = ic.getTextBeforeCursor(10000, 0)?.length ?: 0
+                        val after = ic.getTextAfterCursor(10000, 0)?.length ?: 0
+                        ic.deleteSurroundingText(before, after)
+                        ic.commitText(text, 1)
+                    }
+                } finally {
+                    ic.endBatchEdit()
+                    postDelayed({ isExecutingReplacement = false }, 1000)
+                }
 
                 Toast.makeText(context, "Text replaced", Toast.LENGTH_SHORT).show()
             }
@@ -652,15 +878,7 @@ class AiWritingToolsView @JvmOverloads constructor(
         sparkleDust.animate().cancel()
         glowAnimator?.cancel()
         glowShiftAnimator?.cancel()
-
-        glowBorder.visibility = View.VISIBLE
-        glowBorder.alpha = 0f
-        glowBorder.bringToFront()
-        glowBorder.setLayerType(View.LAYER_TYPE_HARDWARE, null)
-        sparkleDust.visibility = View.VISIBLE
-        sparkleDust.alpha = 0f
-        sparkleDust.bringToFront()
-        sparkleDust.setLayerType(View.LAYER_TYPE_HARDWARE, null)
+        sparkleFadeAnimator?.cancel()
 
         val shiftingGradient = FluidGlowGradientDrawable(
             createGlowGradientColors(),
@@ -668,17 +886,41 @@ class AiWritingToolsView @JvmOverloads constructor(
         )
         glowBorder.background = shiftingGradient
 
-        glowAnimator = ObjectAnimator.ofFloat(glowBorder, "alpha", 0.38f, 0.82f).apply {
-            duration = 1800
-            repeatMode = ValueAnimator.REVERSE
-            repeatCount = ValueAnimator.INFINITE
+        // Set alpha to 0f BEFORE making it visible to avoid single-frame flash of old alpha
+        glowBorder.setLayerType(View.LAYER_TYPE_HARDWARE, null)
+        glowBorder.alpha = 0f
+        glowBorder.visibility = View.VISIBLE
+        glowBorder.bringToFront()
+
+        sparkleDust.setLayerType(View.LAYER_TYPE_NONE, null)
+        sparkleDust.overallAlpha = 0f
+        sparkleDust.alpha = 1f // keep View's own alpha fully opaque to bypass ViewPropertyAnimator layer quirks
+        sparkleDust.visibility = View.VISIBLE
+        sparkleDust.bringToFront()
+        sparkleDust.startDustAnimation()
+
+        // Fade in smoothly to exactly 0.48f, which matches the starting value of the pulsing loop
+        glowBorder.animate()
+            .alpha(0.48f)
+            .setDuration(480)
+            .withEndAction {
+                // Pulse seamlessly between 0.48f and 0.82f with zero jumps
+                glowAnimator = ObjectAnimator.ofFloat(glowBorder, "alpha", 0.48f, 0.82f).apply {
+                    duration = 1800
+                    repeatMode = ValueAnimator.REVERSE
+                    repeatCount = ValueAnimator.INFINITE
+                    start()
+                }
+            }
+            .start()
+
+        sparkleFadeAnimator = ValueAnimator.ofFloat(0f, 1f).apply {
+            duration = 480
+            addUpdateListener {
+                sparkleDust.overallAlpha = it.animatedValue as Float
+            }
             start()
         }
-
-        sparkleDust.animate()
-            .alpha(1f)
-            .setDuration(300)
-            .start()
 
         var lastFrameTime = 0L
         glowShiftAnimator = ValueAnimator.ofFloat(0f, 1f).apply {
@@ -687,7 +929,7 @@ class AiWritingToolsView @JvmOverloads constructor(
             repeatCount = ValueAnimator.INFINITE
             repeatMode = ValueAnimator.RESTART
             addUpdateListener {
-                if (!isAttachedToWindow || windowVisibility != View.VISIBLE || !glowBorder.isShown) {
+                if (!isAttachedToWindow) {
                     stopGlowAnimation(immediate = true)
                     return@addUpdateListener
                 }
@@ -736,6 +978,8 @@ class AiWritingToolsView @JvmOverloads constructor(
         glowAnimator = null
         glowShiftAnimator?.cancel()
         glowShiftAnimator = null
+        sparkleFadeAnimator?.cancel()
+        sparkleFadeAnimator = null
 
         if (immediate) {
             glowBorder.animate().cancel()
@@ -745,27 +989,34 @@ class AiWritingToolsView @JvmOverloads constructor(
             glowBorder.setLayerType(View.LAYER_TYPE_NONE, null)
             if (::sparkleDust.isInitialized) {
                 sparkleDust.animate().cancel()
-                sparkleDust.alpha = 0f
+                sparkleDust.stopDustAnimation()
+                sparkleDust.overallAlpha = 0f
+                sparkleDust.alpha = 1f
                 sparkleDust.visibility = View.GONE
-                sparkleDust.setLayerType(View.LAYER_TYPE_NONE, null)
             }
             return
         }
 
         if (::sparkleDust.isInitialized) {
-            sparkleDust.animate()
-                .alpha(0f)
-                .setDuration(300)
-                .withEndAction {
-                    sparkleDust.visibility = View.GONE
-                    sparkleDust.setLayerType(View.LAYER_TYPE_NONE, null)
+            val startAlpha = sparkleDust.overallAlpha
+            sparkleFadeAnimator = ValueAnimator.ofFloat(startAlpha, 0f).apply {
+                duration = GLOW_FADE_OUT_MS
+                addUpdateListener {
+                    sparkleDust.overallAlpha = it.animatedValue as Float
                 }
-                .start()
+                addListener(object : AnimatorListenerAdapter() {
+                    override fun onAnimationEnd(animation: Animator) {
+                        sparkleDust.stopDustAnimation()
+                        sparkleDust.visibility = View.GONE
+                    }
+                })
+                start()
+            }
         }
 
         glowBorder.animate()
             .alpha(0f)
-            .setDuration(300)
+            .setDuration(GLOW_FADE_OUT_MS)
             .withEndAction {
                 glowBorder.visibility = View.GONE
                 glowBorder.background = null

@@ -1188,4 +1188,7 @@ New dictionary:
     <!-- new strings should go above the section for gesture data gathering -->
     <string name="no_recent_items">No recent items</string>
     <string name="no_results_found">No results found</string>
+    <!-- AI Writing Tools result card button labels -->
+    <string name="ai_use_this">Use this</string>
+    <string name="ai_applied">Applied</string>
 </resources>

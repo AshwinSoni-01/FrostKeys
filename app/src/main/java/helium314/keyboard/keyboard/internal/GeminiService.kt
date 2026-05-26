@@ -31,7 +31,6 @@ object GeminiService : SharedPreferences.OnSharedPreferenceChangeListener {
     private var generationInFlight = false
     private var activeGenerationId = 0L
     @Volatile private var quotaCooldownUntilMs = 0L
-    @Volatile private var quotaCooldownMessage: String? = null
 
     fun init(context: Context) {
         if (isInitialized) return
@@ -222,16 +221,14 @@ object GeminiService : SharedPreferences.OnSharedPreferenceChangeListener {
         val remainingMs = quotaCooldownUntilMs - System.currentTimeMillis()
         if (remainingMs <= 0L) {
             quotaCooldownUntilMs = 0L
-            quotaCooldownMessage = null
             return null
         }
-        return quotaCooldownMessage ?: quotaMessageForDelay(remainingMs)
+        return quotaMessageForDelay(remainingMs)
     }
 
     private fun setQuotaCooldown(delayMs: Long) {
         val safeDelayMs = delayMs.coerceAtLeast(1_000L)
         quotaCooldownUntilMs = System.currentTimeMillis() + safeDelayMs
-        quotaCooldownMessage = quotaMessageForDelay(safeDelayMs)
     }
 
     private fun quotaMessageForDelay(delayMs: Long): String {

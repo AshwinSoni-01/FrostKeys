@@ -1,13 +1,11 @@
 package helium314.keyboard.keyboard.internal
 
 import android.content.Context
-import android.graphics.BlendMode
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
-import android.graphics.PorterDuff
-import android.graphics.PorterDuffXfermode
-import android.os.Build
+import android.graphics.Path
+import android.graphics.RectF
 import android.os.SystemClock
 import android.util.AttributeSet
 import android.view.View
@@ -56,6 +54,8 @@ class SparkleDustView @JvmOverloads constructor(
 
     private val ambientDust = mutableListOf<AmbientDustParticle>()
     private val streamDust = mutableListOf<StreamDustParticle>()
+    private val clipPath = Path()
+    private val clipRect = RectF()
 
     private val dustPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.FILL
@@ -63,6 +63,13 @@ class SparkleDustView @JvmOverloads constructor(
 
     private var animationTime = 0f
     private var lastFrameUptimeMs = 0L
+    private var isAnimating = false
+
+    var overallAlpha: Float = 1f
+        set(value) {
+            field = value.coerceIn(0f, 1f)
+            invalidate()
+        }
 
     private val dustColors = listOf(
         DustColor(255, 244, 210), // warm sunlight
@@ -74,13 +81,23 @@ class SparkleDustView @JvmOverloads constructor(
 
     init {
         setWillNotDraw(false)
+    }
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            dustPaint.blendMode = BlendMode.SCREEN
-        } else {
-            @Suppress("DEPRECATION")
-            dustPaint.xfermode = PorterDuffXfermode(PorterDuff.Mode.SCREEN)
+    fun startDustAnimation() {
+        isAnimating = true
+        lastFrameUptimeMs = 0L
+
+        if (width > 0 && height > 0 && (ambientDust.isEmpty() || streamDust.isEmpty())) {
+            createParticles(width.toFloat(), height.toFloat())
         }
+
+        postInvalidateOnAnimation()
+    }
+
+    fun stopDustAnimation() {
+        isAnimating = false
+        lastFrameUptimeMs = 0L
+        invalidate()
     }
 
     override fun onSizeChanged(
@@ -93,7 +110,12 @@ class SparkleDustView @JvmOverloads constructor(
 
         if (w <= 0 || h <= 0) return
 
-        createParticles(w.toFloat(), h.toFloat())
+        if (ambientDust.isEmpty() || streamDust.isEmpty() || kotlin.math.abs(w - oldw) > 10 || kotlin.math.abs(h - oldh) > 10) {
+            createParticles(w.toFloat(), h.toFloat())
+        }
+        if (isAnimating) {
+            postInvalidateOnAnimation()
+        }
     }
 
     private fun createParticles(width: Float, height: Float) {
@@ -138,9 +160,12 @@ class SparkleDustView @JvmOverloads constructor(
         super.onDraw(canvas)
 
         if (width <= 0 || height <= 0) return
-        if (!isShown || windowVisibility != VISIBLE || alpha <= 0f) {
+        if (!isAnimating) {
             lastFrameUptimeMs = 0L
             return
+        }
+        if (ambientDust.isEmpty() || streamDust.isEmpty()) {
+            createParticles(width.toFloat(), height.toFloat())
         }
 
         val now = SystemClock.uptimeMillis()
@@ -156,10 +181,24 @@ class SparkleDustView @JvmOverloads constructor(
         }
         lastFrameUptimeMs = now
 
+        val saveCount = canvas.save()
+        clipRect.set(0f, 0f, width.toFloat(), height.toFloat())
+        clipPath.reset()
+        val cornerRadius = CARD_CORNER_RADIUS_DP * resources.displayMetrics.density
+        clipPath.addRoundRect(clipRect, cornerRadius, cornerRadius, Path.Direction.CW)
+        canvas.clipPath(clipPath)
+
         drawStreamDust(canvas)
         drawAmbientDust(canvas)
 
+        canvas.restoreToCount(saveCount)
+
         postInvalidateDelayed(FRAME_INTERVAL_MS)
+    }
+
+    override fun onDetachedFromWindow() {
+        stopDustAnimation()
+        super.onDetachedFromWindow()
     }
 
     /**
@@ -274,7 +313,7 @@ class SparkleDustView @JvmOverloads constructor(
         alpha: Float,
         color: DustColor
     ) {
-        val finalAlpha = (alpha.coerceIn(0f, 1f) * DUST_ALPHA_BOOST * 255).toInt()
+        val finalAlpha = (alpha.coerceIn(0f, 1f) * DUST_ALPHA_BOOST * 255 * overallAlpha).toInt()
             .coerceIn(0, 255)
 
         dustPaint.color = Color.argb(
@@ -327,5 +366,6 @@ class SparkleDustView @JvmOverloads constructor(
         private const val FRAME_INTERVAL_MS = 33L
         private const val TARGET_FRAME_MS = 16.6667f
         private const val ANIMATION_STEP_PER_FRAME = 0.01f
+        private const val CARD_CORNER_RADIUS_DP = 20f
     }
 }
