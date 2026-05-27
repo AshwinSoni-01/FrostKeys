@@ -394,6 +394,7 @@ class KlipyPalettesView @JvmOverloads constructor(
 
     private fun loadMoreResults() {
         if (isLoadingMore || !hasMorePages || searchQuery.isBlank()) return
+        if (!CloudManager.isFeatureAllowed(context, CloudManager.CloudFeature.KLIPY_MEDIA)) return
         val tabAtRequest = currentTab
         isLoadingMore = true
         currentPage++
@@ -429,6 +430,33 @@ class KlipyPalettesView @JvmOverloads constructor(
                 val isSticker = currentTab == KlipyHistoryDao.TYPE_STICKER
                 val sendGifAsSticker = currentTab == KlipyHistoryDao.TYPE_GIF && shouldSendGifsAsStickers()
                 val sendAsSticker = isSticker || sendGifAsSticker
+
+                val isCloudAllowed = CloudManager.isFeatureAllowed(context, CloudManager.CloudFeature.KLIPY_MEDIA)
+                if (!isCloudAllowed) {
+                    val cacheId = getStickerProcessingCacheId(item.id, isSticker)
+                    val cachedFile = getUsableCachedProcessedStickerFile(cacheId) ?: if (!sendAsSticker) {
+                        val storageDir = if (isSticker) {
+                            File(context.filesDir, "stickers/klipy")
+                        } else {
+                            File(context.cacheDir, "klipy")
+                        }
+                        val suffix = if (isSticker) ".webp" else ".gif"
+                        val file = File(storageDir, "klipy_${item.id}${suffix}")
+                        if (file.exists()) file else null
+                    } else null
+
+                    if (cachedFile != null) {
+                        if (sendAsSticker) {
+                            val contentUri = "content://${context.packageName}.stickercontentprovider/stickers/klipy/${cachedFile.name}".toUri()
+                            getLatinIME()?.commitKlipyContent(contentUri, if (isSticker) "Sticker" else "GIF", "image/webp.wasticker")
+                        } else {
+                            sendNormalGif(cachedFile)
+                        }
+                    } else {
+                        Toast.makeText(context, "Cloud features are disabled. Please enable them in settings.", Toast.LENGTH_LONG).show()
+                    }
+                    return@launch
+                }
 
                 if (sendAsSticker) {
                     val processedFile = getOrStartStickerProcessingJob(item, isSticker).await()
@@ -529,6 +557,9 @@ class KlipyPalettesView @JvmOverloads constructor(
     }
 
     private suspend fun downloadAndPrepareFile(url: String, id: String, isSticker: Boolean): File? {
+        if (!CloudManager.isFeatureAllowed(context, CloudManager.CloudFeature.KLIPY_MEDIA)) {
+            return null
+        }
         val client = CloudManager.client
         val request = Request.Builder().url(url).build()
         return try {
@@ -650,6 +681,15 @@ class KlipyPalettesView @JvmOverloads constructor(
         currentPage = 1
         hasMorePages = true
 
+        if (!CloudManager.isFeatureAllowed(context, CloudManager.CloudFeature.KLIPY_MEDIA)) {
+            loadingIndicator.visibility = View.GONE
+            val activeAdapter = if (tabAtRequest == KlipyHistoryDao.TYPE_GIF) gifsAdapter else stickersAdapter
+            activeAdapter.updateItems(emptyList())
+            emptyState.text = "Cloud features are disabled. Please enable them in settings to search."
+            emptyState.visibility = View.VISIBLE
+            return
+        }
+
         loadingIndicator.visibility = View.VISIBLE
         emptyState.visibility = View.GONE
 
@@ -688,6 +728,9 @@ class KlipyPalettesView @JvmOverloads constructor(
     }
 
     private fun fetchSearchResults(query: String, page: Int = 1, tab: String = currentTab): Pair<List<KlipyItem>, Boolean> {
+        if (!CloudManager.isFeatureAllowed(context, CloudManager.CloudFeature.KLIPY_MEDIA)) {
+            return Pair(emptyList(), false)
+        }
         val apiKey = CloudManager.getKlipyApiKey(context)
         val endpoint = if (tab == KlipyHistoryDao.TYPE_GIF) "gifs" else "stickers"
 

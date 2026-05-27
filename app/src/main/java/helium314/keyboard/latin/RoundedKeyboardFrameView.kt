@@ -92,6 +92,7 @@ class RoundedKeyboardFrameView @JvmOverloads constructor(
     }
 
     private fun shouldDrawStaticDust(): Boolean {
+        if (Defaults.LIMIT_EXPENSIVE_RENDERING) return false
         val isFrosted = runCatching { Settings.getValues()?.mColors?.isFrosted == true }.getOrDefault(false)
         return isFrosted && staticDustEnabled()
     }

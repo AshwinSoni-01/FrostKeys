@@ -1,12 +1,20 @@
 // SPDX-License-Identifier: GPL-3.0-only
 package helium314.keyboard.settings.screens
-
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.IconButton
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.draw.scale
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -92,8 +100,25 @@ fun MainSettingsScreen(
         val showDataGathering = remember {
             JniUtils.sHaveGestureLib && System.currentTimeMillis() < END_DATE_EPOCH_MILLIS + TWO_WEEKS_IN_MILLIS
         }
+        val ctx = LocalContext.current
+        val b = (ctx.getActivity() as? SettingsActivity)?.prefChanged?.collectAsState()
+        val telegramJoined = remember(b?.value) {
+            ctx.prefs().getBoolean("pref_telegram_joined", false)
+        }
         Scaffold(contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom)) { innerPadding ->
             LazyColumn(contentPadding = innerPadding) {
+                if (!telegramJoined) {
+                    item("telegram_invite") {
+                        TelegramInviteCard(
+                            onJoinClick = {
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/FrostKeys"))
+                                ctx.startActivity(intent)
+                                SettingsActivity.clickedTelegramJoin = true
+                            }
+                        )
+                    }
+                }
+
                 item("quick_setup") {
                     QuickSetupCard(
                         onClickGestureTyping = onClickGestureTyping,
@@ -357,6 +382,57 @@ private fun QuickSetupStep(
             )
         } else {
             NextScreenIcon()
+        }
+    }
+}
+@Composable
+private fun TelegramInviteCard(
+    onJoinClick: () -> Unit
+) {
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = Color(0xFF229ED9)
+        ),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 0.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { onJoinClick() }
+                .padding(16.dp)
+        ) {
+            Icon(
+                painter = painterResource(R.drawable.ic_telegram_white),
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier.size(36.dp)
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Join our Telegram Channel",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = "Get announcements, sneak peeks, and share ideas! Tap here to join.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color.White.copy(alpha = 0.85f)
+                )
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+            Icon(
+                painter = painterResource(R.drawable.ic_arrow_left),
+                contentDescription = null,
+                tint = Color.White.copy(alpha = 0.8f),
+                modifier = (if (LocalLayoutDirection.current == LayoutDirection.Ltr) Modifier.scale(-1f, 1f) else Modifier)
+                    .size(20.dp)
+            )
         }
     }
 }

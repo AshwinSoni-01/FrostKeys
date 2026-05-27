@@ -144,6 +144,7 @@ class AiWritingToolsView @JvmOverloads constructor(
             }
 
             fun playAppliedFeedback(accentColor: Int) {
+                if (helium314.keyboard.latin.settings.Defaults.LIMIT_EXPENSIVE_RENDERING) return
                 resetAppliedFeedback()
 
                 appliedOverlay.background = createAppliedOverlayBackground(accentColor)
@@ -262,7 +263,8 @@ class AiWritingToolsView @JvmOverloads constructor(
 
             holder.cancelTextReveal()
             holder.resetAppliedFeedback()
-            val shouldRevealText = resultRevealGeneration == generationSequence &&
+            val shouldRevealText = !helium314.keyboard.latin.settings.Defaults.LIMIT_EXPENSIVE_RENDERING &&
+                    resultRevealGeneration == generationSequence &&
                     !isThinking &&
                     !isError &&
                     !isPlaceholder &&
@@ -796,7 +798,12 @@ class AiWritingToolsView @JvmOverloads constructor(
                 if (exception != null) {
                     resultRevealGeneration = 0L
                     revealedResultPositions.clear()
-                    aiVariations = listOf("Error: ${exception.message}", "", "")
+                    val displayMessage = if (exception is SecurityException || exception.message?.contains("Gatekeeper", ignoreCase = true) == true) {
+                        "Cloud features are disabled. Please enable them in settings to use Ai writing tools"
+                    } else {
+                        "Error: ${exception.message}"
+                    }
+                    aiVariations = listOf(displayMessage, "", "")
                     copyButton.isEnabled = false
                 } else if (result != null) {
                     val rawVariations = result.split(DELIMITER)
@@ -872,6 +879,7 @@ class AiWritingToolsView @JvmOverloads constructor(
     }
 
     private fun startGlowAnimation() {
+        if (helium314.keyboard.latin.settings.Defaults.LIMIT_EXPENSIVE_RENDERING) return
         if (!::glowBorder.isInitialized || !::sparkleDust.isInitialized) return
 
         glowBorder.animate().cancel()

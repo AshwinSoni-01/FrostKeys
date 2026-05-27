@@ -625,7 +625,7 @@ public class KeyboardView extends View {
                     paint.setColor(key.selectTextColor(params) | 0xFF000000); // ignore alpha for emojis (though
                                                                               // actually color isn't applied anyway and
                                                                               // we could just set white)
-                else if (mColors.isFrosted() && (key.hasActionKeyBackground() || isSpecialKey(key)))
+                else if (mColors.isFrosted())
                     paint.setColor(mColors.get(ColorType.KEY_TEXT));
                 else if (key.hasActionKeyBackground())
                     paint.setColor(mColors.get(ColorType.ACTION_KEY_ICON));
@@ -657,7 +657,7 @@ public class KeyboardView extends View {
         if (hintLabel != null && mShowsHints) {
             paint.setTextSize(key.selectHintTextSize(params) * mFontSizeMultiplier); // maybe take sqrt to not have such
                                                                                      // extreme changes?
-            paint.setColor(key.selectHintTextColor(params));
+            paint.setColor(mColors.isFrosted() ? mColors.get(ColorType.KEY_HINT_TEXT) : key.selectHintTextColor(params));
             // TODO: Should add a way to specify type face for hint letters
             paint.setTypeface(KeyboardTypeface.resolve(hintLabel, Typeface.DEFAULT_BOLD));
             blendAlpha(paint, params.mAnimAlpha);
@@ -749,7 +749,7 @@ public class KeyboardView extends View {
         final float hintBaseline = paint.ascent();
         paint.setTypeface(params.mTypeface);
         paint.setTextSize(params.mHintLetterSize);
-        paint.setColor(params.mHintLabelColor);
+        paint.setColor(mColors.isFrosted() ? mColors.get(ColorType.KEY_TEXT) : params.mHintLabelColor);
         paint.setTextAlign(Align.CENTER);
         if (mColors.getThemeStyle().equals(STYLE_ROUNDED) || mColors.getThemeStyle().equals(STYLE_CIRCLE)) {
             if (key.getBackgroundType() == Key.BACKGROUND_TYPE_SPACEBAR)
@@ -780,7 +780,7 @@ public class KeyboardView extends View {
             paint.setTypeface(KeyboardTypeface.resolve(null, mKeyDrawParams.mTypeface));
             paint.setTextSize(mKeyDrawParams.mLabelSize);
         } else {
-            paint.setColor(key.selectTextColor(mKeyDrawParams));
+            paint.setColor(mColors.isFrosted() ? mColors.get(ColorType.KEY_TEXT) : key.selectTextColor(mKeyDrawParams));
             paint.setTypeface(KeyboardTypeface.resolve(key.getLabel(), key.selectTypeface(mKeyDrawParams)));
             paint.setTextSize(key.selectTextSize(mKeyDrawParams) * mFontSizeMultiplier);
         }

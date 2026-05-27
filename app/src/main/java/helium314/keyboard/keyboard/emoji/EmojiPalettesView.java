@@ -263,6 +263,13 @@ public final class EmojiPalettesView extends LinearLayout
                final EditorInfo editorInfo, final KeyboardActionListener keyboardActionListener) {
         initialize();
 
+        // Reset scroll position to the top every time the emoji panel is opened
+        if (mPager != null) {
+            mPager.scrollToPosition(0);
+        }
+        // Also reset the selected category back to the first one (Recents)
+        setCurrentCategoryId(mEmojiCategory.getCurrentCategoryId(), true);
+
         setupBottomRowKeyboard(editorInfo, keyboardActionListener);
         final KeyDrawParams params = new KeyDrawParams();
         params.updateParams(mEmojiLayoutParams.getBottomRowKeyboardHeight(), keyVisualAttr);

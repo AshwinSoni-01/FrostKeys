@@ -213,4 +213,6 @@ object Defaults {
     const val PREF_FROSTED_DUST_ENABLED = true
     const val PREF_FROSTED_DUST_ALPHA = 5f
     const val PREF_FROSTED_DUST_ALPHA_NIGHT = 5f
+
+    const val LIMIT_EXPENSIVE_RENDERING = true
 }

@@ -521,41 +521,43 @@ fun FrostedGlassAdjustDialog(
                             )
                         }
 
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(
-                                text = stringResource(R.string.pref_frosted_dust_enabled_title),
-                                style = MaterialTheme.typography.bodyMedium,
-                                modifier = Modifier.weight(1f)
-                            )
-                            Switch(
-                                checked = snapshot.dustEnabled,
-                                onCheckedChange = { checked ->
-                                    updateSparklesEnabled(checked)
-                                }
-                            )
-                        }
+                        if (!Defaults.LIMIT_EXPENSIVE_RENDERING) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.pref_frosted_dust_enabled_title),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                Switch(
+                                    checked = snapshot.dustEnabled,
+                                    onCheckedChange = { checked ->
+                                        updateSparklesEnabled(checked)
+                                    }
+                                )
+                            }
 
-                        Column(modifier = Modifier.padding(vertical = 8.dp)) {
-                            Text(
-                                text = "${stringResource(R.string.pref_frosted_dust_alpha_title)}: ${
-                                    String.format(java.util.Locale.US, "%.1f", currentValues.dustAlpha)
-                                }",
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-                            Slider(
-                                value = currentValues.dustAlpha,
-                                onValueChange = { newValue ->
-                                    updateCurrentProfile { it.copy(dustAlpha = newValue.coerceIn(1f, 10f)) }
-                                },
-                                valueRange = 1f..10f,
-                                enabled = snapshot.dustEnabled
-                            )
+                            Column(modifier = Modifier.padding(vertical = 8.dp)) {
+                                Text(
+                                    text = "${stringResource(R.string.pref_frosted_dust_alpha_title)}: ${
+                                        String.format(java.util.Locale.US, "%.1f", currentValues.dustAlpha)
+                                    }",
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                                Slider(
+                                    value = currentValues.dustAlpha,
+                                    onValueChange = { newValue ->
+                                        updateCurrentProfile { it.copy(dustAlpha = newValue.coerceIn(1f, 10f)) }
+                                    },
+                                    valueRange = 1f..10f,
+                                    enabled = snapshot.dustEnabled
+                                )
+                            }
                         }
 
                         Spacer(modifier = Modifier.height(12.dp))

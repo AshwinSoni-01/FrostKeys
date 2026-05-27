@@ -19,7 +19,8 @@ object CloudManager {
 
     enum class CloudFeature {
         TEST_CONNECTION,
-        AI_WRITING_TOOLS
+        AI_WRITING_TOOLS,
+        KLIPY_MEDIA
     }
 
     fun isFeatureAllowed(context: Context, feature: CloudFeature): Boolean {
