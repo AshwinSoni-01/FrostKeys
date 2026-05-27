@@ -57,6 +57,7 @@ fun AboutScreen(
         SettingsWithoutKey.HIDDEN_FEATURES,
         SettingsWithoutKey.GITHUB_WIKI,
         SettingsWithoutKey.GITHUB,
+        SettingsWithoutKey.TELEGRAM,
         SettingsWithoutKey.SAVE_LOG,
     )
     SearchSettingsScreen(
@@ -157,6 +158,20 @@ fun createAboutSettings(context: Context) = listOf(
                 ctx.startActivity(intent)
             },
             icon = R.drawable.ic_settings_about_github
+        )
+    },
+    Setting(context, SettingsWithoutKey.TELEGRAM, R.string.join_telegram_community) {
+        val ctx = LocalContext.current
+        Preference(
+            name = it.title,
+            description = it.description,
+            onClick = {
+                val intent = Intent()
+                intent.data = "https://t.me/FrostKeys".toUri()
+                intent.action = Intent.ACTION_VIEW
+                ctx.startActivity(intent)
+            },
+            icon = R.drawable.ic_telegram
         )
     },
     Setting(context, SettingsWithoutKey.SAVE_LOG, R.string.save_log) { setting ->

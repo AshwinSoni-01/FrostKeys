@@ -1337,6 +1337,10 @@ public class LatinIME extends InputMethodService implements
 
         // Release keyboard buffers and stop active panels without forcing a process-wide GC.
         deallocateMemory();
+
+        // Reset to the main alphabet keyboard so that reopening always shows the ABC view
+        // instead of whatever panel (emoji, clipboard, AI tools, klipy) was active.
+        mKeyboardSwitcher.setAlphabetKeyboard();
     }
 
     void onFinishInputInternal() {

@@ -95,8 +95,8 @@
                 android:gravity="center"
                 android:hapticFeedbackEnabled="false"
                 android:soundEffectsEnabled="false"
-                android:clipChildren="false"
-                android:clipToPadding="false"
+                android:clipChildren="true"
+                android:clipToPadding="true"
                 android:minWidth="0dp"
                 style="?attr/suggestionWordStyle">
             </LinearLayout>

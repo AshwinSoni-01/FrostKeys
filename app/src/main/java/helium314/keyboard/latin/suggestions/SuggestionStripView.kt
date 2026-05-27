@@ -139,6 +139,7 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
     private val pinnedKeys: ViewGroup = findViewById(R.id.pinned_keys_container)
     private val suggestionsStrip: ViewGroup = findViewById(R.id.suggestions_strip)
     private val persistentToolbarKey: ImageButton = findViewById(R.id.persistent_toolbar_key)
+    private val accessPointTriggerBtn: ImageButton = findViewById(R.id.access_point_trigger_btn)
     private val toolbarExpandKey: ImageButton? = null
     private val incognitoIcon = KeyboardIconsSet.instance.getNewDrawable(ToolbarKey.INCOGNITO.name, context)
     private val toolbarArrowIcon = KeyboardIconsSet.instance.getNewDrawable(KeyboardIconsSet.NAME_TOOLBAR_KEY, context)
@@ -258,6 +259,8 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
         }
 
         toolbarExpandKey?.scaleX = direction.toFloat()
+        // Restore access point icon when returning to normal state
+        setAccessPointIcon(isMenuOpen = false)
     }
 
     fun showPinnedToolbarKeys() {
@@ -266,6 +269,8 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
         suggestionsStrip.isVisible = false
         suggestionsChipScroll.isVisible = false
         pinnedKeys.isVisible = pinnedKeys.childCount > 0
+        // Swap access point icon to back arrow while menu is open
+        setAccessPointIcon(isMenuOpen = true)
     }
 
     fun setSuggestions(suggestions: SuggestedWords, isRtlLanguage: Boolean) {
@@ -387,6 +392,9 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
         AudioAndHapticFeedbackManager.getInstance().performHapticAndAudioFeedback(KeyCode.NOT_SPECIFIED, this, HapticEvent.KEY_PRESS)
         if (view.id == R.id.access_point_trigger_btn) {
             KeyboardSwitcher.getInstance().onToggleKeyboard(KeyboardSwitcher.KeyboardSwitchState.ACCESS_POINT)
+            // Update icon based on resulting state (back arrow when menu is open, grid when closed)
+            val isMenuOpen = KeyboardSwitcher.getInstance().isShowingAccessPointMenu
+            setAccessPointIcon(isMenuOpen = isMenuOpen)
             return
         }
         val tag = view.tag
@@ -572,6 +580,8 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
         populatePinnedKeys()
         updateVoiceKey()
         updateSuggestionContainersVisibility(true)
+        // Restore access point icon to default grid when menu is closed
+        setAccessPointIcon(isMenuOpen = false)
     }
 
     private fun shouldUseChipSuggestions(words: SuggestedWords = suggestedWords): Boolean {
@@ -764,22 +774,26 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
         updateSuggestionContainersVisibility(true)
     }
 
-    private fun pinnedSlotLayoutParams(width: Int) =
-        LinearLayout.LayoutParams(
-            width,
-            LinearLayout.LayoutParams.MATCH_PARENT
-        )
+    private fun pinnedSlotLayoutParams(width: Int): LinearLayout.LayoutParams {
+        val stripHeight = resources.getDimensionPixelSize(R.dimen.config_suggestions_strip_height)
+        val circleVisualSize = 40.dpToPx(resources) - 2 * 3.dpToPx(resources) // matches circle buttons: 40dp - 3dp inset each side = 34dp
+        return LinearLayout.LayoutParams(width, circleVisualSize).apply {
+            val verticalMargin = (stripHeight - circleVisualSize) / 2
+            topMargin = verticalMargin
+            bottomMargin = verticalMargin
+        }
+    }
 
     private fun pinnedButtonWidth(slotCount: Int): Int {
-        val stripHeight = resources.getDimensionPixelSize(R.dimen.config_suggestions_strip_height)
-        val desiredWidth = (stripHeight * 1.32f).toInt()
+        val circleVisualSize = 40.dpToPx(resources) - 2 * 3.dpToPx(resources) // 34dp to match circle buttons
+        val desiredWidth = (circleVisualSize * 1.58f).toInt()
         val availableWidth = pinnedKeys.width.takeIf { it > 0 } ?: suggestionsMiddleContainer.width
         if (availableWidth <= 0) return desiredWidth
         val visibleSlotCount = slotCount.coerceIn(1, MAX_PINNED_TOOLBAR_KEYS)
-        val reservedGapWidth = 6.dpToPx(resources) * (visibleSlotCount + 1)
-        val widthAfterGaps = (availableWidth - reservedGapWidth).coerceAtLeast(availableWidth / visibleSlotCount)
-        val maxWidthForSlots = (widthAfterGaps / visibleSlotCount).coerceAtLeast(1)
-        val minimumWidth = 36.dpToPx(resources).coerceAtMost(maxWidthForSlots)
+        val totalGaps = visibleSlotCount + 1
+        val reservedGapWidth = 4.dpToPx(resources) * totalGaps
+        val maxWidthForSlots = ((availableWidth - reservedGapWidth) / visibleSlotCount).coerceAtLeast(1)
+        val minimumWidth = 32.dpToPx(resources).coerceAtMost(maxWidthForSlots)
         return desiredWidth.coerceAtMost(maxWidthForSlots).coerceAtLeast(minimumWidth)
     }
 
@@ -856,13 +870,13 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
     }
 
     private fun createToolbarPillBackground(colors: Colors): Drawable {
-        val verticalInset = 6.dpToPx(resources) // (46dp strip - 40dp layout) / 2 + 3dp circle inset = 6dp
+        val circleVisualSize = 40.dpToPx(resources) - 2 * 3.dpToPx(resources) // 34dp to match circle buttons
         val horizontalInset = 2.dpToPx(resources)
-        val contentHeight = resources.getDimensionPixelSize(R.dimen.config_suggestions_strip_height) - (verticalInset * 2)
+        val verticalInset = 0 // height is now controlled by layout params, no extra inset needed
         val cornerRadius = when (colors.themeStyle) {
             KeyboardTheme.STYLE_HOLO -> 0f
             KeyboardTheme.STYLE_MATERIAL -> 8.dpToPx(resources).toFloat()
-            KeyboardTheme.STYLE_ROUNDED, KeyboardTheme.STYLE_CIRCLE -> contentHeight / 2f
+            KeyboardTheme.STYLE_ROUNDED, KeyboardTheme.STYLE_CIRCLE -> circleVisualSize / 2f
             else -> 8.dpToPx(resources).toFloat()
         }
         val background = GradientDrawable().apply {
@@ -889,6 +903,18 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
         view.setOnLongClickListener(this)
         colors.setColor(view, ColorType.TOOL_BAR_KEY)
         colors.setBackground(view, ColorType.STRIP_BACKGROUND)
+    }
+
+    private fun setAccessPointIcon(isMenuOpen: Boolean) {
+        val colors = Settings.getValues().mColors
+        val drawable = if (isMenuOpen) {
+            androidx.core.content.ContextCompat.getDrawable(context, R.drawable.ic_arrow_back)?.mutate()
+        } else {
+            androidx.core.content.ContextCompat.getDrawable(context, R.drawable.ic_access_point_grid)?.mutate()
+        } ?: return
+        accessPointTriggerBtn.setImageDrawable(drawable)
+        applyAlphabetIconTint(accessPointTriggerBtn, colors)
+        applySuggestionStripButtonIconSizing(accessPointTriggerBtn)
     }
 
     companion object {

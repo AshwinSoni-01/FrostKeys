@@ -40,6 +40,12 @@ ifeq ($(TARGET_ARCH), x86)
     LOCAL_CFLAGS += -mstackrealign
 endif # x86
 
+# Workaround for clang 19 compiler crash on armv7 (Thumb-2 vectorizer signal failure)
+ifeq ($(TARGET_ARCH_ABI), armeabi-v7a)
+    LOCAL_ARM_MODE := arm
+    LOCAL_CFLAGS += -fno-vectorize -fno-slp-vectorize
+endif
+
 include $(LOCAL_PATH)/NativeFileList.mk
 
 LOCAL_SRC_FILES := \

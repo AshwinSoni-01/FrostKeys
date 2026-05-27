@@ -832,6 +832,8 @@ New dictionary:
     <string name="version">Version</string>
     <!-- github repo link for about screen -->
     <string name="about_github_link">View on GitHub</string>
+    <!-- link to Telegram channel in about screen -->
+    <string name="join_telegram_community">Join Telegram community</string>
     <!-- link to the wiki for about screen -->
     <string name="about_wiki_link">Go to Wiki</string>
     <!-- description for wiki link -->

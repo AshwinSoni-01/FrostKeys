@@ -38,13 +38,18 @@ android {
         minSdk = 21
         targetSdk = 36
         versionCode = providers.of(GitCommitCountValueSource::class.java) {}.get()
-        versionName = "2.5.2"
+        versionName = "2.5.3"
         buildConfigField("String", "CONTENT_PROVIDER_AUTHORITY", "\"${applicationId}.stickercontentprovider\"")
         manifestPlaceholders["stickerAuthority"] = "${applicationId}.stickercontentprovider"
         manifestPlaceholders["stickerProviderAuthority"] = "${applicationId}.stickercontentprovider"
         ndk {
             abiFilters.clear()
             abiFilters.addAll(listOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64"))
+        }
+        externalNativeBuild {
+            ndkBuild {
+                arguments.add("-j1")
+            }
         }
         proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
     }
