@@ -86,6 +86,7 @@ public final class Settings implements SharedPreferences.OnSharedPreferenceChang
     public static final String PREF_FROSTED_DUST_ALPHA = "pref_frosted_dust_alpha";
     public static final String PREF_FROSTED_DUST_ALPHA_NIGHT = "pref_frosted_dust_alpha_night";
     public static final String PREF_FROSTED_GLASS_TRIGGER = "frosted_glass_trigger";
+    public static final String PREF_BLUR_RENDER_OVERRIDE = "blur_render_override";
 
     public static final String PREF_CUSTOM_ICON_NAMES = "custom_icon_names";
     public static final String PREF_TOOLBAR_CUSTOM_KEY_CODES = "toolbar_custom_key_codes";
@@ -266,6 +267,7 @@ public final class Settings implements SharedPreferences.OnSharedPreferenceChang
         add(PREF_FROSTED_DUST_ALPHA);
         add(PREF_FROSTED_DUST_ALPHA_NIGHT);
         add(PREF_FROSTED_GLASS_TRIGGER);
+        add(PREF_BLUR_RENDER_OVERRIDE);
     }};
 
     public static Settings getInstance() {

@@ -18,6 +18,7 @@ import helium314.keyboard.latin.utils.ResourceUtils
 import helium314.keyboard.latin.utils.prefs
 import helium314.keyboard.latin.utils.updateSoftInputWindowLayoutParameters
 import helium314.keyboard.settings.SettingsActivity
+import androidx.core.content.ContextCompat
 import androidx.core.graphics.ColorUtils
 import java.lang.reflect.Constructor
 import java.lang.reflect.Field
@@ -173,17 +174,43 @@ object FrostedGlassHelper {
         val isBatterySaver = isBatterySaverMode(service)
         val shouldEnable = enable && !isBatterySaver
 
-        if (Build.MANUFACTURER.equals("samsung", ignoreCase = true)) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                applySamsungSemBlur(window, inputView, shouldEnable)
-            } else {
-                applyDefaultBlur(service, window, inputView, shouldEnable)
-                applySamsungLegacyBlur(window, shouldEnable)
+        val overrideMode = service.prefs().getString(Settings.PREF_BLUR_RENDER_OVERRIDE, "auto")
+
+        if (overrideMode == "force_solid" || !shouldEnable) {
+            applyDefaultBlur(service, window, inputView, false)
+            if (Build.MANUFACTURER.equals("samsung", ignoreCase = true) || overrideMode == "force_samsung") {
+                applySamsungSemBlur(window, inputView, false)
             }
+            Log.i(TAG, "Frosted glass disabled or forced solid. Applied solid fallback tint successfully.")
             return
         }
 
-        applyDefaultBlur(service, window, inputView, shouldEnable)
+        when (overrideMode) {
+            "force_native" -> {
+                applyDefaultBlur(service, window, inputView, true)
+                Log.i(TAG, "OVERRIDE: Force Native Android Blur applied successfully via window.setBackgroundBlurRadius.")
+            }
+            "force_samsung" -> {
+                applySamsungSemBlur(window, inputView, true)
+                Log.i(TAG, "OVERRIDE: Force Samsung Proprietary Blur applied successfully via SemBlurInfo.")
+            }
+            else -> {
+                // "auto" mode - The existing logic
+                if (Build.MANUFACTURER.equals("samsung", ignoreCase = true)) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        applySamsungSemBlur(window, inputView, true)
+                        Log.i(TAG, "AUTO: Samsung device detected (SDK >= S). Applied SemBlurInfo successfully.")
+                    } else {
+                        applyDefaultBlur(service, window, inputView, true)
+                        applySamsungLegacyBlur(window, true)
+                        Log.i(TAG, "AUTO: Older Samsung device detected. Applied Legacy semAddExtensionFlags successfully.")
+                    }
+                } else {
+                    applyDefaultBlur(service, window, inputView, true)
+                    Log.i(TAG, "AUTO: Non-Samsung device detected. Applied Native Android window blur successfully.")
+                }
+            }
+        }
     }
 
     private fun constrainImeWindowToKeyboardBounds(service: InputMethodService, window: Window, inputView: View?) {
@@ -245,7 +272,7 @@ object FrostedGlassHelper {
 
         try {
             val radius = blurRadius(context)
-            val tint = windowTint(context, blursEnabled = true)
+            val tint = samsungBlurTint(context)
             val candidates = SemBlurInfoReflect.cachedCandidates
 
             for (mode in candidates) {
@@ -267,6 +294,7 @@ object FrostedGlassHelper {
                     val blurInfo = SemBlurInfoReflect.buildMethod!!.invoke(builder)
                     target.setBackgroundColor(Color.TRANSPARENT)
                     SemBlurInfoReflect.semSetBlurInfoMethod!!.invoke(target, blurInfo)
+                    Log.d(TAG, "semSetBlurInfo successfully called without throwing an exception.")
                     Log.d(TAG, "Applied SemBlurInfo mode=${mode.name}(${mode.value}) radius=$radius target=${target.javaClass.simpleName} size=${target.width}x${target.height}")
                     return
                 } catch (modeError: Throwable) {
@@ -321,6 +349,7 @@ object FrostedGlassHelper {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             val targetRadius = if (enable) blurRadius(service) else 0
             window.setBackgroundBlurRadius(targetRadius)
+            Log.d(TAG, "window.setBackgroundBlurRadius successfully called without throwing an exception.")
 
             val blurFlag = WindowManager.LayoutParams.FLAG_BLUR_BEHIND
             val hasBlurFlag = (params.flags and blurFlag) != 0
@@ -375,6 +404,48 @@ object FrostedGlassHelper {
             isNight -> DARK_TINT_WITHOUT_BLUR
             else -> LIGHT_TINT_WITHOUT_BLUR
         }
+    }
+
+    /**
+     * Computes the Samsung SemBlurInfo tint overlay color from user preferences.
+     * This ONLY affects the color/alpha of the overlay on top of the blurred content.
+     * It does NOT affect the blur mechanism itself (mode, radius, semSetBlurInfo).
+     */
+    private fun samsungBlurTint(context: Context): Int {
+        val isNight = isNight(context)
+        val prefs = context.prefs()
+
+        // Read user's background transparency setting (0-255 alpha)
+        val bgTransparency = KeyboardTheme.livePreviewValues?.bgTransparency
+            ?: if (isNight) prefs.getInt(Settings.PREF_FROSTED_BG_TRANSPARENCY_NIGHT, Defaults.PREF_FROSTED_BG_TRANSPARENCY_NIGHT)
+            else prefs.getInt(Settings.PREF_FROSTED_BG_TRANSPARENCY, Defaults.PREF_FROSTED_BG_TRANSPARENCY)
+
+        // Read user's color blend setting (0-200, percentage)
+        val colorBlendPct = (KeyboardTheme.livePreviewValues?.colorBlend
+            ?: if (isNight) prefs.getInt(Settings.PREF_FROSTED_COLOR_BLEND_NIGHT, Defaults.PREF_FROSTED_COLOR_BLEND_NIGHT)
+            else prefs.getInt(Settings.PREF_FROSTED_COLOR_BLEND, Defaults.PREF_FROSTED_COLOR_BLEND)) / 100f
+
+        // Base tint: black for dark mode, white for light mode
+        val baseColor = if (isNight) Color.BLACK else Color.WHITE
+
+        // Blend with system wallpaper/accent color if the user has color blend > 0
+        val blendedColor = if (colorBlendPct > 0f) {
+            try {
+                val accentRes = if (isNight) android.R.color.system_accent1_700
+                    else android.R.color.system_accent1_300
+                val accentColor = ContextCompat.getColor(context, accentRes)
+                ColorUtils.blendARGB(baseColor, accentColor, colorBlendPct.coerceIn(0f, 1f))
+            } catch (e: Exception) {
+                Log.w(TAG, "Could not read system accent for Samsung blur tint; using base color", e)
+                baseColor
+            }
+        } else {
+            baseColor
+        }
+
+        // Apply the user's transparency as the alpha of the tint overlay
+        val tintAlpha = bgTransparency.coerceIn(0, 255)
+        return ColorUtils.setAlphaComponent(blendedColor, tintAlpha)
     }
 
     private fun isNight(context: Context): Boolean {

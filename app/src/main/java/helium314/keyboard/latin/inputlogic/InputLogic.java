@@ -2810,4 +2810,10 @@ public final class InputLogic {
             mEmojiDictionaryFacilitator = null;
         }
     }
+
+    public void onDestroy() {
+        finishInput();
+        mInputLogicHandler.onDestroy();
+        closeEmojiDictionary();
+    }
 }

@@ -160,4 +160,11 @@ class InputLogicHandler implements Handler.Callback {
     public void getSuggestedWords(final Runnable callback) {
         mNonUIThreadHandler.obtainMessage(MSG_GET_SUGGESTED_WORDS, callback).sendToTarget();
     }
+
+    public void onDestroy() {
+        mNonUIThreadHandler.removeCallbacksAndMessages(null);
+        if (mNonUIThreadHandler.getLooper() != null) {
+            mNonUIThreadHandler.getLooper().quit();
+        }
+    }
 }

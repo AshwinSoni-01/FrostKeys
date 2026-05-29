@@ -455,6 +455,10 @@
     <string name="custom_font">Set custom font from file</string>
     <!-- Title of the setting for adding / removing custom font file used only for emojis -->
     <string name="custom_emoji_font">Set custom emoji font from file</string>
+    <!-- Safeguard warning when loading a potentially invalid font file -->
+    <string name="custom_font_safeguard_warning">This font file does not seem to support standard letters (like \'a\') or numbers.\n\nIf you load it as the main keyboard font, your key labels may appear completely blank.\n\nIf this is an emoji-only or icon-only font, please load it under \"Set custom emoji font from file\" instead.\n\nDo you still want to load this font?</string>
+    <!-- Safeguard warning when loading a standard text font as custom emoji font -->
+    <string name="custom_emoji_font_safeguard_warning">This font file seems to support standard letters and numbers.\n\nThis usually means it is a regular text font rather than a custom emoji font.\n\nIf you want to set the main keyboard font, please load it under \"Set custom font from file\" instead.\n\nDo you still want to load this as your custom emoji font?</string>
     <!-- Description for English (UK) keyboard subtype
          (UK) should be an abbreviation of United Kingdom. -->
     <string name="subtype_en_GB">English (UK)</string>
@@ -1193,4 +1197,27 @@ New dictionary:
     <!-- AI Writing Tools result card button labels -->
     <string name="ai_use_this">Use this</string>
     <string name="ai_applied">Applied</string>
+
+    <!-- Advanced developer toggle to override frosted glass blur rendering method -->
+    <string name="pref_blur_render_override_title">Override blur rendering method</string>
+    <string name="pref_blur_render_override_summary">Manually override the frosted glass blur rendering method or force fallback solid tint.</string>
+
+    <string name="blur_render_override_auto_entry">Auto (Default)</string>
+    <string name="blur_render_override_force_native_entry">Force Native Android Blur</string>
+    <string name="blur_render_override_force_samsung_entry">Force Samsung Proprietary Blur</string>
+    <string name="blur_render_override_force_solid_entry">Force Solid Fallback</string>
+
+    <string-array name="pref_blur_render_override_entries">
+        <item>Auto (Default)</item>
+        <item>Force Native Android Blur</item>
+        <item>Force Samsung Proprietary Blur</item>
+        <item>Force Solid Fallback</item>
+    </string-array>
+
+    <string-array name="pref_blur_render_override_values">
+        <item>auto</item>
+        <item>force_native</item>
+        <item>force_samsung</item>
+        <item>force_solid</item>
+    </string-array>
 </resources>

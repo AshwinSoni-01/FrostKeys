@@ -91,6 +91,7 @@ fun AdvancedSettingsScreen(
             SettingsWithoutKey.DEBUG_SETTINGS else null,
         R.string.settings_category_experimental,
         Settings.PREF_EMOJI_MAX_SDK,
+        Settings.PREF_BLUR_RENDER_OVERRIDE,
         Settings.PREF_URL_DETECTION,
         if (BuildConfig.BUILD_TYPE != "nouserlib") SettingsWithoutKey.LOAD_GESTURE_LIB else null
     )
@@ -266,6 +267,17 @@ fun createAdvancedSettings(context: Context) = listOf(
                 KeyboardSwitcher.getInstance().setThemeNeedsReload()
             }
         )
+    },
+    Setting(context, Settings.PREF_BLUR_RENDER_OVERRIDE, R.string.pref_blur_render_override_title, R.string.pref_blur_render_override_summary) {
+        val items = listOf(
+            stringResource(R.string.blur_render_override_auto_entry) to "auto",
+            stringResource(R.string.blur_render_override_force_native_entry) to "force_native",
+            stringResource(R.string.blur_render_override_force_samsung_entry) to "force_samsung",
+            stringResource(R.string.blur_render_override_force_solid_entry) to "force_solid"
+        )
+        ListPreference(it, items, Defaults.PREF_BLUR_RENDER_OVERRIDE) {
+            KeyboardSwitcher.getInstance().setThemeNeedsReload()
+        }
     },
     Setting(context, Settings.PREF_URL_DETECTION, R.string.url_detection_title, R.string.url_detection_summary) {
         SwitchPreference(it, Defaults.PREF_URL_DETECTION)

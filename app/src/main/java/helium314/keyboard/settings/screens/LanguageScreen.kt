@@ -70,6 +70,27 @@ fun LanguageScreen(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                androidx.compose.material3.TextButton(
+                    onClick = {
+                        try {
+                            val intent = android.content.Intent(android.provider.Settings.ACTION_INPUT_METHOD_SUBTYPE_SETTINGS).apply {
+                                val imiId = helium314.keyboard.latin.RichInputMethodManager.getInstance().inputMethodInfoOfThisIme.id
+                                putExtra(android.provider.Settings.EXTRA_INPUT_METHOD_ID, imiId)
+                                addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
+                            ctx.startActivity(intent)
+                        } catch (e: Exception) {
+                            Log.e("LanguageScreen", "Failed to launch system enabler", e)
+                        }
+                    },
+                    modifier = Modifier.padding(top = 4.dp)
+                ) {
+                    Text(
+                        "Sync Enabled Languages with OS Switcher",
+                        color = MaterialTheme.colorScheme.primary,
+                        style = MaterialTheme.typography.labelLarge
+                    )
+                }
             }
         },
         filteredItems = { term ->

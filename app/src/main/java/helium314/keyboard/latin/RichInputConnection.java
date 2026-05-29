@@ -124,6 +124,7 @@ public final class RichInputConnection implements PrivateCommandPerformer {
     private final InputMethodService mParent;
     private InputConnection mIC;
     private int mNestLevel;
+    private boolean mIsReloading = false;
 
     /**
      * The timestamp of the last slow InputConnection operation
@@ -159,7 +160,12 @@ public final class RichInputConnection implements PrivateCommandPerformer {
         r.hintMaxLines = 0;
         r.token = 1;
         r.flags = 0;
-        final ExtractedText et = mIC.getExtractedText(r, 0);
+        ExtractedText et = null;
+        try {
+            et = mIC.getExtractedText(r, 0);
+        } catch (Exception e) {
+            Log.w(TAG, "Exception in checkConsistencyForDebug ExtractedText", e);
+        }
         final CharSequence beforeCursor = getTextBeforeCursor(Constants.EDITOR_CONTENTS_CACHE_SIZE,
                 0);
         final StringBuilder internal = new StringBuilder(mCommittedTextBeforeComposingText)
@@ -189,7 +195,11 @@ public final class RichInputConnection implements PrivateCommandPerformer {
         if (++mNestLevel == 1) {
             mIC = mParent.getCurrentInputConnection();
             if (isConnected()) {
-                mIC.beginBatchEdit();
+                try {
+                    mIC.beginBatchEdit();
+                } catch (Exception e) {
+                    Log.w(TAG, "Exception in beginBatchEdit", e);
+                }
             }
         } else {
             if (DBG) {
@@ -204,7 +214,11 @@ public final class RichInputConnection implements PrivateCommandPerformer {
     public void endBatchEdit() {
         if (mNestLevel <= 0) Log.e(TAG, "Batch edit not in progress!"); // TODO: exception instead
         if (--mNestLevel == 0 && isConnected()) {
-            mIC.endBatchEdit();
+            try {
+                mIC.endBatchEdit();
+            } catch (Exception e) {
+                Log.w(TAG, "Exception in endBatchEdit", e);
+            }
         }
         if (DEBUG_PREVIOUS_TEXT) checkConsistencyForDebug();
     }
@@ -243,7 +257,11 @@ public final class RichInputConnection implements PrivateCommandPerformer {
             }
         }
         if (isConnected() && shouldFinishComposition) {
-            mIC.finishComposingText();
+            try {
+                mIC.finishComposingText();
+            } catch (Exception e) {
+                Log.w(TAG, "Exception in resetCachesUponCursorMove finishComposingText", e);
+            }
         }
         return true;
     }
@@ -254,37 +272,49 @@ public final class RichInputConnection implements PrivateCommandPerformer {
      * @return true if successful
      */
     private boolean reloadTextCache() {
-        mCommittedTextBeforeComposingText.setLength(0);
-        // Clearing composing text was not in original AOSP and OpenBoard, but why? should actually
-        // be necessary when reloading text. Only when called by setSelection, mComposingText isn't
-        // always empty, but looks like things still work normally
-        mComposingText.setLength(0);
-        mIC = mParent.getCurrentInputConnection();
-        // Call upon the inputconnection directly since our own method is using the cache, and
-        // we want to refresh it.
-        final CharSequence textBeforeCursor = getTextBeforeCursorAndDetectLaggyConnection(
-                OPERATION_RELOAD_TEXT_CACHE,
-                SLOW_INPUT_CONNECTION_ON_FULL_RELOAD_MS,
-                Constants.EDITOR_CONTENTS_CACHE_SIZE,
-                0 /* flags */);
-        if (null == textBeforeCursor) {
-            // For some reason the app thinks we are not connected to it. This looks like a
-            // framework bug... Fall back to ground state and return false.
-            mExpectedSelStart = INVALID_CURSOR_POSITION;
-            mExpectedSelEnd = INVALID_CURSOR_POSITION;
-            Log.e(TAG, "Unable to connect to the editor to retrieve text.");
+        if (mIsReloading) {
             return false;
         }
-        mCommittedTextBeforeComposingText.append(textBeforeCursor);
-        return true;
+        try {
+            mIsReloading = true;
+            mIC = mParent.getCurrentInputConnection();
+            // Call upon the inputconnection directly since our own method is using the cache, and
+            // we want to refresh it.
+            final CharSequence textBeforeCursor = getTextBeforeCursorAndDetectLaggyConnection(
+                    OPERATION_RELOAD_TEXT_CACHE,
+                    SLOW_INPUT_CONNECTION_ON_FULL_RELOAD_MS,
+                    Constants.EDITOR_CONTENTS_CACHE_SIZE,
+                    0 /* flags */);
+            if (null == textBeforeCursor) {
+                // For some reason the app thinks we are not connected to it. This looks like a
+                // framework bug... Fall back to ground state and return false.
+                mExpectedSelStart = INVALID_CURSOR_POSITION;
+                mExpectedSelEnd = INVALID_CURSOR_POSITION;
+                Log.e(TAG, "Unable to connect to the editor to retrieve text.");
+                return false;
+            }
+            mCommittedTextBeforeComposingText.setLength(0);
+            // Clearing composing text was not in original AOSP and OpenBoard, but why? should actually
+            // be necessary when reloading text. Only when called by setSelection, mComposingText isn't
+            // always empty, but looks like things still work normally
+            mComposingText.setLength(0);
+            mCommittedTextBeforeComposingText.append(textBeforeCursor);
+            return true;
+        } finally {
+            mIsReloading = false;
+        }
     }
 
     private void reloadCursorPosition() {
         if (!isConnected()) return;
-        final ExtractedText et = mIC.getExtractedText(new ExtractedTextRequest(), 0);
-        if (et == null) return;
-        mExpectedSelStart = et.selectionStart + et.startOffset;
-        mExpectedSelEnd = et.selectionEnd + et.startOffset;
+        try {
+            final ExtractedText et = mIC.getExtractedText(new ExtractedTextRequest(), 0);
+            if (et == null) return;
+            mExpectedSelStart = et.selectionStart + et.startOffset;
+            mExpectedSelEnd = et.selectionEnd + et.startOffset;
+        } catch (Exception e) {
+            Log.w(TAG, "Exception in reloadCursorPosition getExtractedText", e);
+        }
     }
 
     private void checkBatchEdit() {
@@ -304,7 +334,11 @@ public final class RichInputConnection implements PrivateCommandPerformer {
         mCommittedTextBeforeComposingText.append(mComposingText);
         mComposingText.setLength(0);
         if (isConnected()) {
-            mIC.finishComposingText();
+            try {
+                mIC.finishComposingText();
+            } catch (Exception e) {
+                Log.w(TAG, "Exception in finishComposingText", e);
+            }
         }
     }
 
@@ -352,13 +386,23 @@ public final class RichInputConnection implements PrivateCommandPerformer {
                     }
                 }
             }
-            mIC.commitText(mTempObjectForCommitText, newCursorPosition);
+            try {
+                mIC.commitText(mTempObjectForCommitText, newCursorPosition);
+            } catch (Exception e) {
+                Log.w(TAG, "Exception in commitText", e);
+            }
         }
     }
 
     @Nullable
     public CharSequence getSelectedText(final int flags) {
-        return isConnected() ?  mIC.getSelectedText(flags) : null;
+        if (!isConnected()) return null;
+        try {
+            return mIC.getSelectedText(flags);
+        } catch (Exception e) {
+            Log.w(TAG, "Exception in getSelectedText", e);
+            return null;
+        }
     }
 
     public boolean canDeleteCharacters() {
@@ -473,11 +517,19 @@ public final class RichInputConnection implements PrivateCommandPerformer {
             return null;
         }
         final long startTime = SystemClock.uptimeMillis();
-        final CharSequence result = mIC.getTextBeforeCursor(n, flags);
+        CharSequence result = null;
+        try {
+            result = mIC.getTextBeforeCursor(n, flags);
+        } catch (Exception e) {
+            Log.w(TAG, "Exception in getTextBeforeCursor", e);
+        }
         detectLaggyConnection(operation, timeout, startTime);
 
         // only do the consistency check if we actually have text (i.e. we're not coming from some reload / reset)
-        if ((mCommittedTextBeforeComposingText.length() > 0 || mComposingText.length() > 0)
+        // and only do it when we are not actively composing text, to avoid race conditions with asynchronous editor updates
+        if (operation != OPERATION_RELOAD_TEXT_CACHE
+                && mComposingText.length() == 0
+                && mCommittedTextBeforeComposingText.length() > 0
                 && result != null && !checkTextBeforeCursorConsistency(result)) {
             // inconsistent state can occur for (at least) two reasons
             // 1. the app actively changes text field content, e.g. joplin when deleting list markers like "2."
@@ -540,7 +592,12 @@ public final class RichInputConnection implements PrivateCommandPerformer {
             return null;
         }
         final long startTime = SystemClock.uptimeMillis();
-        final CharSequence result = mIC.getTextAfterCursor(n, flags);
+        CharSequence result = null;
+        try {
+            result = mIC.getTextAfterCursor(n, flags);
+        } catch (Exception e) {
+            Log.w(TAG, "Exception in getTextAfterCursor", e);
+        }
         detectLaggyConnection(operation, timeout, startTime);
         return result;
     }
@@ -586,7 +643,11 @@ public final class RichInputConnection implements PrivateCommandPerformer {
             mExpectedSelStart = 0;
         }
         if (isConnected()) {
-            mIC.deleteSurroundingText(beforeLength, 0);
+            try {
+                mIC.deleteSurroundingText(beforeLength, 0);
+            } catch (Exception e) {
+                Log.w(TAG, "Exception in deleteSurroundingText", e);
+            }
         }
         if (DEBUG_PREVIOUS_TEXT) checkConsistencyForDebug();
     }
@@ -594,7 +655,11 @@ public final class RichInputConnection implements PrivateCommandPerformer {
     public void performEditorAction(final int actionId) {
         mIC = mParent.getCurrentInputConnection();
         if (isConnected()) {
-            mIC.performEditorAction(actionId);
+            try {
+                mIC.performEditorAction(actionId);
+            } catch (Exception e) {
+                Log.w(TAG, "Exception in performEditorAction", e);
+            }
         }
     }
 
@@ -651,7 +716,11 @@ public final class RichInputConnection implements PrivateCommandPerformer {
             }
         }
         if (isConnected()) {
-            mIC.sendKeyEvent(keyEvent);
+            try {
+                mIC.sendKeyEvent(keyEvent);
+            } catch (Exception e) {
+                Log.w(TAG, "Exception in sendKeyEvent", e);
+            }
         }
     }
 
@@ -677,7 +746,11 @@ public final class RichInputConnection implements PrivateCommandPerformer {
                     textBeforeCursor.subSequence(0, indexOfStartOfComposingText));
         }
         if (isConnected()) {
-            mIC.setComposingRegion(start, end);
+            try {
+                mIC.setComposingRegion(start, end);
+            } catch (Exception e) {
+                Log.w(TAG, "Exception in setComposingRegion", e);
+            }
         }
     }
 
@@ -695,15 +768,30 @@ public final class RichInputConnection implements PrivateCommandPerformer {
         if (isConnected()) {
             if (DebugFlags.DEBUG_ENABLED)
                 Log.d(TAG, "setting composing text of length "+text.length()); // don't log actual text
-            mIC.setComposingText(text, newCursorPosition);
+            try {
+                mIC.setComposingText(text, newCursorPosition);
+            } catch (Exception e) {
+                Log.w(TAG, "Exception in setComposingText", e);
+            }
             if (!Settings.getValues().mInputAttributes.mShouldShowSuggestions && text.length() > 0) {
                 // We have a field that disables suggestions, but still committed text is set.
                 // This might lead to weird bugs (e.g. https://github.com/HeliBorg/HeliBoard/issues/225), so better do
                 // a sanity check whether the wanted text has been set.
                 // Note that the check may also fail because the text field is not yet updated, so we don't want to check everything!
-                final CharSequence lastChar = mIC.getTextBeforeCursor(1, 0);
+                CharSequence lastChar = null;
+                try {
+                    lastChar = mIC.getTextBeforeCursor(1, 0);
+                } catch (Exception e) {
+                    Log.w(TAG, "Exception in setComposingText getTextBeforeCursor", e);
+                }
                 if (lastChar == null || lastChar.length() == 0 || text.charAt(text.length() - 1) != lastChar.charAt(0)) {
-                    Log.w(TAG, "did set " + text + ", but got " + mIC.getTextBeforeCursor(text.length(), 0) + " as last character");
+                    CharSequence checkedText = null;
+                    try {
+                        checkedText = mIC.getTextBeforeCursor(text.length(), 0);
+                    } catch (Exception e) {
+                        Log.w(TAG, "Exception in setComposingText getTextBeforeCursor checkedText", e);
+                    }
+                    Log.w(TAG, "did set " + text + ", but got " + checkedText + " as last character");
                     return false;
                 }
             }
@@ -740,8 +828,13 @@ public final class RichInputConnection implements PrivateCommandPerformer {
             mExpectedSelEnd = end;
         }
         if (isConnected()) {
-            final boolean isIcValid = mIC.setSelection(start, end);
-            if (!isIcValid) {
+            try {
+                final boolean isIcValid = mIC.setSelection(start, end);
+                if (!isIcValid) {
+                    return false;
+                }
+            } catch (Exception e) {
+                Log.w(TAG, "Exception in setSelection", e);
                 return false;
             }
         }
@@ -750,36 +843,48 @@ public final class RichInputConnection implements PrivateCommandPerformer {
 
     public void selectAll() {
         if (!isConnected()) return;
-        if (mExpectedSelStart != mExpectedSelEnd && mExpectedSelStart == 0 && !hasTextAfterCursor()) { // all text already selected
-            mIC.setSelection(mExpectedSelEnd, mExpectedSelEnd);
-        } else mIC.performContextMenuAction(android.R.id.selectAll);
+        try {
+            if (mExpectedSelStart != mExpectedSelEnd && mExpectedSelStart == 0 && !hasTextAfterCursor()) { // all text already selected
+                mIC.setSelection(mExpectedSelEnd, mExpectedSelEnd);
+            } else mIC.performContextMenuAction(android.R.id.selectAll);
+        } catch (Exception e) {
+            Log.w(TAG, "Exception in selectAll", e);
+        }
     }
 
     public void selectWord(final SpacingAndPunctuations spacingAndPunctuations, final String script) {
         if (!isConnected()) return;
-        if (mExpectedSelStart != mExpectedSelEnd) { // already something selected
-            mIC.setSelection(mExpectedSelEnd, mExpectedSelEnd);
-            return;
+        try {
+            if (mExpectedSelStart != mExpectedSelEnd) { // already something selected
+                mIC.setSelection(mExpectedSelEnd, mExpectedSelEnd);
+                return;
+            }
+            final TextRange range = getWordRangeAtCursor(spacingAndPunctuations, script);
+            if (range == null) return;
+            mIC.setSelection(mExpectedSelStart - range.getNumberOfCharsInWordBeforeCursor(), mExpectedSelStart + range.getNumberOfCharsInWordAfterCursor());
+        } catch (Exception e) {
+            Log.w(TAG, "Exception in selectWord", e);
         }
-        final TextRange range = getWordRangeAtCursor(spacingAndPunctuations, script);
-        if (range == null) return;
-        mIC.setSelection(mExpectedSelStart - range.getNumberOfCharsInWordBeforeCursor(), mExpectedSelStart + range.getNumberOfCharsInWordAfterCursor());
     }
 
     public void copyText(final boolean getSelection) {
         CharSequence text = null;
-        if (getSelection) {
-            // copy selected text, and if nothing is selected copy the whole text
-            text = getSelectedText(InputConnection.GET_TEXT_WITH_STYLES);
-        }
-        if (text == null || text.length() == 0) {
-            // we have no selection, get the whole text
-            final ExtractedTextRequest etr = new ExtractedTextRequest();
-            etr.flags = InputConnection.GET_TEXT_WITH_STYLES;
-            etr.hintMaxChars = Integer.MAX_VALUE;
-            final ExtractedText et = mIC.getExtractedText(etr, 0);
-            if (et == null) return;
-            text = et.text;
+        try {
+            if (getSelection) {
+                // copy selected text, and if nothing is selected copy the whole text
+                text = getSelectedText(InputConnection.GET_TEXT_WITH_STYLES);
+            }
+            if (text == null || text.length() == 0) {
+                // we have no selection, get the whole text
+                final ExtractedTextRequest etr = new ExtractedTextRequest();
+                etr.flags = InputConnection.GET_TEXT_WITH_STYLES;
+                etr.hintMaxChars = Integer.MAX_VALUE;
+                final ExtractedText et = mIC.getExtractedText(etr, 0);
+                if (et == null) return;
+                text = et.text;
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Exception in copyText", e);
         }
         if (text == null || text.length() == 0) return;
         final ClipboardManager cm = (ClipboardManager) mParent.getSystemService(Context.CLIPBOARD_SERVICE);
@@ -795,7 +900,11 @@ public final class RichInputConnection implements PrivateCommandPerformer {
         // This has no effect on the text field and does not change its content. It only makes
         // TextView flash the text for a second based on indices contained in the argument.
         if (isConnected()) {
-            mIC.commitCorrection(correctionInfo);
+            try {
+                mIC.commitCorrection(correctionInfo);
+            } catch (Exception e) {
+                Log.w(TAG, "Exception in commitCorrection", e);
+            }
         }
         if (DEBUG_PREVIOUS_TEXT) checkConsistencyForDebug();
     }
@@ -813,7 +922,11 @@ public final class RichInputConnection implements PrivateCommandPerformer {
         mExpectedSelEnd = mExpectedSelStart;
         mComposingText.setLength(0);
         if (isConnected()) {
-            mIC.commitCompletion(completionInfo);
+            try {
+                mIC.commitCompletion(completionInfo);
+            } catch (Exception e) {
+                Log.w(TAG, "Exception in commitCompletion", e);
+            }
         }
         if (DEBUG_PREVIOUS_TEXT) checkConsistencyForDebug();
     }
@@ -1090,7 +1203,14 @@ public final class RichInputConnection implements PrivateCommandPerformer {
         mIC = mParent.getCurrentInputConnection();
         final CharSequence textBeforeCursor = getTextBeforeCursor(
                 Constants.EDITOR_CONTENTS_CACHE_SIZE, 0);
-        final CharSequence selectedText = isConnected() ? mIC.getSelectedText(0 /* flags */) : null;
+        CharSequence selectedText = null;
+        if (isConnected()) {
+            try {
+                selectedText = mIC.getSelectedText(0 /* flags */);
+            } catch (Exception e) {
+                Log.w(TAG, "Exception in tryFixIncorrectCursorPosition getSelectedText", e);
+            }
+        }
         if (null == textBeforeCursor ||
                 (!TextUtils.isEmpty(selectedText) && mExpectedSelEnd == mExpectedSelStart)) {
             // If textBeforeCursor is null, we have no idea what kind of text field we have or if
@@ -1135,7 +1255,12 @@ public final class RichInputConnection implements PrivateCommandPerformer {
         if (!isConnected()) {
             return false;
         }
-        return mIC.performPrivateCommand(action, data);
+        try {
+            return mIC.performPrivateCommand(action, data);
+        } catch (Exception e) {
+            Log.w(TAG, "Exception in performPrivateCommand", e);
+            return false;
+        }
     }
 
     public int getExpectedSelectionStart() {
@@ -1175,6 +1300,11 @@ public final class RichInputConnection implements PrivateCommandPerformer {
         }
         final int cursorUpdateMode = (enableMonitor ? InputConnection.CURSOR_UPDATE_MONITOR : 0)
             | (requestImmediateCallback ? InputConnection.CURSOR_UPDATE_IMMEDIATE : 0);
-        return mIC.requestCursorUpdates(cursorUpdateMode);
+        try {
+            return mIC.requestCursorUpdates(cursorUpdateMode);
+        } catch (Exception e) {
+            Log.w(TAG, "Exception in requestCursorUpdates", e);
+            return false;
+        }
     }
 }

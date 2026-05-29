@@ -215,4 +215,5 @@ object Defaults {
     const val PREF_FROSTED_DUST_ALPHA_NIGHT = 5f
 
     const val LIMIT_EXPENSIVE_RENDERING = true
+    const val PREF_BLUR_RENDER_OVERRIDE = "auto"
 }

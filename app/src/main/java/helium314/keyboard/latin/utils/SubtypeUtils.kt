@@ -103,6 +103,8 @@ class SubtypeState(private val switchToSubtype: (InputMethodSubtype?) -> Unit) {
     var currentSubtypeHasBeenUsed = true // starting with true avoids immediate switch
         private set
 
+    private var lastAutoSwitchTime = 0L
+
     fun setCurrentSubtypeHasBeenUsed() {
         currentSubtypeHasBeenUsed = true
     }
@@ -123,6 +125,11 @@ class SubtypeState(private val switchToSubtype: (InputMethodSubtype?) -> Unit) {
         locales: MutableList<Locale>,
         subtypeForApp: RichInputMethodSubtype?
     ): InputMethodSubtype? {
+        val now = android.os.SystemClock.elapsedRealtime()
+        if (now - lastAutoSwitchTime < 1000) {
+            return null // Throttle/debounce rapid automatic switching to avoid input loop
+        }
+
         val overridden = overriddenByLocale
         if (locales.isEmpty() && subtypeForApp == null) {
             if (overridden != null) {
@@ -130,6 +137,7 @@ class SubtypeState(private val switchToSubtype: (InputMethodSubtype?) -> Unit) {
                 // whatever subtype was used last time.
                 overriddenByLocale = null
 
+                lastAutoSwitchTime = now
                 return overridden
             }
             return null
@@ -166,6 +174,7 @@ class SubtypeState(private val switchToSubtype: (InputMethodSubtype?) -> Unit) {
                 overriddenByLocale = currentSubtype.rawSubtype
             }
 
+            lastAutoSwitchTime = now
             return newSubtype
         }
 

@@ -38,20 +38,12 @@ public class DictionaryFacilitatorLruCache {
 
     private static void waitForLoadingMainDictionary(
             final DictionaryFacilitator dictionaryFacilitator) {
-        for (int i = 0; i < MAX_RETRY_COUNT_FOR_WAITING_FOR_LOADING_DICT; i++) {
-            try {
-                dictionaryFacilitator.waitForLoadingMainDictionaries(
-                        WAIT_FOR_LOADING_MAIN_DICT_IN_MILLISECONDS, TimeUnit.MILLISECONDS);
-                return;
-            } catch (final InterruptedException e) {
-                Log.i(TAG, "Interrupted during waiting for loading main dictionary.", e);
-                if (i < MAX_RETRY_COUNT_FOR_WAITING_FOR_LOADING_DICT - 1) {
-                    Log.i(TAG, "Retry", e);
-                } else {
-                    Log.w(TAG, "Give up retrying. Retried "
-                            + MAX_RETRY_COUNT_FOR_WAITING_FOR_LOADING_DICT + " times.", e);
-                }
-            }
+        try {
+            dictionaryFacilitator.waitForLoadingMainDictionaries(
+                    (long) WAIT_FOR_LOADING_MAIN_DICT_IN_MILLISECONDS * MAX_RETRY_COUNT_FOR_WAITING_FOR_LOADING_DICT,
+                    TimeUnit.MILLISECONDS);
+        } catch (final InterruptedException e) {
+            Log.i(TAG, "Interrupted during waiting for loading main dictionary.", e);
         }
     }
 

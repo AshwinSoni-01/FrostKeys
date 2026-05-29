@@ -665,11 +665,19 @@ public class KeyboardView extends View {
             final float labelCharWidth = TypefaceUtils.getReferenceCharWidth(paint);
             final boolean isFunctionalKeyAndRoundedStyle = (mColors.getThemeStyle().equals(STYLE_ROUNDED)
                     || isCircleStyle) && key.hasFunctionalBackground();
+            if (isEmojiLabel) {
+                paint.setTextSize(paint.getTextSize() * 0.55f);
+                blendAlpha(paint, 110);
+            }
             final float hintX, hintBaseline;
             if (isTopRowNumberHintStacking) {
                 hintBaseline = stackedHintBaseline;
                 hintX = centerX;
                 paint.setTextAlign(Align.CENTER);
+            } else if (isEmojiLabel) {
+                paint.setTextAlign(Align.RIGHT);
+                hintX = keyWidth;
+                hintBaseline = -paint.ascent();
             } else if (key.hasHintLabel()) {
                 // The hint label is placed just right of the key label. Used mainly on
                 // "phone number" layout.

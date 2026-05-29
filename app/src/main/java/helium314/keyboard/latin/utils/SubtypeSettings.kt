@@ -191,6 +191,7 @@ object SubtypeSettings {
         loadEnabledSubtypes(context)
         if (RichInputMethodManager.isInitialized())
             RichInputMethodManager.getInstance().refreshSubtypeCaches()
+        updateSystemSubtypes(context)
     }
 
     fun createSettingsSubtypes(prefSubtypes: String): List<SettingsSubtype> =
@@ -212,6 +213,7 @@ object SubtypeSettings {
         loadResourceSubtypes(context.resources)
         loadAdditionalSubtypes(context.prefs())
         loadEnabledSubtypes(context)
+        updateSystemSubtypes(context)
     }
 
     @Suppress("SameReturnValue")
@@ -298,6 +300,18 @@ object SubtypeSettings {
             } catch (_: Exception) { } // do nothing if RichInputMethodManager isn't initialized
         }
         return true
+    }
+
+    private fun updateSystemSubtypes(context: Context) {
+        try {
+            val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE) as? android.view.inputmethod.InputMethodManager ?: return
+            val imePackageName = context.packageName
+            val imi = imm.inputMethodList.firstOrNull { it.packageName == imePackageName } ?: return
+            val subtypes = getEnabledSubtypes(fallback = true)
+            imm.setAdditionalInputMethodSubtypes(imi.id, subtypes.toTypedArray())
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to update system subtypes", e)
+        }
     }
 
     private val enabledSubtypes = mutableListOf<InputMethodSubtype>()

@@ -168,7 +168,7 @@ final class SuggestionStripLayoutHelper {
                 R.dimen.config_suggestion_text_horizontal_padding) * 2;
         mChipHorizontalMargin = Math.max(1, mChipHorizontalPadding / 3);
         mChipVerticalMargin = Math.max(2, mSuggestionsStripHeight / 10);
-        mChipElevation = 1.5f * res.getDisplayMetrics().density;
+        mChipElevation = 0f;
     }
 
     public int getMaxMoreSuggestionsRow() {

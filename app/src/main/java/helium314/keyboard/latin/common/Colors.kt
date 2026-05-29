@@ -282,7 +282,8 @@ class DynamicColors(context: Context, override val themeStyle: String, override 
     override fun get(color: ColorType): Int = when (color) {
         TOOL_BAR_KEY_ENABLED_BACKGROUND, EMOJI_CATEGORY_SELECTED, ACTION_KEY_BACKGROUND,
         CLIPBOARD_PIN, SHIFT_KEY_ICON, ENTER_KEY_BACKGROUND -> accent
-        AUTOFILL_BACKGROUND_CHIP, GESTURE_PREVIEW, POPUP_KEYS_BACKGROUND, MORE_SUGGESTIONS_BACKGROUND -> adjustedBackground
+        AUTOFILL_BACKGROUND_CHIP -> if (isNight) adjustLuminosityAndKeepAlpha(background, 0.15f) else adjustedBackground
+        GESTURE_PREVIEW, POPUP_KEYS_BACKGROUND, MORE_SUGGESTIONS_BACKGROUND -> adjustedBackground
         KEY_PREVIEW_BACKGROUND -> adjustedBackground
         TOOL_BAR_EXPAND_KEY_BACKGROUND -> if (!isNight) accent else doubleAdjustedBackground
         GESTURE_TRAIL -> gesture
@@ -529,7 +530,7 @@ class DefaultColors (
             CLIPBOARD_PIN, SHIFT_KEY_ICON -> accent
         SPECIAL_KEY_BACKGROUND -> specialKeyBackground
         ENTER_KEY_BACKGROUND -> enterKeyBackground
-        AUTOFILL_BACKGROUND_CHIP -> if (themeStyle == STYLE_MATERIAL && !hasKeyBorders) background else adjustedBackground
+        AUTOFILL_BACKGROUND_CHIP -> if (isColorDark(background)) adjustLuminosityAndKeepAlpha(background, 0.15f) else (if (themeStyle == STYLE_MATERIAL && !hasKeyBorders) background else adjustedBackground)
         GESTURE_PREVIEW -> adjustedBackground
         POPUP_KEYS_BACKGROUND, MORE_SUGGESTIONS_BACKGROUND -> if (isFrosted) ColorUtils.setAlphaComponent(adjustedBackground, 230) else adjustedBackground
         KEY_PREVIEW_BACKGROUND -> if (isFrosted) ColorUtils.setAlphaComponent(adjustedBackground, 230) else adjustedBackground
@@ -606,19 +607,21 @@ class DefaultColors (
     override fun setBackground(view: View, color: ColorType) {
         if (view.background == null)
             view.setBackgroundColor(Color.WHITE) // set white to make the color filters work
+        val bg = view.background
+        val shouldFilter = bg != null && bg.javaClass.simpleName != "BackgroundBlurDrawable"
         when (color) {
-            KEY_PREVIEW_BACKGROUND -> view.background.colorFilter = getColorFilter(KEY_PREVIEW_BACKGROUND)
+            KEY_PREVIEW_BACKGROUND -> if (shouldFilter) bg.colorFilter = getColorFilter(KEY_PREVIEW_BACKGROUND)
             POPUP_KEYS_BACKGROUND -> {
-                view.background.colorFilter = adjustedBackgroundFilter
+                if (shouldFilter) bg.colorFilter = adjustedBackgroundFilter
                 if (themeStyle == STYLE_ROUNDED || themeStyle == STYLE_CIRCLE)
-                    applyPillShape(view.background)
+                    applyPillShape(bg)
             }
-            FUNCTIONAL_KEY_BACKGROUND, KEY_BACKGROUND, MORE_SUGGESTIONS_WORD_BACKGROUND, SPACE_BAR_BACKGROUND, STRIP_BACKGROUND, CLIPBOARD_SUGGESTION_BACKGROUND -> setColor(view.background, color)
-            ONE_HANDED_MODE_BUTTON -> setColor(view.background, if (keyboardBackground == null) MAIN_BACKGROUND else STRIP_BACKGROUND)
+            FUNCTIONAL_KEY_BACKGROUND, KEY_BACKGROUND, MORE_SUGGESTIONS_WORD_BACKGROUND, SPACE_BAR_BACKGROUND, STRIP_BACKGROUND, CLIPBOARD_SUGGESTION_BACKGROUND -> setColor(bg, color)
+            ONE_HANDED_MODE_BUTTON -> setColor(bg, if (keyboardBackground == null) MAIN_BACKGROUND else STRIP_BACKGROUND)
             MORE_SUGGESTIONS_BACKGROUND -> {
-                view.background.colorFilter = getColorFilter(MORE_SUGGESTIONS_BACKGROUND)
+                if (shouldFilter) bg.colorFilter = getColorFilter(MORE_SUGGESTIONS_BACKGROUND)
                 if (themeStyle == STYLE_ROUNDED || themeStyle == STYLE_CIRCLE)
-                    applyPillShape(view.background)
+                    applyPillShape(bg)
             }
             MAIN_BACKGROUND -> {
                 if (keyboardBackground != null) {
@@ -628,10 +631,10 @@ class DefaultColors (
                     }
                     view.background = keyboardBackground
                 } else {
-                    view.background.colorFilter = backgroundFilter
+                    if (shouldFilter) bg.colorFilter = backgroundFilter
                 }
             }
-            else -> view.background.colorFilter = backgroundFilter
+            else -> if (shouldFilter) bg.colorFilter = backgroundFilter
         }
     }
 
@@ -665,6 +668,7 @@ class AllColors(private val colorMap: EnumMap<ColorType, Int>, override val them
     override fun get(color: ColorType): Int {
         val baseColor = colorMap[color] ?: color.default()
         return when (color) {
+            AUTOFILL_BACKGROUND_CHIP -> if (isColorDark(get(MAIN_BACKGROUND))) adjustLuminosityAndKeepAlpha(baseColor, 0.15f) else baseColor
             POPUP_KEYS_BACKGROUND, MORE_SUGGESTIONS_BACKGROUND -> if (isFrosted) ColorUtils.setAlphaComponent(baseColor, 200) else baseColor
             KEY_PREVIEW_BACKGROUND -> if (isFrosted) ColorUtils.setAlphaComponent(baseColor, 200) else baseColor
             else -> baseColor
@@ -763,6 +767,15 @@ private fun applyPillShape(drawable: Drawable?) {
     } else if (d is GradientDrawable) {
         d.cornerRadius = 60f
     }
+}
+
+private fun isColorDark(color: Int): Boolean {
+    if (color == Color.TRANSPARENT) return true
+    val r = Color.red(color)
+    val g = Color.green(color)
+    val b = Color.blue(color)
+    val brightness = (r * r * 0.241 + g * g * 0.691 + b * b * 0.068)
+    return brightness < 130 * 130
 }
 
 enum class ColorType {

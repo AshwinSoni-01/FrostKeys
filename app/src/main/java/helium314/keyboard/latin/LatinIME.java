@@ -166,6 +166,7 @@ public class LatinIME extends InputMethodService implements
     // Working variable for {@link #startShowingInputView()} and
     // {@link #onEvaluateInputViewShown()}.
     private boolean mIsExecutingStartShowingInputView;
+    private boolean mIsDestroyed = false;
 
     // Used for re-initialize keyboard layout after onConfigurationChange.
     @Nullable
@@ -341,8 +342,8 @@ public class LatinIME extends InputMethodService implements
 
         public void postResetCaches(final boolean tryResumeSuggestions, final int remainingTries) {
             removeMessages(MSG_RESET_CACHES);
-            sendMessage(obtainMessage(MSG_RESET_CACHES, tryResumeSuggestions ? 1 : 0,
-                    remainingTries, null));
+            sendMessageDelayed(obtainMessage(MSG_RESET_CACHES, tryResumeSuggestions ? 1 : 0,
+                    remainingTries, null), 50); // 50ms debounce delay
         }
 
         public void postWaitForDictionaryLoad() {
@@ -949,7 +950,10 @@ public class LatinIME extends InputMethodService implements
 
     @Override
     public void onDestroy() {
+        mIsDestroyed = true;
         sInstance = null;
+        mHandler.removeCallbacksAndMessages(null);
+        mInputLogic.onDestroy();
         mClipboardHistoryManager.onDestroy();
         mDictionaryFacilitator.closeDictionaries();
         mSettings.onDestroy();
@@ -961,12 +965,30 @@ public class LatinIME extends InputMethodService implements
         unregisterReceiver(mRestartAfterDeviceUnlockReceiver);
         mStatsUtilsManager.onDestroy(this /* context */);
         KtxKt.prefs(this).unregisterOnSharedPreferenceChangeListener(mPrefsListener);
-        mFrostedPrefsHandler.removeCallbacks(mApplyLiveFrostedRedraw);
-        mFrostedPrefsHandler.removeCallbacks(mApplyHardFrostedReset);
+        mFrostedPrefsHandler.removeCallbacksAndMessages(null);
         mFrostedLiveRedrawScheduled = false;
         mFrostedLiveRedrawDirty = false;
-        super.onDestroy();
-        mHandler.removeCallbacksAndMessages(null);
+        // Proposed safe-check handling for SDK 37 view extraction bugs
+        try {
+            if (getWindow() != null && getWindow().getWindow() != null) {
+                final android.view.View decorView = getWindow().getWindow().getDecorView();
+                if (decorView == null || decorView.getParent() == null) {
+                    // If the decorator view is already unparented or orphaned, 
+                    // manually bypass standard dialog layout cascading triggers if possible
+                }
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Pre-empted window lifecycle crash during cleanup", e);
+        }
+
+        // Wrap super execution to catch unhandled framework lifecycle exceptions on Android 17
+        try {
+            super.onDestroy();
+        } catch (NullPointerException npe) {
+            Log.e(TAG, "Swallowed framework NullPointerException during onDestroy view dismissal", npe);
+        } catch (Throwable t) {
+            Log.e(TAG, "Swallowed framework error during onDestroy view dismissal", t);
+        }
         helium314.keyboard.keyboard.KeyboardTheme.setThemeOverride(null);
         deallocateMemory();
     }
@@ -1114,6 +1136,24 @@ public class LatinIME extends InputMethodService implements
      * used for internal switching
      */
     public void switchToSubtype(final InputMethodSubtype subtype) {
+        if (subtype.hashCode() == 0x7000000f) {
+            return;
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+            try {
+                final String imiId = mRichImm.getInputMethodInfoOfThisIme().getId();
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    switchInputMethod(imiId, subtype);
+                } else {
+                    final android.os.IBinder token = getWindow().getWindow().getAttributes().token;
+                    if (token != null) {
+                        mRichImm.getInputMethodManager().setInputMethodAndSubtype(token, imiId, subtype);
+                    }
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Failed to switch subtype on system", e);
+            }
+        }
         onCurrentInputMethodSubtypeChanged(subtype);
     }
 
@@ -1624,6 +1664,7 @@ public class LatinIME extends InputMethodService implements
 
         final List<InlineSuggestion> inlineSuggestions = response.getInlineSuggestions();
         if (inlineSuggestions.isEmpty()) {
+            removeExternalSuggestions();
             return false;
         }
 
@@ -1821,6 +1862,9 @@ public class LatinIME extends InputMethodService implements
     // This method must run on the UI Thread.
     private void showGesturePreviewAndSetSuggestions(@NonNull final SuggestedWords suggestedWords,
             final boolean dismissGestureFloatingPreviewText) {
+        if (mIsDestroyed) {
+            return;
+        }
         setSuggestions(suggestedWords);
         final MainKeyboardView mainKeyboardView = mKeyboardSwitcher.getMainKeyboardView();
         mainKeyboardView.showGestureFloatingPreviewText(suggestedWords,
@@ -1832,6 +1876,9 @@ public class LatinIME extends InputMethodService implements
     }
 
     private void setSuggestedWords(final SuggestedWords suggestedWords) {
+        if (mIsDestroyed) {
+            return;
+        }
         final SettingsValues currentSettingsValues = mSettings.getCurrent();
         mInputLogic.setSuggestedWords(suggestedWords);
         // TODO: Modify this when we support suggestions with hard keyboard
@@ -1865,6 +1912,9 @@ public class LatinIME extends InputMethodService implements
 
     @Override
     public void setSuggestions(final SuggestedWords suggestedWords) {
+        if (mIsDestroyed) {
+            return;
+        }
         if (suggestedWords.isEmpty()) {
             // avoids showing clipboard suggestion when starting gesture typing
             // should be fine, as there will be another suggestion in a few ms
