@@ -87,6 +87,14 @@ class KlipyPalettesView @JvmOverloads constructor(
     private lateinit var stickersAdapter: KlipyAdapter
     private lateinit var historyDao: KlipyHistoryDao
 
+    private lateinit var recentSearchesContainer: View
+    private lateinit var recentSearchesCard: View
+    private val recentSearchItems = ArrayList<View>()
+    private val recentSearchTexts = ArrayList<TextView>()
+    private val recentSearchIcons = ArrayList<ImageView>()
+    private val recentSearchArrows = ArrayList<ImageView>()
+    private val recentSearchSeparators = ArrayList<View>()
+
     private var currentTab = KlipyHistoryDao.TYPE_GIF
     private var isSearchActive = false
     private var lastGifSearch: MutableList<KlipyItem> = mutableListOf()
@@ -120,6 +128,7 @@ class KlipyPalettesView @JvmOverloads constructor(
             if (isUpdatingSearchText) return
             searchQuery = s?.toString().orEmpty()
             updateSearchQueryUI()
+            updateRecentSearchesUI()
         }
     }
 
@@ -263,6 +272,34 @@ class KlipyPalettesView @JvmOverloads constructor(
         clearHistoryConfirmTitle = findViewById(R.id.clearHistoryConfirmTitle)
         searchEditText = findViewById(R.id.dummySearchTextView)
 
+        recentSearchesContainer = findViewById(R.id.recentSearchesContainer)
+        recentSearchesCard = findViewById(R.id.recentSearchesCard)
+
+        recentSearchItems.clear()
+        recentSearchTexts.clear()
+        recentSearchIcons.clear()
+        recentSearchArrows.clear()
+        recentSearchSeparators.clear()
+
+        recentSearchItems.add(findViewById(R.id.recentSearchItem1))
+        recentSearchItems.add(findViewById(R.id.recentSearchItem2))
+        recentSearchItems.add(findViewById(R.id.recentSearchItem3))
+
+        recentSearchTexts.add(findViewById(R.id.recentSearchText1))
+        recentSearchTexts.add(findViewById(R.id.recentSearchText2))
+        recentSearchTexts.add(findViewById(R.id.recentSearchText3))
+
+        recentSearchIcons.add(findViewById(R.id.recentSearchIcon1))
+        recentSearchIcons.add(findViewById(R.id.recentSearchIcon2))
+        recentSearchIcons.add(findViewById(R.id.recentSearchIcon3))
+
+        recentSearchArrows.add(findViewById(R.id.recentSearchArrow1))
+        recentSearchArrows.add(findViewById(R.id.recentSearchArrow2))
+        recentSearchArrows.add(findViewById(R.id.recentSearchArrow3))
+
+        recentSearchSeparators.add(findViewById(R.id.recentSearchSeparator1))
+        recentSearchSeparators.add(findViewById(R.id.recentSearchSeparator2))
+
         val padding = TypedValue.applyDimension(
             TypedValue.COMPLEX_UNIT_DIP, 4f, resources.displayMetrics
         ).toInt()
@@ -311,20 +348,98 @@ class KlipyPalettesView @JvmOverloads constructor(
         isInitialized = true
     }
 
+    private fun getRecentSearches(): List<String> {
+        val prefs = context.prefs()
+        val keySuffix = if (currentTab == KlipyHistoryDao.TYPE_GIF) "gif" else "sticker"
+        val jsonStr = prefs.getString("klipy_recent_searches_$keySuffix", null)
+        if (jsonStr == null) {
+            // Tab-specific popular premium defaults!
+            return if (currentTab == KlipyHistoryDao.TYPE_GIF) {
+                listOf("love", "lol", "dance")
+            } else {
+                listOf("happy", "cat", "wow")
+            }
+        }
+        return try {
+            json.decodeFromString<List<String>>(jsonStr)
+        } catch (e: Exception) {
+            if (currentTab == KlipyHistoryDao.TYPE_GIF) listOf("love", "lol", "dance") else listOf("happy", "cat", "wow")
+        }
+    }
+
+    private fun saveRecentSearch(query: String) {
+        val trimmed = query.trim()
+        if (trimmed.isBlank()) return
+        val current = getRecentSearches().toMutableList()
+        current.remove(trimmed)
+        current.add(0, trimmed)
+        val limited = current.take(3)
+        try {
+            val jsonStr = json.encodeToString(limited)
+            val keySuffix = if (currentTab == KlipyHistoryDao.TYPE_GIF) "gif" else "sticker"
+            context.prefs().edit().putString("klipy_recent_searches_$keySuffix", jsonStr).apply()
+        } catch (e: Exception) {
+            Log.e("KlipyPalettesView", "Failed to save recent search", e)
+        }
+    }
+
+    private fun updateRecentSearchesUI() {
+        if (!::recentSearchesContainer.isInitialized) return
+
+        if (!isSearchMode || searchQuery.isNotEmpty()) {
+            recentSearchesContainer.visibility = View.GONE
+            return
+        }
+
+        val recents = getRecentSearches()
+        if (recents.isEmpty()) {
+            recentSearchesContainer.visibility = View.GONE
+            return
+        }
+
+        recentSearchesContainer.visibility = View.VISIBLE
+
+        for (i in 0 until 3) {
+            val item = recentSearchItems.getOrNull(i) ?: continue
+            val text = recentSearchTexts.getOrNull(i) ?: continue
+            val separator = recentSearchSeparators.getOrNull(i)
+
+            if (i < recents.size) {
+                val term = recents[i]
+                text.text = term
+                item.visibility = View.VISIBLE
+                item.setOnClickListener {
+                    performTapFeedback(item)
+                    setSearchText(term, term.length)
+                    exitSearchMode(triggerSearch = true)
+                }
+
+                if (separator != null) {
+                    separator.visibility = if (i < recents.size - 1) View.VISIBLE else View.GONE
+                }
+            } else {
+                item.visibility = View.GONE
+                if (separator != null) {
+                    separator.visibility = View.GONE
+                }
+            }
+        }
+    }
+
     private fun setupRecyclerViews() {
         gifsAdapter = KlipyAdapter(emptyList()) { item -> onItemUsed(item) }
         val staggeredLayoutManager = StaggeredGridLayoutManager(2, StaggeredGridLayoutManager.VERTICAL).apply {
-            gapStrategy = StaggeredGridLayoutManager.GAP_HANDLING_NONE
+            gapStrategy = StaggeredGridLayoutManager.GAP_HANDLING_MOVE_ITEMS_BETWEEN_SPANS
         }
         gifsRecyclerView.layoutManager = staggeredLayoutManager
         gifsRecyclerView.adapter = gifsAdapter
         gifsRecyclerView.setItemViewCacheSize(2)
-        gifsRecyclerView.setHasFixedSize(true)
         gifsRecyclerView.addOnScrollListener(createPaginationScrollListener())
 
-        stickersAdapter = KlipyAdapter(emptyList()) { item -> onItemUsed(item) }
+        stickersAdapter = KlipyAdapter(emptyList(), isStickersMode = true) { item -> onItemUsed(item) }
         stickersRecyclerView.layoutManager = GridLayoutManager(context, 4)
         stickersRecyclerView.adapter = stickersAdapter
+        stickersRecyclerView.itemAnimator = null // prevent ghosting with translucent backgrounds
         stickersRecyclerView.setItemViewCacheSize(2)
         stickersRecyclerView.setHasFixedSize(true)
         stickersRecyclerView.addOnScrollListener(createPaginationScrollListener())
@@ -681,6 +796,10 @@ class KlipyPalettesView @JvmOverloads constructor(
         currentPage = 1
         hasMorePages = true
 
+        if (query.isNotBlank()) {
+            saveRecentSearch(query)
+        }
+
         if (!CloudManager.isFeatureAllowed(context, CloudManager.CloudFeature.KLIPY_MEDIA)) {
             loadingIndicator.visibility = View.GONE
             val activeAdapter = if (tabAtRequest == KlipyHistoryDao.TYPE_GIF) gifsAdapter else stickersAdapter
@@ -799,6 +918,10 @@ class KlipyPalettesView @JvmOverloads constructor(
                     return Pair(emptyList(), false)
                 }
 
+                if (rawList.isNotEmpty()) {
+                    Log.d("KlipyPalettesView", "Raw JSON sample: ${body.substringBefore("\"data\":[")}\"data\":[${body.substringAfter("\"data\":[").take(1000)}")
+                }
+
                 val hasMore = rawList.size >= 24
                 val sendAsGif = tab == KlipyHistoryDao.TYPE_GIF && !shouldSendGifsAsStickers()
 
@@ -820,11 +943,25 @@ class KlipyPalettesView @JvmOverloads constructor(
                         return@mapNotNull null
                     }
 
+                    val resolvedWidth = item.width
+                        ?: item.file.hd.webp?.width
+                        ?: item.file.hd.gif.width
+                        ?: item.file.sm?.webp?.width
+                        ?: item.file.sm?.gif?.width
+                        ?: 200
+
+                    val resolvedHeight = item.height
+                        ?: item.file.hd.webp?.height
+                        ?: item.file.hd.gif.height
+                        ?: item.file.sm?.webp?.height
+                        ?: item.file.sm?.gif?.height
+                        ?: 200
+
                     KlipyItem(
                         id = item.id.toString(),
                         url = hdUrl,
-                        width = item.width ?: 200,
-                        height = item.height ?: 200,
+                        width = resolvedWidth,
+                        height = resolvedHeight,
                         previewUrl = previewUrl
                     )
                 }
@@ -1057,6 +1194,44 @@ class KlipyPalettesView @JvmOverloads constructor(
             findViewById<TextView>(R.id.emptyState)?.let {
                 KeyboardTypeface.applyToTextView(it)
             }
+
+            if (::recentSearchesContainer.isInitialized) {
+                val density = resources.displayMetrics.density
+                val cornerRadius = 16f * density
+                val recentBgColor = colors.get(ColorType.SPECIAL_KEY_BACKGROUND)
+                
+                val hsl = FloatArray(3)
+                ColorUtils.colorToHSL(recentBgColor, hsl)
+                hsl[1] = hsl[1] * 0.35f // Make it less saturated (scale saturation down by 65%)
+                hsl[2] = hsl[2] * 0.45f // Make it significantly darker (reduce lightness by 55%)
+                val desaturatedBgColor = ColorUtils.HSLToColor(hsl)
+
+                val roundedBg = GradientDrawable().apply {
+                    shape = GradientDrawable.RECTANGLE
+                    this.cornerRadius = cornerRadius
+                    setColor(desaturatedBgColor)
+                }
+                recentSearchesCard.background = roundedBg
+
+                val toolBarColor = colors.get(ColorType.TOOL_BAR_KEY)
+
+                for (i in 0 until 3) {
+                    recentSearchTexts.getOrNull(i)?.setTextColor(toolBarColor)
+                    recentSearchTexts.getOrNull(i)?.let { KeyboardTypeface.applyToTextView(it) }
+                    
+                    recentSearchIcons.getOrNull(i)?.let { icon ->
+                        icon.setColorFilter(toolBarColor, android.graphics.PorterDuff.Mode.SRC_IN)
+                    }
+                    
+                    recentSearchArrows.getOrNull(i)?.let { arrow ->
+                        val fadedColor = ColorUtils.setAlphaComponent(toolBarColor, 100)
+                        arrow.setColorFilter(fadedColor, android.graphics.PorterDuff.Mode.SRC_IN)
+                    }
+                    
+                    val sepColor = ColorUtils.setAlphaComponent(toolBarColor, 40)
+                    recentSearchSeparators.getOrNull(i)?.setBackgroundColor(sepColor)
+                }
+            }
         } catch (e: Exception) {
             Log.e("KlipyPalettesView", "Failed to apply theme", e)
         }
@@ -1190,6 +1365,7 @@ class KlipyPalettesView @JvmOverloads constructor(
         swapKeyboardToKlipy(enter = true)
         focusSearchEditText(moveCursorToEnd)
         updateSearchQueryUI()
+        updateRecentSearchesUI()
         currentSearchKeyboardElementId = KeyboardId.ELEMENT_ALPHABET
         updateSearchKeyboard()
     }
@@ -1208,6 +1384,7 @@ class KlipyPalettesView @JvmOverloads constructor(
         stickersAdapter.setAnimationsRunning(true)
         showClearHistoryButton()
         updateSearchQueryUI()
+        updateRecentSearchesUI()
 
         swapKeyboardToKlipy(enter = false)
         KeyboardSwitcher.getInstance().mainKeyboardView?.setKeyboardActionListener(mainListener)
@@ -1265,6 +1442,7 @@ class KlipyPalettesView @JvmOverloads constructor(
             }
         }
         updateSearchQueryUI()
+        updateRecentSearchesUI()
     }
 
     private fun syncSearchQueryFromField() {
@@ -1521,5 +1699,9 @@ class KlipyPalettesView @JvmOverloads constructor(
     private data class KlipySmInfo(val gif: KlipyUrlInfo, val webp: KlipyUrlInfo? = null)
 
     @Serializable
-    private data class KlipyUrlInfo(val url: String)
+    private data class KlipyUrlInfo(
+        val url: String,
+        val width: Int? = null,
+        val height: Int? = null
+    )
 }

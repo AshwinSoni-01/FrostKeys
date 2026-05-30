@@ -21,8 +21,8 @@
         android:layout_height="48dp"
         android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:paddingStart="6dp"
-        android:paddingEnd="6dp"
+        android:paddingStart="10dp"
+        android:paddingEnd="10dp"
         android:paddingTop="0dp"
         android:paddingBottom="4dp">
 
@@ -89,6 +89,152 @@
                     android:scaleType="fitCenter" />
             </LinearLayout>
         </FrameLayout>
+    </LinearLayout>
+
+    <!-- Recent Searches Container -->
+    <LinearLayout
+        android:id="@+id/recentSearchesContainer"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:visibility="gone"
+        android:paddingHorizontal="14dp"
+        android:paddingTop="4dp"
+        android:paddingBottom="8dp">
+
+        <LinearLayout
+            android:id="@+id/recentSearchesCard"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingHorizontal="12dp">
+
+            <!-- Item 1 -->
+            <LinearLayout
+                android:id="@+id/recentSearchItem1"
+                android:layout_width="match_parent"
+                android:layout_height="40dp"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:clickable="true"
+                android:focusable="true"
+                android:background="?android:attr/selectableItemBackground">
+                
+                <ImageView
+                    android:id="@+id/recentSearchIcon1"
+                    android:layout_width="16dp"
+                    android:layout_height="16dp"
+                    android:src="@drawable/ic_recent_clock_rounded"
+                    android:layout_marginEnd="12dp"
+                    android:contentDescription="@null" />
+
+                <TextView
+                    android:id="@+id/recentSearchText1"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:textSize="14sp"
+                    android:textColor="@color/textColorPrimary"
+                    android:singleLine="true" />
+
+                <ImageView
+                    android:id="@+id/recentSearchArrow1"
+                    android:layout_width="16dp"
+                    android:layout_height="16dp"
+                    android:src="@drawable/ic_diagonal_arrow"
+                    android:contentDescription="@null"
+                    android:alpha="0.4" />
+            </LinearLayout>
+
+            <!-- Separator 1 -->
+            <View
+                android:id="@+id/recentSearchSeparator1"
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="#33FFFFFF" />
+
+            <!-- Item 2 -->
+            <LinearLayout
+                android:id="@+id/recentSearchItem2"
+                android:layout_width="match_parent"
+                android:layout_height="40dp"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:clickable="true"
+                android:focusable="true"
+                android:background="?android:attr/selectableItemBackground">
+
+                <ImageView
+                    android:id="@+id/recentSearchIcon2"
+                    android:layout_width="16dp"
+                    android:layout_height="16dp"
+                    android:src="@drawable/ic_recent_clock_rounded"
+                    android:layout_marginEnd="12dp"
+                    android:contentDescription="@null" />
+
+                <TextView
+                    android:id="@+id/recentSearchText2"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:textSize="14sp"
+                    android:textColor="@color/textColorPrimary"
+                    android:singleLine="true" />
+
+                <ImageView
+                    android:id="@+id/recentSearchArrow2"
+                    android:layout_width="16dp"
+                    android:layout_height="16dp"
+                    android:src="@drawable/ic_diagonal_arrow"
+                    android:contentDescription="@null"
+                    android:alpha="0.4" />
+            </LinearLayout>
+
+            <!-- Separator 2 -->
+            <View
+                android:id="@+id/recentSearchSeparator2"
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="#33FFFFFF" />
+
+            <!-- Item 3 -->
+            <LinearLayout
+                android:id="@+id/recentSearchItem3"
+                android:layout_width="match_parent"
+                android:layout_height="40dp"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:clickable="true"
+                android:focusable="true"
+                android:background="?android:attr/selectableItemBackground">
+
+                <ImageView
+                    android:id="@+id/recentSearchIcon3"
+                    android:layout_width="16dp"
+                    android:layout_height="16dp"
+                    android:src="@drawable/ic_recent_clock_rounded"
+                    android:layout_marginEnd="12dp"
+                    android:contentDescription="@null" />
+
+                <TextView
+                    android:id="@+id/recentSearchText3"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:textSize="14sp"
+                    android:textColor="@color/textColorPrimary"
+                    android:singleLine="true" />
+
+                <ImageView
+                    android:id="@+id/recentSearchArrow3"
+                    android:layout_width="16dp"
+                    android:layout_height="16dp"
+                    android:src="@drawable/ic_diagonal_arrow"
+                    android:contentDescription="@null"
+                    android:alpha="0.4" />
+            </LinearLayout>
+
+        </LinearLayout>
     </LinearLayout>
 
     <!-- Header containing Back button and Tabs -->

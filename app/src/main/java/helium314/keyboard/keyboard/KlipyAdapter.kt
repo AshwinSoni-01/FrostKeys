@@ -34,6 +34,7 @@ import helium314.keyboard.latin.database.KlipyHistoryDao
 
 class KlipyAdapter(
     private var items: List<KlipyHistoryDao.KlipyItem>,
+    private val isStickersMode: Boolean = false,
     private val onItemClick: (KlipyHistoryDao.KlipyItem) -> Unit
 ) : RecyclerView.Adapter<KlipyAdapter.ViewHolder>() {
 
@@ -52,25 +53,62 @@ class KlipyAdapter(
         return items[position].id.hashCode().toLong()
     }
 
-    class ViewHolder(view: View, val parent: ViewGroup) : RecyclerView.ViewHolder(view) {
+    class ViewHolder(view: View, val parent: ViewGroup, val isStickersMode: Boolean) : RecyclerView.ViewHolder(view) {
         val imageView: ImageView = view.findViewById(R.id.klipyImage)
         var pendingLoadRunnable: Runnable? = null
         var releasedWhileDetached: Boolean = false
 
         init {
-            imageView.clipToOutline = true
-            imageView.outlineProvider = object : ViewOutlineProvider() {
-                override fun getOutline(view: View, outline: android.graphics.Outline) {
-                    val radius = 8f * view.context.resources.displayMetrics.density
-                    outline.setRoundRect(0, 0, view.width, view.height, radius)
+            val radius = 8f * view.context.resources.displayMetrics.density
+            if (isStickersMode) {
+                // Strictly unchanged logic for Stickers: round the corners of imageView only
+                imageView.clipToOutline = true
+                imageView.outlineProvider = object : ViewOutlineProvider() {
+                    override fun getOutline(view: View, outline: android.graphics.Outline) {
+                        outline.setRoundRect(0, 0, view.width, view.height, radius)
+                    }
                 }
+            } else {
+                // Isolated fix for GIFs: round the corners of parent FrameLayout (view/itemView)
+                view.clipToOutline = true
+                view.outlineProvider = object : ViewOutlineProvider() {
+                    override fun getOutline(v: View, outline: android.graphics.Outline) {
+                        outline.setRoundRect(0, 0, v.width, v.height, radius)
+                    }
+                }
+                // Double safety: also make sure the child imageView has clipToOutline
+                imageView.clipToOutline = true
             }
         }
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
         val view = LayoutInflater.from(parent.context).inflate(R.layout.klipy_item, parent, false)
-        return ViewHolder(view, parent)
+
+        // Decorative semi-transparent white rounded background for sticker grid only
+        if (isStickersMode) {
+            val density = parent.context.resources.displayMetrics.density
+
+            // Tighter grid spacing for stickers
+            val margin = (2f * density).toInt()
+            (view.layoutParams as? ViewGroup.MarginLayoutParams)?.setMargins(margin, margin, margin, margin)
+
+            val cornerRadius = 8f * density
+            val bgDrawable = android.graphics.drawable.GradientDrawable().apply {
+                shape = android.graphics.drawable.GradientDrawable.RECTANGLE
+                cornerRadii = floatArrayOf(
+                    cornerRadius, cornerRadius, cornerRadius, cornerRadius,
+                    cornerRadius, cornerRadius, cornerRadius, cornerRadius
+                )
+                setColor(0xFFFFFFFF.toInt()) // fully opaque white (testing)
+            }
+            view.background = bgDrawable
+            val pad = (1f * density).toInt()
+            view.setPadding(pad, pad, pad, pad)
+            view.findViewById<ImageView>(R.id.klipyImage).scaleType = ImageView.ScaleType.FIT_CENTER
+        }
+
+        return ViewHolder(view, parent, isStickersMode)
     }
 
     private var imageLoader: ImageLoader? = null
@@ -171,7 +209,15 @@ class KlipyAdapter(
             }
             val itemWidth = (parent.width - parent.paddingLeft - parent.paddingRight) / spanCount
             val widthRatio = if (item.width > 0) item.height.toFloat() / item.width.toFloat() else 1f
-            targetHeight = (itemWidth * widthRatio).toInt().coerceIn(50, itemWidth * 3)
+            targetHeight = if (isStickersMode) {
+                // Subtract horizontal margins so the cell is visually square
+                // (MATCH_PARENT width = itemWidth - margins, so height must match)
+                val marginLp = holder.itemView.layoutParams as? ViewGroup.MarginLayoutParams
+                val hMargins = (marginLp?.leftMargin ?: 0) + (marginLp?.rightMargin ?: 0)
+                (itemWidth - hMargins).coerceAtLeast(50)
+            } else {
+                (itemWidth * widthRatio).toInt().coerceIn(50, itemWidth * 3)
+            }
             targetWidth = itemWidth
             hasDimensions = true
 
@@ -182,7 +228,7 @@ class KlipyAdapter(
 
             val imageLayoutParams = holder.imageView.layoutParams
             imageLayoutParams.width = ViewGroup.LayoutParams.MATCH_PARENT
-            imageLayoutParams.height = targetHeight
+            imageLayoutParams.height = if (isStickersMode) targetHeight else ViewGroup.LayoutParams.MATCH_PARENT
             holder.imageView.layoutParams = imageLayoutParams
         } else {
             val itemLp = holder.itemView.layoutParams
@@ -192,7 +238,7 @@ class KlipyAdapter(
 
             val imageLayoutParams = holder.imageView.layoutParams
             imageLayoutParams.width = ViewGroup.LayoutParams.MATCH_PARENT
-            imageLayoutParams.height = ViewGroup.LayoutParams.WRAP_CONTENT
+            imageLayoutParams.height = if (isStickersMode) ViewGroup.LayoutParams.WRAP_CONTENT else ViewGroup.LayoutParams.MATCH_PARENT
             holder.imageView.layoutParams = imageLayoutParams
         }
 
