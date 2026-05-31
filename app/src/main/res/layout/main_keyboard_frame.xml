@@ -46,7 +46,9 @@
         android:id="@+id/keyboard_view_wrapper"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layoutDirection="ltr" >
+        android:layoutDirection="ltr"
+        android:clipChildren="false"
+        android:clipToPadding="false" >
 
         <helium314.keyboard.keyboard.MainKeyboardView
             android:id="@+id/keyboard_view"

@@ -81,7 +81,7 @@ class ClipboardHistoryView @JvmOverloads constructor(
         val abcHeight = ResourceUtils.getKeyboardHeight(resources, settings)
         val persistentEmojiEnabled = context.prefs().getBoolean(Settings.PREF_PERSISTENT_EMOJI_ROW, helium314.keyboard.latin.settings.Defaults.PREF_PERSISTENT_EMOJI_ROW)
         val emojiRowHeight = if (persistentEmojiEnabled) (41 * resources.displayMetrics.density).toInt() else 0
-        val finalHeight = abcHeight + emojiRowHeight + paddingTop + paddingBottom
+        val finalHeight = abcHeight + emojiRowHeight + paddingTop + paddingBottom - (6 * resources.displayMetrics.density).toInt() + 1
         super.onMeasure(widthMeasureSpec, MeasureSpec.makeMeasureSpec(finalHeight, MeasureSpec.EXACTLY))
         setMeasuredDimension(MeasureSpec.getSize(widthMeasureSpec), finalHeight)
     }

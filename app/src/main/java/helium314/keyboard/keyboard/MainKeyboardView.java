@@ -341,7 +341,35 @@ public final class MainKeyboardView extends KeyboardView implements DrawingProxy
     private void locatePreviewPlacerView() {
         getLocationInWindow(mOriginCoords);
         mDrawingPreviewPlacerView.setKeyboardViewGeometry(mOriginCoords, getWidth(), getHeight());
+        ensurePreviewPlacerViewInstalled();
     }
+
+    private void ensurePreviewPlacerViewInstalled() {
+        final View rootView = getRootView();
+        if (rootView == null) {
+            return;
+        }
+        final ViewGroup windowContentView = rootView.findViewById(android.R.id.content);
+        if (windowContentView == null) {
+            return;
+        }
+        windowContentView.setClipChildren(false);
+        windowContentView.setClipToPadding(false);
+        final ViewGroup parent = (ViewGroup) mDrawingPreviewPlacerView.getParent();
+        if (parent != windowContentView) {
+            if (parent != null) {
+                parent.removeView(mDrawingPreviewPlacerView);
+            }
+            windowContentView.addView(mDrawingPreviewPlacerView);
+        }
+        mDrawingPreviewPlacerView.setClipChildren(false);
+        mDrawingPreviewPlacerView.setClipToPadding(false);
+        final int childCount = windowContentView.getChildCount();
+        if (childCount > 0 && windowContentView.getChildAt(childCount - 1) != mDrawingPreviewPlacerView) {
+            mDrawingPreviewPlacerView.bringToFront();
+        }
+    }
+
 
     private void installPreviewPlacerView() {
         final View rootView = getRootView();
@@ -484,6 +512,7 @@ public final class MainKeyboardView extends KeyboardView implements DrawingProxy
             parent.removeView(mDrawingPreviewPlacerView);
         }
         mDrawingPreviewPlacerView.removeAllViews();
+        mKeyPreviewChoreographer.clear();
     }
 
     // Implements {@link DrawingProxy@showPopupKeysKeyboard(Key,PointerTracker)}.

@@ -100,6 +100,8 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
     private int mCurrentOrientation;
     private int mCurrentDpi;
     private boolean mThemeNeedsReload;
+    private View mCurrentAnimatingPanel = null;
+    private android.view.ViewPropertyAnimator mRunningAnimator = null;
 
     @SuppressLint("StaticFieldLeak") // this is a keyboard, we want to keep it alive in background
     private static final KeyboardSwitcher sInstance = new KeyboardSwitcher();
@@ -212,39 +214,101 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
     }
 
     public void onHideWindow() {
+        clearTransitions();
         if (mKeyboardView != null) {
             mKeyboardView.onHideWindow();
         }
+    }
+
+    private void clearTransitions() {
+        if (mRunningAnimator != null) {
+            mRunningAnimator.cancel();
+            mRunningAnimator = null;
+        }
+        if (mCurrentAnimatingPanel != null) {
+            mCurrentAnimatingPanel.setAlpha(1f);
+            mCurrentAnimatingPanel = null;
+        }
+        if (mKeyboardView != null) mKeyboardView.setAlpha(1f);
+        if (mEmojiPalettesView != null) mEmojiPalettesView.setAlpha(1f);
+        if (mClipboardHistoryView != null) mClipboardHistoryView.setAlpha(1f);
+        if (mAiWritingToolsView != null) mAiWritingToolsView.setAlpha(1f);
+        if (mKlipyPalettesView != null) mKlipyPalettesView.setAlpha(1f);
+        if (mAccessPointMenuView != null) mAccessPointMenuView.setAlpha(1f);
+    }
+
+    private void transitionToPanel(final View targetPanel, final Runnable action) {
+        if (mKeyboardView == null || targetPanel == null) {
+            action.run();
+            return;
+        }
+        if (mRunningAnimator != null) {
+            mRunningAnimator.cancel();
+            mRunningAnimator = null;
+        }
+        if (mCurrentAnimatingPanel != null) {
+            mCurrentAnimatingPanel.setAlpha(1f);
+            mCurrentAnimatingPanel = null;
+        }
+        action.run();
+        targetPanel.setAlpha(0f);
+        mCurrentAnimatingPanel = targetPanel;
+        mRunningAnimator = targetPanel.animate()
+                .alpha(1f)
+                .setDuration(350)
+                .withEndAction(new Runnable() {
+                    @Override
+                    public void run() {
+                        targetPanel.setAlpha(1f);
+                        mCurrentAnimatingPanel = null;
+                        mRunningAnimator = null;
+                    }
+                });
+        mRunningAnimator.start();
     }
 
     private void setKeyboard(final int keyboardId, @NonNull final KeyboardSwitchState toggleState) {
         // with a hardware keyboard we might get here without ever calling onCreateInputView, so don't crash
         if (mKeyboardView == null) return;
 
-        // Make {@link MainKeyboardView} visible and hide {@link EmojiPalettesView}.
-        final SettingsValues currentSettingsValues = Settings.getValues();
-        setMainKeyboardFrame(currentSettingsValues, toggleState);
-        // TODO: pass this object to setKeyboard instead of getting the current values.
-        final MainKeyboardView keyboardView = mKeyboardView;
-        final Keyboard oldKeyboard = keyboardView.getKeyboard();
-        final Keyboard newKeyboard = mKeyboardLayoutSet.getKeyboard(keyboardId);
-        keyboardView.setKeyboard(newKeyboard);
-        mCurrentInputView.setKeyboardTopPadding(newKeyboard.mTopPadding);
-        setKeyboardPanelOffsets(newKeyboard.mId.mElementId >= KeyboardId.ELEMENT_EMOJI_RECENTS && newKeyboard.mId.mElementId != KeyboardId.ELEMENT_NUMPAD);
-        keyboardView.setKeyPreviewPopupEnabled(currentSettingsValues.mKeyPreviewPopupOn);
-        keyboardView.updateShortcutKey(mRichImm.isShortcutImeReady());
-        final boolean subtypeChanged = (oldKeyboard == null) || !newKeyboard.mId.mSubtype.equals(oldKeyboard.mId.mSubtype);
-        final int languageOnSpacebarFormatType = LanguageOnSpacebarUtils.getLanguageOnSpacebarFormatType(newKeyboard.mId.mSubtype);
-        final boolean hasMultipleEnabledIMEsOrSubtypes = mRichImm.hasMultipleEnabledIMEsOrSubtypes(true);
-        keyboardView.startDisplayLanguageOnSpacebar(subtypeChanged, languageOnSpacebarFormatType, hasMultipleEnabledIMEsOrSubtypes);
+        final View currentPanel = getVisibleKeyboardView();
+        final boolean animate = currentPanel != mKeyboardView;
 
-        if (currentSettingsValues.needsToLookupSuggestions()
-                                    && (currentSettingsValues.mInlineEmojiSearch || currentSettingsValues.mSuggestEmojis)) {
-            EmojiParserKt.loadEmojiDefaultVersionsAndPopupSpecs(mThemeContext);
-        }
-        updatePersistentEmojiRow();
-        if (mCurrentInputView != null) {
-            mCurrentInputView.requestLayout();
+        final Runnable action = new Runnable() {
+            @Override
+            public void run() {
+                // Make {@link MainKeyboardView} visible and hide {@link EmojiPalettesView}.
+                final SettingsValues currentSettingsValues = Settings.getValues();
+                setMainKeyboardFrame(currentSettingsValues, toggleState);
+                // TODO: pass this object to setKeyboard instead of getting the current values.
+                final MainKeyboardView keyboardView = mKeyboardView;
+                final Keyboard oldKeyboard = keyboardView.getKeyboard();
+                final Keyboard newKeyboard = mKeyboardLayoutSet.getKeyboard(keyboardId);
+                keyboardView.setKeyboard(newKeyboard);
+                mCurrentInputView.setKeyboardTopPadding(newKeyboard.mTopPadding);
+                setKeyboardPanelOffsets(newKeyboard.mId.mElementId >= KeyboardId.ELEMENT_EMOJI_RECENTS && newKeyboard.mId.mElementId != KeyboardId.ELEMENT_NUMPAD);
+                keyboardView.setKeyPreviewPopupEnabled(currentSettingsValues.mKeyPreviewPopupOn);
+                keyboardView.updateShortcutKey(mRichImm.isShortcutImeReady());
+                final boolean subtypeChanged = (oldKeyboard == null) || !newKeyboard.mId.mSubtype.equals(oldKeyboard.mId.mSubtype);
+                final int languageOnSpacebarFormatType = LanguageOnSpacebarUtils.getLanguageOnSpacebarFormatType(newKeyboard.mId.mSubtype);
+                final boolean hasMultipleEnabledIMEsOrSubtypes = mRichImm.hasMultipleEnabledIMEsOrSubtypes(true);
+                keyboardView.startDisplayLanguageOnSpacebar(subtypeChanged, languageOnSpacebarFormatType, hasMultipleEnabledIMEsOrSubtypes);
+
+                if (currentSettingsValues.needsToLookupSuggestions()
+                                            && (currentSettingsValues.mInlineEmojiSearch || currentSettingsValues.mSuggestEmojis)) {
+                    EmojiParserKt.loadEmojiDefaultVersionsAndPopupSpecs(mThemeContext);
+                }
+                updatePersistentEmojiRow();
+                if (mCurrentInputView != null) {
+                    mCurrentInputView.requestLayout();
+                }
+            }
+        };
+
+        if (animate) {
+            transitionToPanel(mKeyboardView, action);
+        } else {
+            action.run();
         }
     }
 
@@ -403,30 +467,35 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
         if (DEBUG_ACTION) {
             Log.d(TAG, "setEmojiKeyboard");
         }
-        updatePersistentEmojiRow();
-        mMainKeyboardFrame.setVisibility(View.VISIBLE);
-        mKeyboardView.setVisibility(View.GONE);
+        transitionToPanel(mEmojiPalettesView, new Runnable() {
+            @Override
+            public void run() {
+                updatePersistentEmojiRow();
+                mMainKeyboardFrame.setVisibility(View.VISIBLE);
+                mKeyboardView.setVisibility(View.GONE);
 
-        // Start emoji palettes
-        mEmojiPalettesView.startEmojiPalettes(mKeyboardView.getKeyVisualAttribute(),
-                mLatinIME.getCurrentInputEditorInfo(), mLatinIME.mKeyboardActionListener);
-        mEmojiPalettesView.setVisibility(View.VISIBLE);
-        mEmojiTabStripView.setVisibility(View.VISIBLE);
-        mStripContainer.setVisibility(getSecondaryStripVisibility());
-        setKeyboardPanelOffsets(true);
+                // Start emoji palettes
+                mEmojiPalettesView.startEmojiPalettes(mKeyboardView.getKeyVisualAttribute(),
+                        mLatinIME.getCurrentInputEditorInfo(), mLatinIME.mKeyboardActionListener);
+                mEmojiPalettesView.setVisibility(View.VISIBLE);
+                mEmojiTabStripView.setVisibility(View.VISIBLE);
+                mStripContainer.setVisibility(getSecondaryStripVisibility());
+                setKeyboardPanelOffsets(true);
 
-        mSuggestionStripView.setVisibility(View.GONE);
-        mClipboardStripScrollView.setVisibility(View.GONE);
-        mClipboardHistoryView.setVisibility(View.GONE);
-        if (mAiWritingToolsView != null) {
-            mAiWritingToolsView.setVisibility(View.GONE);
-            mAiWritingToolsView.onClose();
-        }
-        if (mAccessPointMenuView != null) {
-            mAccessPointMenuView.setVisibility(View.GONE);
-        }
-        updatePersistentEmojiRow();
-        if (mCurrentInputView != null) mCurrentInputView.requestLayout();
+                mSuggestionStripView.setVisibility(View.GONE);
+                mClipboardStripScrollView.setVisibility(View.GONE);
+                mClipboardHistoryView.setVisibility(View.GONE);
+                if (mAiWritingToolsView != null) {
+                    mAiWritingToolsView.setVisibility(View.GONE);
+                    mAiWritingToolsView.onClose();
+                }
+                if (mAccessPointMenuView != null) {
+                    mAccessPointMenuView.setVisibility(View.GONE);
+                }
+                updatePersistentEmojiRow();
+                if (mCurrentInputView != null) mCurrentInputView.requestLayout();
+            }
+        });
     }
 
     // Implements {@link KeyboardState.SwitchActions}.
@@ -435,31 +504,36 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
         if (DEBUG_ACTION) {
             Log.d(TAG, "setClipboardKeyboard");
         }
-        updatePersistentEmojiRow();
-        mMainKeyboardFrame.setVisibility(View.VISIBLE);
-        mKeyboardView.setVisibility(View.GONE);
+        transitionToPanel(mClipboardHistoryView, new Runnable() {
+            @Override
+            public void run() {
+                updatePersistentEmojiRow();
+                mMainKeyboardFrame.setVisibility(View.VISIBLE);
+                mKeyboardView.setVisibility(View.GONE);
 
-        // Start clipboard
-        mClipboardHistoryView.startClipboardHistory(mLatinIME.getClipboardHistoryManager(), mKeyboardView.getKeyVisualAttribute(),
-                mLatinIME.getCurrentInputEditorInfo(), mLatinIME.mKeyboardActionListener);
-        mClipboardHistoryView.setVisibility(View.VISIBLE);
-        mStripContainer.setVisibility(getSecondaryStripVisibility());
-        setKeyboardPanelOffsets(true);
-        mClipboardStripScrollView.post(() -> mClipboardStripScrollView.fullScroll(HorizontalScrollView.FOCUS_RIGHT));
-        mClipboardStripScrollView.setVisibility(View.VISIBLE);
+                // Start clipboard
+                mClipboardHistoryView.startClipboardHistory(mLatinIME.getClipboardHistoryManager(), mKeyboardView.getKeyVisualAttribute(),
+                        mLatinIME.getCurrentInputEditorInfo(), mLatinIME.mKeyboardActionListener);
+                mClipboardHistoryView.setVisibility(View.VISIBLE);
+                mStripContainer.setVisibility(getSecondaryStripVisibility());
+                setKeyboardPanelOffsets(true);
+                mClipboardStripScrollView.post(() -> mClipboardStripScrollView.fullScroll(HorizontalScrollView.FOCUS_RIGHT));
+                mClipboardStripScrollView.setVisibility(View.VISIBLE);
 
-        mEmojiTabStripView.setVisibility(View.GONE);
-        mSuggestionStripView.setVisibility(View.GONE);
-        mEmojiPalettesView.setVisibility(View.GONE);
-        if (mAiWritingToolsView != null) {
-            mAiWritingToolsView.setVisibility(View.GONE);
-            mAiWritingToolsView.onClose();
-        }
-        if (mAccessPointMenuView != null) {
-            mAccessPointMenuView.setVisibility(View.GONE);
-        }
-        updatePersistentEmojiRow();
-        if (mCurrentInputView != null) mCurrentInputView.requestLayout();
+                mEmojiTabStripView.setVisibility(View.GONE);
+                mSuggestionStripView.setVisibility(View.GONE);
+                mEmojiPalettesView.setVisibility(View.GONE);
+                if (mAiWritingToolsView != null) {
+                    mAiWritingToolsView.setVisibility(View.GONE);
+                    mAiWritingToolsView.onClose();
+                }
+                if (mAccessPointMenuView != null) {
+                    mAccessPointMenuView.setVisibility(View.GONE);
+                }
+                updatePersistentEmojiRow();
+                if (mCurrentInputView != null) mCurrentInputView.requestLayout();
+            }
+        });
     }
 
     @Override
@@ -467,68 +541,78 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
         if (DEBUG_ACTION) {
             Log.d(TAG, "setAiToolsKeyboard");
         }
-        updatePersistentEmojiRow();
-        mMainKeyboardFrame.setVisibility(View.VISIBLE);
-        mKeyboardView.setVisibility(View.GONE);
+        transitionToPanel(mAiWritingToolsView, new Runnable() {
+            @Override
+            public void run() {
+                updatePersistentEmojiRow();
+                mMainKeyboardFrame.setVisibility(View.VISIBLE);
+                mKeyboardView.setVisibility(View.GONE);
 
-        if (mAiWritingToolsView != null) {
-            // CRITICAL: Force the panel to match the frame, not the screen
-            android.widget.FrameLayout.LayoutParams lp = new android.widget.FrameLayout.LayoutParams(
-                    android.view.ViewGroup.LayoutParams.MATCH_PARENT,
-                    android.view.ViewGroup.LayoutParams.WRAP_CONTENT
-            );
-            mAiWritingToolsView.setLayoutParams(lp);
-            mAiWritingToolsView.onOpen(mLatinIME.getCurrentInputConnection());
-            mAiWritingToolsView.setVisibility(View.VISIBLE);
-        }
-        mStripContainer.setVisibility(View.GONE);
-        setKeyboardPanelOffsets(true);
+                if (mAiWritingToolsView != null) {
+                    // CRITICAL: Force the panel to match the frame, not the screen
+                    android.widget.FrameLayout.LayoutParams lp = new android.widget.FrameLayout.LayoutParams(
+                            android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                            android.view.ViewGroup.LayoutParams.WRAP_CONTENT
+                    );
+                    mAiWritingToolsView.setLayoutParams(lp);
+                    mAiWritingToolsView.onOpen(mLatinIME.getCurrentInputConnection());
+                    mAiWritingToolsView.setVisibility(View.VISIBLE);
+                }
+                mStripContainer.setVisibility(View.GONE);
+                setKeyboardPanelOffsets(true);
 
-        mEmojiTabStripView.setVisibility(View.GONE);
-        mSuggestionStripView.setVisibility(View.GONE);
-        mEmojiPalettesView.setVisibility(View.GONE);
-        mClipboardHistoryView.setVisibility(View.GONE);
-        mClipboardStripScrollView.setVisibility(View.GONE);
-        if (mAccessPointMenuView != null) {
-            mAccessPointMenuView.setVisibility(View.GONE);
-        }
-        updatePersistentEmojiRow();
-        if (mCurrentInputView != null) mCurrentInputView.requestLayout();
+                mEmojiTabStripView.setVisibility(View.GONE);
+                mSuggestionStripView.setVisibility(View.GONE);
+                mEmojiPalettesView.setVisibility(View.GONE);
+                mClipboardHistoryView.setVisibility(View.GONE);
+                mClipboardStripScrollView.setVisibility(View.GONE);
+                if (mAccessPointMenuView != null) {
+                    mAccessPointMenuView.setVisibility(View.GONE);
+                }
+                updatePersistentEmojiRow();
+                if (mCurrentInputView != null) mCurrentInputView.requestLayout();
+            }
+        });
     }
 
     public void setKlipyKeyboard() {
         if (DEBUG_ACTION) {
             Log.d(TAG, "setKlipyKeyboard");
         }
-        updatePersistentEmojiRow();
-        mMainKeyboardFrame.setVisibility(View.VISIBLE);
-        mKeyboardView.setVisibility(View.GONE);
+        transitionToPanel(mKlipyPalettesView, new Runnable() {
+            @Override
+            public void run() {
+                updatePersistentEmojiRow();
+                mMainKeyboardFrame.setVisibility(View.VISIBLE);
+                mKeyboardView.setVisibility(View.GONE);
 
-        if (mKlipyPalettesView != null) {
-            mKlipyPalettesView.startKlipyPalettes(
-                    mKeyboardView.getKeyVisualAttribute(),
-                    mLatinIME.getCurrentInputEditorInfo(),
-                    mLatinIME.mKeyboardActionListener
-            );
-            mKlipyPalettesView.setVisibility(View.VISIBLE);
-        }
-        mStripContainer.setVisibility(View.GONE);
-        setKeyboardPanelOffsets(true);
+                if (mKlipyPalettesView != null) {
+                    mKlipyPalettesView.startKlipyPalettes(
+                            mKeyboardView.getKeyVisualAttribute(),
+                            mLatinIME.getCurrentInputEditorInfo(),
+                            mLatinIME.mKeyboardActionListener
+                    );
+                    mKlipyPalettesView.setVisibility(View.VISIBLE);
+                }
+                mStripContainer.setVisibility(View.GONE);
+                setKeyboardPanelOffsets(true);
 
-        mEmojiTabStripView.setVisibility(View.GONE);
-        mSuggestionStripView.setVisibility(View.GONE);
-        mEmojiPalettesView.setVisibility(View.GONE);
-        mClipboardHistoryView.setVisibility(View.GONE);
-        mClipboardStripScrollView.setVisibility(View.GONE);
-        if (mAiWritingToolsView != null) {
-            mAiWritingToolsView.setVisibility(View.GONE);
-            mAiWritingToolsView.onClose();
-        }
-        if (mAccessPointMenuView != null) {
-            mAccessPointMenuView.setVisibility(View.GONE);
-        }
-        updatePersistentEmojiRow();
-        if (mCurrentInputView != null) mCurrentInputView.requestLayout();
+                mEmojiTabStripView.setVisibility(View.GONE);
+                mSuggestionStripView.setVisibility(View.GONE);
+                mEmojiPalettesView.setVisibility(View.GONE);
+                mClipboardHistoryView.setVisibility(View.GONE);
+                mClipboardStripScrollView.setVisibility(View.GONE);
+                if (mAiWritingToolsView != null) {
+                    mAiWritingToolsView.setVisibility(View.GONE);
+                    mAiWritingToolsView.onClose();
+                }
+                if (mAccessPointMenuView != null) {
+                    mAccessPointMenuView.setVisibility(View.GONE);
+                }
+                updatePersistentEmojiRow();
+                if (mCurrentInputView != null) mCurrentInputView.requestLayout();
+            }
+        });
     }
 
     @Override
@@ -536,30 +620,35 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
         if (DEBUG_ACTION) {
             Log.d(TAG, "setAccessPointKeyboard");
         }
-        updatePersistentEmojiRow();
-        mMainKeyboardFrame.setVisibility(View.VISIBLE);
-        mKeyboardView.setVisibility(View.GONE);
-        mEmojiPalettesView.setVisibility(View.GONE);
-        mClipboardHistoryView.setVisibility(View.GONE);
-        if (mAiWritingToolsView != null) {
-            mAiWritingToolsView.setVisibility(View.GONE);
-            mAiWritingToolsView.onClose();
-        }
-        mEmojiTabStripView.setVisibility(View.GONE);
-        mClipboardStripScrollView.setVisibility(View.GONE);
+        transitionToPanel(mAccessPointMenuView, new Runnable() {
+            @Override
+            public void run() {
+                updatePersistentEmojiRow();
+                mMainKeyboardFrame.setVisibility(View.VISIBLE);
+                mKeyboardView.setVisibility(View.GONE);
+                mEmojiPalettesView.setVisibility(View.GONE);
+                mClipboardHistoryView.setVisibility(View.GONE);
+                if (mAiWritingToolsView != null) {
+                    mAiWritingToolsView.setVisibility(View.GONE);
+                    mAiWritingToolsView.onClose();
+                }
+                mEmojiTabStripView.setVisibility(View.GONE);
+                mClipboardStripScrollView.setVisibility(View.GONE);
 
-        if (mAccessPointMenuView != null) {
-            mAccessPointMenuView.populateMenu();
-            mAccessPointMenuView.setVisibility(View.VISIBLE);
-        }
-        mStripContainer.setVisibility(View.VISIBLE);
-        if (mSuggestionStripView != null) {
-            mSuggestionStripView.setVisibility(View.VISIBLE);
-            mSuggestionStripView.showPinnedToolbarKeys();
-        }
-        updatePersistentEmojiRow();
-        setKeyboardPanelOffsets(false);
-        if (mCurrentInputView != null) mCurrentInputView.requestLayout();
+                if (mAccessPointMenuView != null) {
+                    mAccessPointMenuView.populateMenu();
+                    mAccessPointMenuView.setVisibility(View.VISIBLE);
+                }
+                mStripContainer.setVisibility(View.VISIBLE);
+                if (mSuggestionStripView != null) {
+                    mSuggestionStripView.setVisibility(View.VISIBLE);
+                    mSuggestionStripView.showPinnedToolbarKeys();
+                }
+                updatePersistentEmojiRow();
+                setKeyboardPanelOffsets(false);
+                if (mCurrentInputView != null) mCurrentInputView.requestLayout();
+            }
+        });
     }
 
     private void setKeyboardPanelOffsets(boolean enabled) {
@@ -568,9 +657,7 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
             enabled = false;
         }
         final Resources res = mThemeContext.getResources();
-        final int topOffset = enabled
-                ? res.getDimensionPixelSize(R.dimen.config_keyboard_panel_content_top_padding)
-                : 0;
+        final int topOffset = 0;
         final int sideOffset = enabled
                 ? res.getDimensionPixelSize(R.dimen.config_keyboard_panel_content_side_padding)
                 : 0;

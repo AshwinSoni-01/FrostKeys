@@ -60,6 +60,11 @@ public final class KeyPreviewChoreographer {
         return mShowingKeyPreviewViews.containsKey(key);
     }
 
+    public void clear() {
+        mShowingKeyPreviewViews.clear();
+        mFreeKeyPreviewViews.clear();
+    }
+
     public void dismissKeyPreview(final Key key) {
         if (key == null) {
             return;

@@ -10,6 +10,6 @@
     android:propertyName="languageOnSpacebarAnimAlpha"
     android:valueType="intType"
     android:startOffset="1200"
-    android:duration="200"
+    android:duration="400"
     android:valueFrom="255"
     android:valueTo="128" />

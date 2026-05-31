@@ -40,6 +40,8 @@ class KeyboardWrapperView @JvmOverloads constructor(
         // This replaces the fragmented fitsSystemWindows=true on individual child views
         // (KeyboardView, EmojiPalettesView, ClipboardHistoryView, AccessPointMenuView).
         fitsSystemWindows = true
+        clipChildren = false
+        clipToPadding = false
     }
 
     override fun onApplyWindowInsets(insets: WindowInsets): WindowInsets {

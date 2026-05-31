@@ -1205,11 +1205,12 @@ class KlipyPalettesView @JvmOverloads constructor(
                 hsl[1] = hsl[1] * 0.35f // Make it less saturated (scale saturation down by 65%)
                 hsl[2] = hsl[2] * 0.45f // Make it significantly darker (reduce lightness by 55%)
                 val desaturatedBgColor = ColorUtils.HSLToColor(hsl)
+                val transparentBgColor = ColorUtils.setAlphaComponent(desaturatedBgColor, 140) // Make the card more transparent
 
                 val roundedBg = GradientDrawable().apply {
                     shape = GradientDrawable.RECTANGLE
                     this.cornerRadius = cornerRadius
-                    setColor(desaturatedBgColor)
+                    setColor(transparentBgColor)
                 }
                 recentSearchesCard.background = roundedBg
 
@@ -1655,6 +1656,21 @@ class KlipyPalettesView @JvmOverloads constructor(
 
         override fun onCancelBatchInput() {
             updateSearchQueryUI()
+        }
+
+        override fun onHorizontalSpaceSwipe(steps: Int): Boolean {
+            if (!isSearchMode || !::searchEditText.isInitialized) return false
+            moveSearchCursorByCodePoints(steps)
+            return true
+        }
+
+        override fun onVerticalSpaceSwipe(steps: Int): Boolean {
+            // No vertical cursor movement in a single-line search field
+            return false
+        }
+
+        override fun onEndSpaceSwipe() {
+            // Nothing to finalize
         }
     }
 

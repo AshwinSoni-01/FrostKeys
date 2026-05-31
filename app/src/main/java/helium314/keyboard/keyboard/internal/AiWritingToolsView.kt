@@ -114,6 +114,33 @@ class AiWritingToolsView @JvmOverloads constructor(
         setupUI()
     }
 
+    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+        val settings = Settings.getValues()
+        val abcHeight = ResourceUtils.getKeyboardHeight(resources, settings)
+        val persistentEmojiEnabled = context.prefs().getBoolean(Settings.PREF_PERSISTENT_EMOJI_ROW, helium314.keyboard.latin.settings.Defaults.PREF_PERSISTENT_EMOJI_ROW)
+        val emojiRowHeight = if (persistentEmojiEnabled) (41 * resources.displayMetrics.density).toInt() else 0
+        val stripHeight = resources.getDimensionPixelSize(R.dimen.config_suggestions_strip_height)
+        val finalHeight = abcHeight + emojiRowHeight + stripHeight + paddingTop + paddingBottom + 1
+
+        // Calculate and set the ViewPager2 container's height programmatically to prevent weight collapse bugs!
+        val density = resources.displayMetrics.density
+        // Title row: ~40dp, Tools list: ~44dp, indicators: ~8dp, Bottom row: ~40dp = ~132dp total non-card height
+        val nonCardHeightPx = (132 * density).toInt()
+        val cardHeightPx = (finalHeight - nonCardHeightPx).coerceAtLeast((100 * density).toInt())
+
+        val carouselContainer = findViewById<View>(R.id.vp_ai_carousel)?.parent as? View
+        carouselContainer?.let {
+            val lp = it.layoutParams
+            if (lp != null && lp.height != cardHeightPx) {
+                lp.height = cardHeightPx
+                it.layoutParams = lp
+            }
+        }
+
+        super.onMeasure(widthMeasureSpec, View.MeasureSpec.makeMeasureSpec(finalHeight, View.MeasureSpec.EXACTLY))
+        setMeasuredDimension(View.MeasureSpec.getSize(widthMeasureSpec), finalHeight)
+    }
+
     private inner class AiOutputAdapter : RecyclerView.Adapter<AiOutputAdapter.ViewHolder>() {
         private var appliedPosition: Int = RecyclerView.NO_POSITION
         inner class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {

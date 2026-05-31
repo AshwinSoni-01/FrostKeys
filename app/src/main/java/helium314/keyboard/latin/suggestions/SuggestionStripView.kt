@@ -156,6 +156,7 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
     private var suggestedWords = SuggestedWords.getEmptyInstance()
     private var isExternalSuggestionVisible = false // Required to disable the more suggestions if other suggestions are visible
     private var isPinnedToolbarDragActive = false
+    private var isAccessPointMenuOpen = false
     private var pinnedDropPreviewKey: ToolbarKey? = null
     private var pinnedDropPreviewSource: ToolbarDragSource? = null
     private var pinnedDropPreviewRequestedIndex = -1
@@ -599,11 +600,18 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
             pinnedKeys.isVisible = true
             return
         }
+        if (isAccessPointMenuOpen) {
+            suggestionsStrip.isVisible = false
+            suggestionsChipScroll.isVisible = false
+            pinnedKeys.isVisible = pinnedKeys.childCount > 0
+            return
+        }
         val toolbarMode = Settings.getValues().mToolbarMode
         val allowPinnedKeys = toolbarMode == ToolbarMode.EXPANDABLE || toolbarMode == ToolbarMode.TOOLBAR_KEYS
         val allowSuggestions = toolbarMode == ToolbarMode.EXPANDABLE || toolbarMode == ToolbarMode.SUGGESTION_STRIP
+        val isFieldEmpty = isTextFieldEmpty()
         val showSuggestionContent = showSuggestions && allowSuggestions &&
-                (isExternalSuggestionVisible || shouldShowSuggestionContent())
+                (isExternalSuggestionVisible || !isFieldEmpty || shouldShowSuggestionContent())
         val showChips = showSuggestionContent && !isExternalSuggestionVisible && shouldUseChipSuggestions()
         suggestionsStrip.isVisible = showSuggestionContent && !showChips
         suggestionsChipScroll.isVisible = showChips
@@ -906,6 +914,7 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
     }
 
     private fun setAccessPointIcon(isMenuOpen: Boolean) {
+        isAccessPointMenuOpen = isMenuOpen
         val colors = Settings.getValues().mColors
         val drawable = if (isMenuOpen) {
             androidx.core.content.ContextCompat.getDrawable(context, R.drawable.ic_arrow_back)?.mutate()
@@ -915,6 +924,24 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
         accessPointTriggerBtn.setImageDrawable(drawable)
         applyAlphabetIconTint(accessPointTriggerBtn, colors)
         applySuggestionStripButtonIconSizing(accessPointTriggerBtn)
+        updateSuggestionContainersVisibility(true)
+    }
+
+    private fun isTextFieldEmpty(): Boolean {
+        val ime = getLatinIME() ?: return true
+        val connection = ime.currentInputConnection ?: return true
+        val before = connection.getTextBeforeCursor(1, 0)
+        val after = connection.getTextAfterCursor(1, 0)
+        return (before == null || before.isEmpty()) && (after == null || after.isEmpty())
+    }
+
+    private fun getLatinIME(): helium314.keyboard.latin.LatinIME? {
+        var ctx = context
+        while (ctx is android.content.ContextWrapper) {
+            if (ctx is helium314.keyboard.latin.LatinIME) return ctx
+            ctx = ctx.baseContext
+        }
+        return ctx as? helium314.keyboard.latin.LatinIME
     }
 
     companion object {

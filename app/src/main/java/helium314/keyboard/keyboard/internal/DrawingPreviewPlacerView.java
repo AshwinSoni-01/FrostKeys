@@ -26,6 +26,8 @@ public final class DrawingPreviewPlacerView extends RelativeLayout {
     public DrawingPreviewPlacerView(final Context context, final AttributeSet attrs) {
         super(context, attrs);
         setWillNotDraw(false);
+        setClipChildren(false);
+        setClipToPadding(false);
     }
 
     public void setHardwareAcceleratedDrawingEnabled(final boolean enabled) {

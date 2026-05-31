@@ -34,6 +34,8 @@ public final class InputView extends FrameLayout {
 
     public InputView(final Context context, final AttributeSet attrs) {
         super(context, attrs, 0);
+        setClipChildren(false);
+        setClipToPadding(false);
     }
 
     @Override
