@@ -25,7 +25,9 @@ import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.FrameLayout;
 import android.widget.PopupWindow;
+import android.widget.RelativeLayout;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -353,6 +355,10 @@ public final class MainKeyboardView extends KeyboardView implements DrawingProxy
         if (windowContentView == null) {
             return;
         }
+        installPreviewPlacerView(windowContentView);
+    }
+
+    private void installPreviewPlacerView(@NonNull final ViewGroup windowContentView) {
         windowContentView.setClipChildren(false);
         windowContentView.setClipToPadding(false);
         final ViewGroup parent = (ViewGroup) mDrawingPreviewPlacerView.getParent();
@@ -360,16 +366,35 @@ public final class MainKeyboardView extends KeyboardView implements DrawingProxy
             if (parent != null) {
                 parent.removeView(mDrawingPreviewPlacerView);
             }
-            windowContentView.addView(mDrawingPreviewPlacerView);
+            windowContentView.addView(mDrawingPreviewPlacerView,
+                    newPreviewPlacerLayoutParams(windowContentView));
+        } else {
+            ensurePreviewPlacerLayoutParams(windowContentView);
         }
         mDrawingPreviewPlacerView.setClipChildren(false);
         mDrawingPreviewPlacerView.setClipToPadding(false);
-        final int childCount = windowContentView.getChildCount();
-        if (childCount > 0 && windowContentView.getChildAt(childCount - 1) != mDrawingPreviewPlacerView) {
-            mDrawingPreviewPlacerView.bringToFront();
-        }
+        mDrawingPreviewPlacerView.bringToFront();
     }
 
+    private static ViewGroup.LayoutParams newPreviewPlacerLayoutParams(
+            @NonNull final ViewGroup parent) {
+        final int matchParent = ViewGroup.LayoutParams.MATCH_PARENT;
+        if (parent instanceof FrameLayout) {
+            return new FrameLayout.LayoutParams(matchParent, matchParent);
+        }
+        if (parent instanceof RelativeLayout) {
+            return new RelativeLayout.LayoutParams(matchParent, matchParent);
+        }
+        return new ViewGroup.LayoutParams(matchParent, matchParent);
+    }
+
+    private void ensurePreviewPlacerLayoutParams(@NonNull final ViewGroup parent) {
+        final ViewGroup.LayoutParams params = mDrawingPreviewPlacerView.getLayoutParams();
+        final int matchParent = ViewGroup.LayoutParams.MATCH_PARENT;
+        if (params == null || params.width != matchParent || params.height != matchParent) {
+            mDrawingPreviewPlacerView.setLayoutParams(newPreviewPlacerLayoutParams(parent));
+        }
+    }
 
     private void installPreviewPlacerView() {
         final View rootView = getRootView();
@@ -383,11 +408,7 @@ public final class MainKeyboardView extends KeyboardView implements DrawingProxy
             Log.w(TAG, "Cannot find android.R.id.content view to add DrawingPreviewPlacerView");
             return;
         }
-        final ViewGroup parent = (ViewGroup) mDrawingPreviewPlacerView.getParent();
-        if (parent != null) {
-            parent.removeView(mDrawingPreviewPlacerView);
-        }
-        windowContentView.addView(mDrawingPreviewPlacerView);
+        installPreviewPlacerView(windowContentView);
     }
 
     // Implements {@link DrawingProxy#onKeyPressed(Key,boolean)}.
@@ -410,7 +431,20 @@ public final class MainKeyboardView extends KeyboardView implements DrawingProxy
         locatePreviewPlacerView();
         getLocationInWindow(mOriginCoords);
         mKeyPreviewChoreographer.placeAndShowKeyPreview(key, getKeyboard().mIconsSet, getKeyDrawParams(),
-                KeyboardSwitcher.getInstance().getWrapperView().getWidth(), mOriginCoords, mDrawingPreviewPlacerView);
+                getPreviewPopupBoundsWidth(), mOriginCoords, mDrawingPreviewPlacerView);
+    }
+
+    private int getPreviewPopupBoundsWidth() {
+        final View rootView = getRootView();
+        final View contentView = rootView == null ? null : rootView.findViewById(android.R.id.content);
+        if (contentView != null && contentView.getWidth() > 0) {
+            return contentView.getWidth();
+        }
+        final View wrapperView = KeyboardSwitcher.getInstance().getWrapperView();
+        if (wrapperView != null && wrapperView.getWidth() > 0) {
+            return wrapperView.getWidth();
+        }
+        return getWidth();
     }
 
     private void dismissKeyPreviewWithoutDelay(@NonNull final Key key) {

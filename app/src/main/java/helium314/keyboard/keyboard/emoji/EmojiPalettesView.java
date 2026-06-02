@@ -57,6 +57,7 @@ import helium314.keyboard.latin.common.Colors;
 import helium314.keyboard.latin.settings.Settings;
 import helium314.keyboard.latin.settings.SettingsValues;
 import helium314.keyboard.latin.utils.DictionaryInfoUtils;
+import helium314.keyboard.latin.utils.Log;
 import helium314.keyboard.latin.utils.ResourceUtils;
 
 import static helium314.keyboard.latin.common.Constants.NOT_A_COORDINATE;
@@ -74,7 +75,7 @@ import static helium314.keyboard.latin.common.Constants.NOT_A_COORDINATE;
  */
 public final class EmojiPalettesView extends LinearLayout
         implements View.OnClickListener, EmojiViewCallback {
-    private static SingleDictionaryFacilitator sDictionaryFacilitator;
+    private static volatile SingleDictionaryFacilitator sDictionaryFacilitator;
 
     private boolean initialized = false;
     private final Colors mColors;
@@ -241,11 +242,12 @@ public final class EmojiPalettesView extends LinearLayout
 
     @Override
     public String getDescription(String emoji) {
-        if (sDictionaryFacilitator == null) {
+        final SingleDictionaryFacilitator facilitator = sDictionaryFacilitator;
+        if (facilitator == null) {
             return null;
         }
 
-        var wordProperty = sDictionaryFacilitator.getWordProperty(EmojiParserKt.getEmojiNeutralVersion(emoji));
+        var wordProperty = facilitator.getWordProperty(EmojiParserKt.getEmojiNeutralVersion(emoji));
         if (wordProperty == null || ! wordProperty.mHasShortcuts) {
             return null;
         }
@@ -323,45 +325,53 @@ public final class EmojiPalettesView extends LinearLayout
         private static final double RECENCY_DECAY_SECONDS = 7.0 * 24.0 * 60.0 * 60.0;
 
         public static void recordEmojiUsage(@NonNull final Context context, @NonNull final String emoji) {
-            final android.content.SharedPreferences prefs = helium314.keyboard.latin.utils.KtxKt.prefs(context);
-            final String jsonStr = prefs.getString(PREF_ADAPTIVE_METADATA, "{}");
-            org.json.JSONObject root;
-            try {
-                root = new org.json.JSONObject(jsonStr);
-            } catch (Exception e) {
-                root = new org.json.JSONObject();
-            }
+            new Thread(() -> {
+                synchronized (AdaptiveEmojiEngine.class) {
+                    try {
+                        final android.content.SharedPreferences prefs = helium314.keyboard.latin.utils.KtxKt.prefs(context);
+                        final String jsonStr = prefs.getString(PREF_ADAPTIVE_METADATA, "{}");
+                        org.json.JSONObject root;
+                        try {
+                            root = new org.json.JSONObject(jsonStr);
+                        } catch (Exception e) {
+                            root = new org.json.JSONObject();
+                        }
 
-            final long now = System.currentTimeMillis();
-            org.json.JSONObject record = root.optJSONObject(emoji);
-            if (record == null) {
-                record = new org.json.JSONObject();
-                try {
-                    record.put("lastUsed", now);
-                    record.put("freq", 1);
-                    record.put("burst", 1);
-                    root.put(emoji, record);
-                } catch (Exception ignored) {}
-            } else {
-                long lastUsed = record.optLong("lastUsed", now);
-                int freq = record.optInt("freq", 0);
-                int burst = record.optInt("burst", 0);
+                        final long now = System.currentTimeMillis();
+                        org.json.JSONObject record = root.optJSONObject(emoji);
+                        if (record == null) {
+                            record = new org.json.JSONObject();
+                            try {
+                                record.put("lastUsed", now);
+                                record.put("freq", 1);
+                                record.put("burst", 1);
+                                root.put(emoji, record);
+                            } catch (Exception ignored) {}
+                        } else {
+                            long lastUsed = record.optLong("lastUsed", now);
+                            int freq = record.optInt("freq", 0);
+                            int burst = record.optInt("burst", 0);
 
-                if (now - lastUsed < 300_000L) { // 5 minutes window for burst
-                    burst++;
-                } else {
-                    burst = 1; // reset burst if outside window
+                            if (now - lastUsed < 300_000L) { // 5 minutes window for burst
+                                burst++;
+                            } else {
+                                burst = 1; // reset burst if outside window
+                            }
+                            freq++;
+                            try {
+                                record.put("lastUsed", now);
+                                record.put("freq", freq);
+                                record.put("burst", burst);
+                                root.put(emoji, record);
+                            } catch (Exception ignored) {}
+                        }
+
+                        prefs.edit().putString(PREF_ADAPTIVE_METADATA, root.toString()).apply();
+                    } catch (Exception e) {
+                        Log.e("AdaptiveEmojiEngine", "Failed to record emoji usage asynchronously", e);
+                    }
                 }
-                freq++;
-                try {
-                    record.put("lastUsed", now);
-                    record.put("freq", freq);
-                    record.put("burst", burst);
-                    root.put(emoji, record);
-                } catch (Exception ignored) {}
-            }
-
-            prefs.edit().putString(PREF_ADAPTIVE_METADATA, root.toString()).apply();
+            }).start();
         }
 
         public static boolean shouldRefreshFastRow(@NonNull final Context context) {
@@ -622,19 +632,39 @@ public final class EmojiPalettesView extends LinearLayout
 
     private void initDictionaryFacilitator() {
         if (Settings.getValues().mShowEmojiDescriptions) {
-            var locale = RichInputMethodManager.getInstance().getCurrentSubtype().getLocale();
-            if (sDictionaryFacilitator == null || ! sDictionaryFacilitator.isForLocale(locale)) {
+            final var locale = RichInputMethodManager.getInstance().getCurrentSubtype().getLocale();
+            final SingleDictionaryFacilitator facilitator = sDictionaryFacilitator;
+            if (facilitator == null || ! facilitator.isForLocale(locale)) {
                 closeDictionaryFacilitator();
-                var dictFile = DictionaryInfoUtils.getCachedDictForLocaleAndType(locale, Dictionary.TYPE_EMOJI, getContext());
-                var dictionary = dictFile != null? DictionaryFactory.getDictionary(dictFile, locale) : null;
-                sDictionaryFacilitator = dictionary != null? new SingleDictionaryFacilitator(dictionary) : null;
+                // Load asynchronously in a background thread to prevent blocking the UI thread on emoji keyboard start
+                new Thread(() -> {
+                    try {
+                        var dictFile = DictionaryInfoUtils.getCachedDictForLocaleAndType(locale, Dictionary.TYPE_EMOJI, getContext());
+                        var dictionary = dictFile != null ? DictionaryFactory.getDictionary(dictFile, locale) : null;
+                        if (dictionary != null) {
+                            synchronized (EmojiPalettesView.class) {
+                                var currentLocale = RichInputMethodManager.getInstance().getCurrentSubtype().getLocale();
+                                if (locale.equals(currentLocale)) {
+                                    if (sDictionaryFacilitator != null) {
+                                        sDictionaryFacilitator.closeDictionaries();
+                                    }
+                                    sDictionaryFacilitator = new SingleDictionaryFacilitator(dictionary);
+                                } else {
+                                    dictionary.close();
+                                }
+                            }
+                        }
+                    } catch (Exception e) {
+                        Log.e("EmojiPalettesView", "Failed to load emoji dictionary asynchronously", e);
+                    }
+                }).start();
             }
         } else {
             closeDictionaryFacilitator();
         }
     }
 
-    public static void closeDictionaryFacilitator() {
+    public static synchronized void closeDictionaryFacilitator() {
         if (sDictionaryFacilitator != null) {
             sDictionaryFacilitator.closeDictionaries();
             sDictionaryFacilitator = null;

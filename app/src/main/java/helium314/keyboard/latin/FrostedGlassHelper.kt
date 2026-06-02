@@ -2,7 +2,7 @@ package helium314.keyboard.latin
 
 import android.content.Context
 import android.graphics.Color
-import android.graphics.drawable.ColorDrawable
+import android.graphics.drawable.GradientDrawable
 import android.inputmethodservice.InputMethodService
 import android.os.Build
 import android.util.Log
@@ -21,7 +21,6 @@ import helium314.keyboard.settings.SettingsActivity
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.ColorUtils
 import java.lang.reflect.Constructor
-import java.lang.reflect.Field
 import java.lang.reflect.Method
 import java.util.Locale
 
@@ -29,10 +28,6 @@ object FrostedGlassHelper {
 
     private const val TAG = "KBoardBlur"
     private const val SAMSUNG_EXTENSION_FLAG_BLUR = 0x10
-    private const val LIGHT_TINT_WITH_BLUR = 0x33FFFFFF
-    private const val DARK_TINT_WITH_BLUR = 0x33000000
-    private val LIGHT_TINT_WITHOUT_BLUR = 0xCCFFFFFF.toInt()
-    private val DARK_TINT_WITHOUT_BLUR = 0xCC000000.toInt()
     private val failedSamsungSemBlurModes = mutableSetOf<String>()
 
     // =========================================================================
@@ -171,23 +166,35 @@ object FrostedGlassHelper {
     fun configureFrostedGlass(service: InputMethodService, inputView: View?, enable: Boolean) {
         val window = service.window?.window ?: return
         constrainImeWindowToKeyboardBounds(service, window, inputView)
-        val isBatterySaver = isBatterySaverMode(service)
-        val shouldEnable = enable && !isBatterySaver
-
         val overrideMode = service.prefs().getString(Settings.PREF_BLUR_RENDER_OVERRIDE, "auto")
+        val blurAvailable = isSystemBlurAvailable(service)
+        val shouldUseSolidFallback = enable && (overrideMode == "force_solid" || !blurAvailable)
 
-        if (overrideMode == "force_solid" || !shouldEnable) {
-            applyDefaultBlur(service, window, inputView, false)
+        if (shouldUseSolidFallback) {
+            applyDefaultBlur(service, window, false, solidFallbackColor(service))
+            if (Build.MANUFACTURER.equals("samsung", ignoreCase = true) || overrideMode == "force_samsung") {
+                clearSamsungSemBlur(samsungBlurTarget(inputView))
+                applySamsungLegacyBlur(window, false)
+            }
+            applySolidFallbackBackground(service, window, inputView)
+            Log.i(TAG, "Frosted glass blur unavailable or forced solid. Applied opaque frosted fallback.")
+            return
+        }
+
+        if (!enable) {
+            applyDefaultBlur(service, window, false)
             if (Build.MANUFACTURER.equals("samsung", ignoreCase = true) || overrideMode == "force_samsung") {
                 applySamsungSemBlur(window, inputView, false)
+                applySamsungLegacyBlur(window, false)
             }
-            Log.i(TAG, "Frosted glass disabled or forced solid. Applied solid fallback tint successfully.")
+            Log.i(TAG, "Frosted glass disabled. Cleared blur state.")
             return
         }
 
         when (overrideMode) {
             "force_native" -> {
-                applyDefaultBlur(service, window, inputView, true)
+                restoreFrostedThemeBackground(service, inputView)
+                applyDefaultBlur(service, window, true)
                 Log.i(TAG, "OVERRIDE: Force Native Android Blur applied successfully via window.setBackgroundBlurRadius.")
             }
             "force_samsung" -> {
@@ -201,12 +208,14 @@ object FrostedGlassHelper {
                         applySamsungSemBlur(window, inputView, true)
                         Log.i(TAG, "AUTO: Samsung device detected (SDK >= S). Applied SemBlurInfo successfully.")
                     } else {
-                        applyDefaultBlur(service, window, inputView, true)
+                        restoreFrostedThemeBackground(service, inputView)
+                        applyDefaultBlur(service, window, true)
                         applySamsungLegacyBlur(window, true)
                         Log.i(TAG, "AUTO: Older Samsung device detected. Applied Legacy semAddExtensionFlags successfully.")
                     }
                 } else {
-                    applyDefaultBlur(service, window, inputView, true)
+                    restoreFrostedThemeBackground(service, inputView)
+                    applyDefaultBlur(service, window, true)
                     Log.i(TAG, "AUTO: Non-Samsung device detected. Applied Native Android window blur successfully.")
                 }
             }
@@ -243,30 +252,30 @@ object FrostedGlassHelper {
 
         window.clearFlags(WindowManager.LayoutParams.FLAG_BLUR_BEHIND)
         window.setBackgroundBlurRadius(0)
-        window.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+        window.setBackgroundDrawable(roundedWindowBackground(context, Color.TRANSPARENT))
         inputView?.setBackgroundColor(Color.TRANSPARENT)
 
         if (!enable) {
             clearSamsungSemBlur(target)
-            restoreSamsungTargetBackground(target)
+            restoreFrostedThemeBackground(context, inputView)
             return
         }
 
         if (target == null) {
-            Log.e(TAG, "SemBlurInfo target is null; falling back to window tint")
-            window.setBackgroundDrawable(ColorDrawable(windowTint(context, blursEnabled = false)))
+            Log.e(TAG, "SemBlurInfo target is null; falling back to opaque frosted background")
+            applySolidFallbackBackground(context, window, inputView)
             return
         }
 
         if (isKnownFrostedGlassBlurUnsupportedDevice()) {
-            Log.d(TAG, "Known unsupported Samsung blur device (${Build.MODEL}); using readable tint")
-            target.setBackgroundColor(windowTint(context, blursEnabled = false))
+            Log.d(TAG, "Known unsupported Samsung blur device (${Build.MODEL}); using opaque frosted fallback")
+            applySolidFallbackBackground(context, window, inputView)
             return
         }
 
         if (!samsungSemBlurSupported) {
-            Log.e(TAG, "Samsung SemBlurInfo is unsupported on this device environment; falling back to window tint")
-            target.setBackgroundColor(windowTint(context, blursEnabled = false))
+            Log.e(TAG, "Samsung SemBlurInfo is unsupported on this device environment; falling back to opaque frosted background")
+            applySolidFallbackBackground(context, window, inputView)
             return
         }
 
@@ -303,11 +312,11 @@ object FrostedGlassHelper {
                 }
             }
 
-            Log.e(TAG, "No Samsung SemBlurInfo mode applied; falling back to readable tint")
-            target.setBackgroundColor(windowTint(context, blursEnabled = false))
+            Log.e(TAG, "No Samsung SemBlurInfo mode applied; falling back to opaque frosted background")
+            applySolidFallbackBackground(context, window, inputView)
         } catch (e: Throwable) {
-            Log.e(TAG, "Failed to apply Samsung SemBlurInfo blur; falling back to readable tint", e)
-            target.setBackgroundColor(windowTint(context, blursEnabled = false))
+            Log.e(TAG, "Failed to apply Samsung SemBlurInfo blur; falling back to opaque frosted background", e)
+            applySolidFallbackBackground(context, window, inputView)
         }
     }
 
@@ -330,21 +339,16 @@ object FrostedGlassHelper {
         }
     }
 
-    private fun applyDefaultBlur(service: InputMethodService, window: Window, inputView: View?, enable: Boolean) {
+    private fun applyDefaultBlur(
+        service: InputMethodService,
+        window: Window,
+        enable: Boolean,
+        backgroundColor: Int = Color.TRANSPARENT
+    ) {
         val params = window.attributes
         var changed = false
 
-        val radiusPx = Settings.readKeyboardCornerRadius(service.prefs()) * service.resources.displayMetrics.density
-        val bgDrawable = android.graphics.drawable.GradientDrawable().apply {
-            setColor(Color.TRANSPARENT)
-            cornerRadii = floatArrayOf(
-                radiusPx, radiusPx, // top-left
-                radiusPx, radiusPx, // top-right
-                0f, 0f,             // bottom-right
-                0f, 0f              // bottom-left
-            )
-        }
-        window.setBackgroundDrawable(bgDrawable)
+        window.setBackgroundDrawable(roundedWindowBackground(service, backgroundColor))
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             val targetRadius = if (enable) blurRadius(service) else 0
@@ -367,6 +371,19 @@ object FrostedGlassHelper {
         }
     }
 
+    private fun roundedWindowBackground(context: Context, color: Int): GradientDrawable {
+        val radiusPx = Settings.readKeyboardCornerRadius(context.prefs()) * context.resources.displayMetrics.density
+        return GradientDrawable().apply {
+            setColor(color)
+            cornerRadii = floatArrayOf(
+                radiusPx, radiusPx,
+                radiusPx, radiusPx,
+                0f, 0f,
+                0f, 0f
+            )
+        }
+    }
+
     private fun samsungBlurTarget(inputView: View?): View? {
         return inputView?.findViewById<View?>(R.id.main_keyboard_frame) ?: inputView
     }
@@ -381,10 +398,50 @@ object FrostedGlassHelper {
         }
     }
 
-    private fun restoreSamsungTargetBackground(target: View?) {
+    private fun restoreFrostedThemeBackground(context: Context, inputView: View?) {
+        val target = samsungBlurTarget(inputView)
         if (target == null) return
-        Settings.getValues()?.mColors?.setBackground(target, ColorType.MAIN_BACKGROUND)
+        target.setBackgroundColor(Color.WHITE)
+        val colors = runCatching { KeyboardTheme.getColorsForCurrentTheme(context) }
+            .getOrNull()
+            ?: Settings.getValues()?.mColors
+        colors?.setBackground(target, ColorType.MAIN_BACKGROUND)
         target.invalidate()
+    }
+
+    private fun applySolidFallbackBackground(context: Context, window: Window, inputView: View?) {
+        val color = solidFallbackColor(context)
+        window.setBackgroundDrawable(roundedWindowBackground(context, color))
+        inputView?.setBackgroundColor(Color.TRANSPARENT)
+        samsungBlurTarget(inputView)?.let { target ->
+            target.setBackgroundColor(color)
+            target.invalidate()
+        }
+    }
+
+    private fun solidFallbackColor(context: Context): Int {
+        val baseColor = runCatching { KeyboardTheme.getColorsForCurrentTheme(context).get(ColorType.MAIN_BACKGROUND) }
+            .getOrNull()
+            ?: Settings.getValues()?.mColors?.get(ColorType.MAIN_BACKGROUND)
+            ?: if (isNight(context)) Color.BLACK else Color.WHITE
+        val opaqueColor = ColorUtils.setAlphaComponent(baseColor, 255)
+        return if (baseColor == Color.TRANSPARENT) {
+            if (isNight(context)) Color.BLACK else Color.WHITE
+        } else {
+            opaqueColor
+        }
+    }
+
+    private fun isSystemBlurAvailable(context: Context): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return false
+        if (isBatterySaverMode(context)) return false
+        return try {
+            val windowManager = context.getSystemService(Context.WINDOW_SERVICE) as? WindowManager
+            windowManager?.isCrossWindowBlurEnabled == true
+        } catch (e: Throwable) {
+            Log.w(TAG, "Could not read cross-window blur availability; assuming available", e)
+            true
+        }
     }
 
     private fun blurRadius(context: Context): Int {
@@ -396,16 +453,6 @@ object FrostedGlassHelper {
                 context.prefs().getInt(Settings.PREF_FROSTED_BLUR_RADIUS, Defaults.PREF_FROSTED_BLUR_RADIUS)
             }
     }
-    private fun windowTint(context: Context, blursEnabled: Boolean): Int {
-        val isNight = isNight(context)
-        return when {
-            blursEnabled && isNight -> DARK_TINT_WITH_BLUR
-            blursEnabled -> LIGHT_TINT_WITH_BLUR
-            isNight -> DARK_TINT_WITHOUT_BLUR
-            else -> LIGHT_TINT_WITHOUT_BLUR
-        }
-    }
-
     /**
      * Computes the Samsung SemBlurInfo tint overlay color from user preferences.
      * This ONLY affects the color/alpha of the overlay on top of the blurred content.

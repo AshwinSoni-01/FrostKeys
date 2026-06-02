@@ -9,7 +9,6 @@ package helium314.keyboard.latin.common;
 import androidx.annotation.NonNull;
 
 import helium314.keyboard.keyboard.internal.keyboard_parser.floris.KeyCode;
-import helium314.keyboard.latin.BuildConfig;
 
 public final class Constants {
 
@@ -151,8 +150,8 @@ public final class Constants {
 
     // Key events coming any faster than this are long-presses.
     public static final int LONG_PRESS_MILLISECONDS = 200;
-    // TODO: Set this value appropriately.
-    public static final int GET_SUGGESTED_WORDS_TIMEOUT = BuildConfig.DEBUG ? 500 : 200; // debug build is slow, and timeout is annoying for testing
+    // Keep the UI thread responsive; slow suggestion results are skipped and refreshed later.
+    public static final int GET_SUGGESTED_WORDS_TIMEOUT = 40;
     // How many continuous deletes at which to start deleting at a higher speed.
     public static final int DELETE_ACCELERATE_AT = 20;
 

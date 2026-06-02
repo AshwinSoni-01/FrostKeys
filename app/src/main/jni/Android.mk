@@ -40,11 +40,12 @@ ifeq ($(TARGET_ARCH), x86)
     LOCAL_CFLAGS += -mstackrealign
 endif # x86
 
-# Workaround for clang 19 compiler crash on armv7 (Thumb-2 vectorizer signal failure)
+# Workaround for clang 19 compiler crash (vectorizer signal failure)
+# This affects multiple architectures in NDK r28
 ifeq ($(TARGET_ARCH_ABI), armeabi-v7a)
     LOCAL_ARM_MODE := arm
-    LOCAL_CFLAGS += -fno-vectorize -fno-slp-vectorize
 endif
+LOCAL_CFLAGS += -fno-vectorize -fno-slp-vectorize
 
 include $(LOCAL_PATH)/NativeFileList.mk
 
@@ -69,8 +70,7 @@ endif # FLAG_DO_PROFILE
 LOCAL_MODULE := libjni_latinime_common_static
 LOCAL_MODULE_TAGS := optional
 
-LOCAL_CLANG := true
-LOCAL_SDK_VERSION := 14
+LOCAL_SDK_VERSION := 21
 LOCAL_NDK_STL_VARIANT := c++_static
 
 include $(BUILD_STATIC_LIBRARY)
@@ -93,8 +93,7 @@ endif # FLAG_DO_PROFILE
 LOCAL_MODULE := libjni_latinime
 LOCAL_MODULE_TAGS := optional
 
-LOCAL_CLANG := true
-LOCAL_SDK_VERSION := 14
+LOCAL_SDK_VERSION := 21
 LOCAL_NDK_STL_VARIANT := c++_static
 LOCAL_LDFLAGS += -ldl
 

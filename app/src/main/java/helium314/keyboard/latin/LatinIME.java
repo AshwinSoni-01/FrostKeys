@@ -24,6 +24,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Debug;
 import android.os.Message;
+import android.os.PowerManager;
 import android.os.Process;
 import android.util.PrintWriterPrinter;
 import android.util.Printer;
@@ -742,6 +743,11 @@ public class LatinIME extends InputMethodService implements
         filter.addAction(AudioManager.RINGER_MODE_CHANGED_ACTION);
         registerReceiver(mRingerModeChangeReceiver, filter);
 
+        final IntentFilter powerSaveFilter = new IntentFilter();
+        powerSaveFilter.addAction(PowerManager.ACTION_POWER_SAVE_MODE_CHANGED);
+        ContextCompat.registerReceiver(this, mPowerSaveModeChangeReceiver, powerSaveFilter,
+                ContextCompat.RECEIVER_NOT_EXPORTED);
+
         // Register to receive installation and removal of a dictionary pack.
         final IntentFilter packageFilter = new IntentFilter();
         packageFilter.addAction(Intent.ACTION_PACKAGE_ADDED);
@@ -960,6 +966,7 @@ public class LatinIME extends InputMethodService implements
         if (foldableObserver != null)
             foldableObserver.unregister(this);
         unregisterReceiver(mRingerModeChangeReceiver);
+        unregisterReceiver(mPowerSaveModeChangeReceiver);
         unregisterReceiver(mDictionaryPackInstallReceiver);
         unregisterReceiver(mDictionaryDumpBroadcastReceiver);
         unregisterReceiver(mRestartAfterDeviceUnlockReceiver);
@@ -2144,6 +2151,22 @@ public class LatinIME extends InputMethodService implements
                 Log.i(TAG, "ringer mode changed, zen_mode on: " + dnd);
                 AudioAndHapticFeedbackManager.getInstance().onRingerModeChanged(dnd);
             }
+        }
+    };
+
+    private final BroadcastReceiver mPowerSaveModeChangeReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(final Context context, final Intent intent) {
+            if (!PowerManager.ACTION_POWER_SAVE_MODE_CHANGED.equals(intent.getAction())) {
+                return;
+            }
+            if (mInputView == null || !isInputViewShown()) {
+                return;
+            }
+            FrostedGlassHelper.configureFrostedGlass(
+                    LatinIME.this,
+                    mInputView,
+                    FrostedGlassHelper.isFrostedTheme(LatinIME.this));
         }
     };
 

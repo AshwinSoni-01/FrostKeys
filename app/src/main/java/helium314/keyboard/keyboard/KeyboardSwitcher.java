@@ -85,9 +85,11 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
     private RichInputMethodManager mRichImm;
     private boolean mIsHardwareAcceleratedDrawingEnabled;
     private java.util.List<String> mCachedPersistentEmojis = null;
+    private java.util.List<String> mCurrentlyDisplayedPersistentEmojis = null;
 
     public void clearCachedPersistentEmojis() {
         mCachedPersistentEmojis = null;
+        mCurrentlyDisplayedPersistentEmojis = null;
     }
 
     private KeyboardState mState;
@@ -1198,11 +1200,13 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
         if (!enabled || mMainKeyboardFrame == null || mMainKeyboardFrame.getVisibility() != View.VISIBLE) {
             mPersistentEmojiRowScroll.setVisibility(View.GONE);
             if (divider != null) divider.setVisibility(View.GONE);
+            mCurrentlyDisplayedPersistentEmojis = null;
             return;
         }
         if (inPanel) {
             mPersistentEmojiRowScroll.setVisibility(View.GONE);
             if (divider != null) divider.setVisibility(View.GONE);
+            mCurrentlyDisplayedPersistentEmojis = null;
             return;
         }
         mPersistentEmojiRowScroll.setVisibility(View.VISIBLE);
@@ -1224,6 +1228,13 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
         } else {
             emojis.addAll(rawEmojis);
         }
+
+        if (mCurrentlyDisplayedPersistentEmojis != null && mCurrentlyDisplayedPersistentEmojis.equals(emojis) && mPersistentEmojiRowContainer.getChildCount() > 0) {
+            mPersistentEmojiRowScroll.setVisibility(View.VISIBLE);
+            if (divider != null) divider.setVisibility(View.VISIBLE);
+            return;
+        }
+        mCurrentlyDisplayedPersistentEmojis = emojis;
 
         mPersistentEmojiRowContainer.removeAllViews();
         final android.content.Context context = mPersistentEmojiRowContainer.getContext();
