@@ -73,6 +73,7 @@ import helium314.keyboard.latin.utils.htmlToAnnotated
 import helium314.keyboard.latin.utils.mainLayoutName
 import helium314.keyboard.latin.utils.prefs
 import helium314.keyboard.latin.utils.withHtmlLink
+import helium314.keyboard.latin.utils.withMainLayoutAndLocaleDefaults
 import helium314.keyboard.settings.ActionRow
 import helium314.keyboard.latin.utils.DefaultButton
 import helium314.keyboard.latin.utils.DeleteButton
@@ -420,7 +421,7 @@ private fun MainLayoutRow(
                 if (layout == SubtypeLocaleUtils.QWERTY
                     && SubtypeSettings.getResourceSubtypesForLocale(currentSubtype.locale).any { it.mainLayoutName() == null })
                     setCurrentSubtype(currentSubtype.withoutLayout(LayoutType.MAIN))
-                else setCurrentSubtype(currentSubtype.withLayout(LayoutType.MAIN, layout))
+                else setCurrentSubtype(currentSubtype.withMainLayoutAndLocaleDefaults(layout))
             },
             extraButton = {
                 IconButton({ showAddLayoutDialog = true })

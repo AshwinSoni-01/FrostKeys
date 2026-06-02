@@ -14,6 +14,7 @@ import helium314.keyboard.latin.common.LocaleUtils.constructLocale
 import helium314.keyboard.latin.common.LocaleUtils.isGoodMatch
 import helium314.keyboard.latin.settings.Defaults
 import helium314.keyboard.latin.settings.Settings
+import helium314.keyboard.latin.settings.SettingsSubtype
 import helium314.keyboard.latin.settings.SettingsSubtype.Companion.getExtraValueOf
 import helium314.keyboard.latin.utils.SubtypeSettings.isEnabled
 import org.xmlpull.v1.XmlPullParser
@@ -33,6 +34,20 @@ fun InputMethodSubtype.mainLayoutName(): String? {
 }
 
 fun InputMethodSubtype.mainLayoutNameOrQwerty(): String = mainLayoutName() ?: SubtypeLocaleUtils.QWERTY
+
+fun SettingsSubtype.withMainLayoutAndLocaleDefaults(layoutName: String): SettingsSubtype {
+    val subtype = withLayout(LayoutType.MAIN, layoutName)
+    if (locale.language != LayoutUtils.LANGUAGE_BURMESE) return subtype
+    return when (layoutName) {
+        LayoutUtils.LAYOUT_MYANMAR_BASIC ->
+            subtype.withLayout(LayoutType.SYMBOLS, LayoutUtils.LAYOUT_MYANMAR_BASIC_SYMBOLS)
+        LayoutUtils.LAYOUT_MYANMAR_G ->
+            if (subtype.layoutName(LayoutType.SYMBOLS) == LayoutUtils.LAYOUT_MYANMAR_BASIC_SYMBOLS)
+                subtype.withoutLayout(LayoutType.SYMBOLS)
+            else subtype
+        else -> subtype
+    }
+}
 
 fun getResourceSubtypes(resources: Resources): List<InputMethodSubtype> {
     val subtypes = mutableListOf<InputMethodSubtype>()

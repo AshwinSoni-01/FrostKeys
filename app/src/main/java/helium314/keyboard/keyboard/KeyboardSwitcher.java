@@ -172,10 +172,13 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
         final KeyboardLayoutSet.Builder builder = new KeyboardLayoutSet.Builder(
                 mThemeContext, editorInfo);
         final int keyboardWidth = ResourceUtils.getKeyboardWidth(mThemeContext, settingsValues);
-        final int keyboardHeight = ResourceUtils.getKeyboardHeight(mThemeContext.getResources(), settingsValues);
+        final RichInputMethodSubtype currentSubtype = mRichImm.getCurrentSubtype();
+        final int keyboardHeight = ResourceUtils.getKeyboardHeightForLocale(
+                ResourceUtils.getKeyboardHeight(mThemeContext.getResources(), settingsValues),
+                currentSubtype.getLocale());
         final boolean oneHandedModeEnabled = settingsValues.mOneHandedModeEnabled;
         mKeyboardLayoutSet = builder.setKeyboardGeometry(keyboardWidth, keyboardHeight)
-                .setSubtype(mRichImm.getCurrentSubtype())
+                .setSubtype(currentSubtype)
                 .setVoiceInputKeyEnabled(settingsValues.mShowsVoiceInputKey)
                 .setNumberRowEnabled(settingsValues.mShowsNumberRow)
                 .setNumberRowInSymbolsEnabled(settingsValues.mShowsNumberRowInSymbols)

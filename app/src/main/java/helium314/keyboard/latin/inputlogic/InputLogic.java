@@ -1736,6 +1736,62 @@ public final class InputLogic {
         return result;
     }
 
+    public void performUpdateSuggestionStrip(final SettingsValues settingsValues, final int inputStyle) {
+        long startTimeMillis = 0;
+        if (DebugFlags.DEBUG_ENABLED) {
+            startTimeMillis = SystemClock.elapsedRealtime();
+            Log.d(TAG, "performUpdateSuggestionStrip()");
+        }
+        // Check if we have a suggestion engine attached.
+        if (!settingsValues.needsToLookupSuggestions()) {
+            if (mWordComposer.isComposingWord()) {
+                Log.w(TAG, "Called updateSuggestionsOrPredictions but suggestions were not "
+                        + "requested!");
+            }
+            // Clear the suggestions strip.
+            mSuggestionStripViewAccessor.setSuggestions(SuggestedWords.getEmptyInstance());
+            return;
+        }
+
+        if (!mWordComposer.isComposingWord() && !settingsValues.mBigramPredictionEnabled) {
+            mSuggestionStripViewAccessor.setNeutralSuggestionStrip();
+            return;
+        }
+
+        mInputLogicHandler.getSuggestedWords(() -> getSuggestedWords(
+            inputStyle, SuggestedWords.NOT_A_SEQUENCE_NUMBER,
+            suggestedWords -> {
+                final String typedWordString = mWordComposer.getTypedWord();
+                final SuggestedWordInfo typedWordInfo = new SuggestedWordInfo(
+                    typedWordString, "", SuggestedWordInfo.MAX_SCORE, SuggestedWordInfo.KIND_TYPED,
+                    Dictionary.DICTIONARY_USER_TYPED, SuggestedWordInfo.NOT_AN_INDEX, SuggestedWordInfo.NOT_A_CONFIDENCE
+                );
+                // Show new suggestions if we have at least one. Otherwise keep the old
+                // suggestions with the new typed word. Exception: if the length of the
+                // typed word is <= 1 (after a deletion typically) we clear old suggestions.
+                final SuggestedWords result;
+                if (suggestedWords.size() > 1 || typedWordString.length() <= 1) {
+                    result = suggestedWords;
+                } else {
+                    result = retrieveOlderSuggestions(typedWordInfo, mSuggestedWords);
+                }
+
+                mLatinIME.mHandler.post(() -> {
+                    if (result != null) {
+                        // Prefer clipboard suggestions (if available and setting is enabled) over beginning of sentence predictions.
+                        if (!(result.mInputStyle == SuggestedWords.INPUT_STYLE_BEGINNING_OF_SENTENCE_PREDICTION
+                                && mLatinIME.tryShowClipboardSuggestion())) {
+                            mSuggestionStripViewAccessor.setSuggestions(result);
+                        }
+                        if (!result.isEmpty() && settingsValues.isSuggestionsEnabledPerUserSettings() && isInlineEmojiSearchAction()) {
+                            mSuggestionStripViewAccessor.showSuggestionStrip();
+                        }
+                    }
+                });
+            }
+        ));
+    }
+
     public void performUpdateSuggestionStripSync(final SettingsValues settingsValues, final int inputStyle) {
         long startTimeMillis = 0;
         if (DebugFlags.DEBUG_ENABLED) {

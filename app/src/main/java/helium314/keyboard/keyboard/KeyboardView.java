@@ -101,6 +101,8 @@ public class KeyboardView extends View {
     private final Canvas mOffscreenCanvas = new Canvas();
     @NonNull
     private final Paint mPaint = new Paint();
+    @NonNull
+    private final Paint mBackgroundPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint.FontMetrics mFontMetrics = new Paint.FontMetrics();
     private final Rect mEmojiLabelBounds = new Rect();
 
@@ -406,7 +408,7 @@ public class KeyboardView extends View {
             final boolean isCircleStyle = KeyboardTheme.STYLE_CIRCLE.equals(themeStyle);
             final boolean isRoundableKey = isCircleStyle
                     ? (!key.isSpacer() && !isSpaceBar)
-                    : (!key.isSpacer() && !key.hasFunctionalBackground() && key.getCode() > 0 && !isSpaceBar);
+                    : (!key.isSpacer() && !key.hasFunctionalBackground() && (key.getCode() > 0 || key.getCode() == KeyCode.MULTIPLE_CODE_POINTS) && !isSpaceBar);
 
             if (isSpaceBar || isRoundableKey) {
                 ColorType colorType;
@@ -422,8 +424,7 @@ public class KeyboardView extends View {
                     colorType = ColorType.KEY_BACKGROUND;
                 }
 
-                final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
-                paint.setColor(KeyBackgroundUtils.fillColorFor(mColors, colorType, key.isPressed() || key.isLocked()));
+                mBackgroundPaint.setColor(KeyBackgroundUtils.fillColorFor(mColors, colorType, key.isPressed() || key.isLocked()));
 
                 canvas.translate(bgX, bgY);
                 if (isCircleStyle) {
@@ -437,17 +438,17 @@ public class KeyboardView extends View {
                         final float yOffset = (bgHeight - targetBgHeight) * 0.5f;
                         final float spaceRadius = targetBgHeight * 0.5f;
                         canvas.drawRoundRect(0f, yOffset, bgWidth, yOffset + targetBgHeight, spaceRadius,
-                                spaceRadius, paint);
+                                spaceRadius, mBackgroundPaint);
                     } else {
                         final float centerX = bgWidth * 0.5f;
                         final float centerY = bgHeight * 0.5f;
-                        canvas.drawCircle(centerX, centerY, circleRadius, paint);
+                        canvas.drawCircle(centerX, centerY, circleRadius, mBackgroundPaint);
                     }
                 } else if (isSpaceBar) {
                     final float spaceRadius = bgHeight * 0.5f;
-                    canvas.drawRoundRect(0f, 0f, bgWidth, bgHeight, spaceRadius, spaceRadius, paint);
+                    canvas.drawRoundRect(0f, 0f, bgWidth, bgHeight, spaceRadius, spaceRadius, mBackgroundPaint);
                 } else {
-                    canvas.drawRoundRect(0f, 0f, bgWidth, bgHeight, bgWidth * 0.5f, bgWidth * 0.5f, paint);
+                    canvas.drawRoundRect(0f, 0f, bgWidth, bgHeight, bgWidth * 0.5f, bgWidth * 0.5f, mBackgroundPaint);
                 }
                 canvas.translate(-bgX, -bgY);
                 return;
@@ -480,6 +481,15 @@ public class KeyboardView extends View {
     private Keyboard mLastTopRowKeyboard = null;
     private int mTopAlphabetRowY = -1;
 
+    /** Returns true if the label's first codepoint is in a Myanmar Unicode block. */
+    private static boolean isMyanmarLabel(final String label) {
+        if (label == null || label.isEmpty()) return false;
+        final int cp = Character.codePointAt(label, 0);
+        return (cp >= 0x1000 && cp <= 0x109F)
+                || (cp >= 0xAA60 && cp <= 0xAA7F)
+                || (cp >= 0xA9E0 && cp <= 0xA9FF);
+    }
+
     private int getTopAlphabetRowY(Keyboard keyboard) {
         if (keyboard == null)
             return -1;
@@ -489,7 +499,9 @@ public class KeyboardView extends View {
         mLastTopRowKeyboard = keyboard;
         int topY = -1;
         for (Key k : keyboard.getSortedKeys()) {
-            if (k.getLabel() != null && k.getLabel().length() == 1 && Character.isLetter(k.getLabel().charAt(0))) {
+            final String lbl = k.getLabel();
+            if (lbl != null && ((lbl.length() == 1 && Character.isLetter(lbl.charAt(0)))
+                    || isMyanmarLabel(lbl))) {
                 if (topY == -1 || k.getY() < topY) {
                     topY = k.getY();
                 }
@@ -540,7 +552,9 @@ public class KeyboardView extends View {
 
         if (label != null && hintLabel != null && mShowsHints) {
             int topRowY = getTopAlphabetRowY(keyboard);
-            if (topRowY != -1 && key.getY() == topRowY && label.length() == 1 && Character.isLetter(label.charAt(0))) {
+            if (topRowY != -1 && key.getY() == topRowY
+                    && ((label.length() == 1 && Character.isLetter(label.charAt(0)))
+                        || isMyanmarLabel(label))) {
                 isTopRowNumberHintStacking = true;
             }
         }
@@ -571,20 +585,33 @@ public class KeyboardView extends View {
                     : centerY + labelCharHeight / 2.0f;
 
             if (isTopRowNumberHintStacking) {
-                Paint tempPaint = new Paint(paint);
-                tempPaint.setTextSize(key.selectHintTextSize(params) * mFontSizeMultiplier);
-                tempPaint.setTypeface(KeyboardTypeface.resolve(hintLabel, Typeface.DEFAULT_BOLD));
-                float hintCharHeight = TypefaceUtils.getReferenceCharHeight(tempPaint);
+                final float originalTextSize = paint.getTextSize();
+                final Typeface originalTypeface = paint.getTypeface();
 
-                boolean isLowercase = label.length() > 0 && Character.isLowerCase(label.charAt(0));
-                float effectiveLabelHeight = isLowercase ? labelCharHeight * 0.7f : labelCharHeight;
-                float gap = labelCharHeight * 0.42f; // Slightly increased gap to prevent overlap
+                paint.setTextSize(key.selectHintTextSize(params) * mFontSizeMultiplier);
+                paint.setTypeface(KeyboardTypeface.resolve(hintLabel, Typeface.DEFAULT_BOLD));
+                float hintCharHeight = TypefaceUtils.getReferenceCharHeight(paint);
+                float hintAscent = paint.ascent();
 
-                float totalVisualHeight = effectiveLabelHeight + gap + hintCharHeight;
-                float descenderCompensation = isLowercase ? labelCharHeight * 0.08f : 0f;
+                if (isMyanmarLabel(label)) {
+                    // Push the number hint to the absolute top edge of the key
+                    stackedHintBaseline = -hintAscent + mKeyHintLetterPadding;
+                    // Center the main label vertically, slightly shifted down to accommodate the top hint
+                    labelBaseline = centerY + labelCharHeight / 2.0f + (hintCharHeight / 2.0f);
+                } else {
+                    boolean isLowercase = label.length() > 0 && Character.isLowerCase(label.charAt(0));
+                    float effectiveLabelHeight = isLowercase ? labelCharHeight * 0.7f : labelCharHeight;
+                    float gap = labelCharHeight * 0.42f; // Slightly increased gap to prevent overlap
+    
+                    float totalVisualHeight = effectiveLabelHeight + gap + hintCharHeight;
+                    float descenderCompensation = isLowercase ? labelCharHeight * 0.08f : 0f;
+    
+                    labelBaseline = centerY + totalVisualHeight / 2.0f - descenderCompensation;
+                    stackedHintBaseline = centerY - totalVisualHeight / 2.0f - hintAscent - descenderCompensation;
+                }
 
-                labelBaseline = centerY + totalVisualHeight / 2.0f - descenderCompensation;
-                stackedHintBaseline = centerY - totalVisualHeight / 2.0f - tempPaint.ascent() - descenderCompensation;
+                paint.setTextSize(originalTextSize);
+                paint.setTypeface(originalTypeface);
             }
 
             // Horizontal label text alignment

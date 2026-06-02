@@ -1,0 +1,94 @@
+{
+  "artifact": "assets/dictionaries/Burmese_Myanmar.dict",
+  "combined_wordlist": "build/generated/burmese_dictionary/Burmese_Myanmar.combined",
+  "locale": "my",
+  "dictionary_type": "main",
+  "generated_on": "2026-06-03",
+  "word_count": 146438,
+  "boosted_word_count": 23899,
+  "sha256": "ac24e19342c28557c9f32ea8e60703e842a49fc4ada8b7b4931b808e81c256f8",
+  "bytes": 2727793,
+  "excluded": [
+    "Awesome classify_data conversational/abusive phrase lists",
+    "Awesome bullywords.txt offensive list",
+    "Karen word lists and NRC metadata because they are not Burmese main-language word lists"
+  ],
+  "source_commits": {
+    "mcfnlp/Dictionary": "ba6184014052dd066793111faabeeab55a2f863d",
+    "chanmratekoko/Awesome-Myanmar-Wordlists-Dictionary-Collection": "c6f1514fc7d17b4ca1dfb103b0cd58c892effe39",
+    "Helium314/aosp-dictionaries dicttool": "881a5ac3c6fdc5fd866fcdc517b7534c5574dd6b"
+  },
+  "source_stats": {
+    "awesome:mydict-common-words": {
+      "path": "myanmar-data/ethnic dataset/burmese-word-lists/mydict-common-words.txt",
+      "scanned_lines": 28854,
+      "new_words": 28613,
+      "base_weight": 230
+    },
+    "awesome:mydict-mmnlp-words": {
+      "path": "myanmar-data/ethnic dataset/burmese-word-lists/mydict-mmnlp-words.txt",
+      "scanned_lines": 32885,
+      "new_words": 15264,
+      "base_weight": 220
+    },
+    "awesome:stop_words": {
+      "path": "myanmar-data/stopword-lists/stop_words.txt",
+      "scanned_lines": 275,
+      "new_words": 173,
+      "base_weight": 245
+    },
+    "awesome:stopword": {
+      "path": "myanmar-data/stopword-lists/stopword.txt",
+      "scanned_lines": 436,
+      "new_words": 58,
+      "base_weight": 245
+    },
+    "awesome:mydict-syllables": {
+      "path": "myanmar-data/ethnic dataset/burmese-word-lists/mydict-syllables.txt",
+      "scanned_lines": 2552,
+      "new_words": 566,
+      "base_weight": 100
+    },
+    "awesome:person-names": {
+      "path": "myanmar-names/person-name.ver1.0 (Ye Kyaw Thu).txt",
+      "scanned_lines": 100121,
+      "new_words": 29230,
+      "base_weight": 120
+    },
+    "awesome:name-json": {
+      "path": "myanmar-names/mm2en.json + en2mm.json",
+      "scanned_entries": 2924,
+      "new_words": 1,
+      "base_weight": 115
+    },
+    "mcfnlp:definition-tokens": {
+      "path": "Dictionary(Eng-Myan)Wordlist_Part_A.xls + Part_B.xls def column",
+      "scanned_rows": 109638,
+      "candidate_tokens": 192058,
+      "new_words": 72533,
+      "base_weight": 175,
+      "max_codepoints": 24
+    }
+  },
+  "weight_distribution": {
+    "254": 1778,
+    "250": 6189,
+    "245": 126,
+    "240": 10649,
+    "230": 14947,
+    "220": 10419,
+    "205": 7,
+    "195": 7,
+    "185": 89,
+    "175": 72533,
+    "150": 1,
+    "140": 18,
+    "135": 89,
+    "125": 337,
+    "120": 28784,
+    "115": 1,
+    "110": 2,
+    "100": 462
+  },
+  "license_note": "Requested source repositories do not include clear root licenses. Treat this generated artifact as requiring license review before redistribution."
+}

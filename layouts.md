@@ -6,6 +6,8 @@ There are two distinct formats:
 
 You can add both directly in the app, see the related [Wiki page](https://github.com/HeliBorg/HeliBoard/wiki/2.-Layouts).
 
+Importable sample layouts live in [assets/layouts](assets/layouts). The Burmese/Myanmar samples include FUTO's Apache-2.0 `Myanmar G` mobile layout and Keyman's MIT-licensed `basic_kbdmyan` computer/basic layout.
+
 ## General notes
 Adding too many keys or too long texts will make the keyboard look awkward or broken, and even crash the app under some specific conditions (popup keys are especially prone for this).
 There are some sanity checks when adding a layout to avoid such issues, but they do not cover all possible cases.

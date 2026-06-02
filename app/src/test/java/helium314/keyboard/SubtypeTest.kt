@@ -10,10 +10,13 @@ import helium314.keyboard.latin.common.LocaleUtils.constructLocale
 import helium314.keyboard.latin.settings.Settings
 import helium314.keyboard.latin.settings.SettingsSubtype.Companion.toSettingsSubtype
 import helium314.keyboard.latin.utils.LayoutType
+import helium314.keyboard.latin.utils.LayoutUtils
 import helium314.keyboard.latin.utils.POPUP_KEYS_LAYOUT
 import helium314.keyboard.latin.utils.SubtypeSettings
 import helium314.keyboard.latin.utils.SubtypeUtilsAdditional
+import helium314.keyboard.latin.utils.mainLayoutName
 import helium314.keyboard.latin.utils.prefs
+import helium314.keyboard.latin.utils.withMainLayoutAndLocaleDefaults
 import org.junit.runner.RunWith
 import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
@@ -71,5 +74,25 @@ class SubtypeTest {
         SubtypeUtilsAdditional.changeAdditionalSubtype(to, toNew, latinIME)
         assertEquals(emptyList(), SubtypeSettings.getAdditionalSubtypes().map { it.toSettingsSubtype() })
         assertEquals(from.toSettingsSubtype(), SubtypeSettings.getEnabledSubtypes(false).single().toSettingsSubtype())
+    }
+
+    @Test fun burmeseResourceSubtypeIsAvailable() {
+        val subtype = SubtypeSettings.getResourceSubtypesForLocale("my".constructLocale()).single()
+        assertEquals(LayoutUtils.LAYOUT_MYANMAR_G, subtype.mainLayoutName())
+        assertTrue(!subtype.extraValue.contains("SYMBOLS:"))
+        assertTrue(subtype.extraValue.contains("EmojiCapable"))
+        assertTrue(!subtype.isAsciiCapable)
+
+        val layouts = LayoutUtils.getAvailableLayouts(LayoutType.MAIN, latinIME, "my".constructLocale()).toList()
+        assertEquals(LayoutUtils.LAYOUT_MYANMAR_G, layouts[0])
+        assertTrue(LayoutUtils.LAYOUT_MYANMAR_BASIC in layouts)
+
+        val basicSubtype = subtype.toSettingsSubtype().withMainLayoutAndLocaleDefaults(LayoutUtils.LAYOUT_MYANMAR_BASIC)
+        assertEquals(LayoutUtils.LAYOUT_MYANMAR_BASIC, basicSubtype.mainLayoutName())
+        assertEquals(LayoutUtils.LAYOUT_MYANMAR_BASIC_SYMBOLS, basicSubtype.layoutName(LayoutType.SYMBOLS))
+
+        val defaultSubtype = basicSubtype.withMainLayoutAndLocaleDefaults(LayoutUtils.LAYOUT_MYANMAR_G)
+        assertEquals(LayoutUtils.LAYOUT_MYANMAR_G, defaultSubtype.mainLayoutName())
+        assertEquals(null, defaultSubtype.layoutName(LayoutType.SYMBOLS))
     }
 }

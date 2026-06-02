@@ -1,0 +1,503 @@
+[
+  [
+    {
+      "$": "shift_state_selector",
+      "default": {
+        "label": "\u1008",
+        "popup": {
+          "relevant": [
+            {
+              "$": "multi_text_key",
+              "label": "\u100d\u1039\u100e",
+              "codePoints": [
+                4109,
+                4153,
+                4110
+              ]
+            }
+          ]
+        }
+      },
+      "manualOrLocked": {
+        "label": "\u1041"
+      }
+    },
+    {
+      "$": "shift_state_selector",
+      "default": {
+        "label": "\u101d",
+        "popup": {
+          "relevant": [
+            {
+              "$": "multi_text_key",
+              "label": "\u1000\u103b\u1015\u103a",
+              "codePoints": [
+                4096,
+                4155,
+                4117,
+                4154
+              ]
+            }
+          ]
+        }
+      },
+      "manualOrLocked": {
+        "label": "\u1042"
+      }
+    },
+    {
+      "$": "shift_state_selector",
+      "default": {
+        "label": "\u100b",
+        "popup": {
+          "relevant": [
+            {
+              "$": "multi_text_key",
+              "label": "\u100b\u1039\u100c",
+              "codePoints": [
+                4107,
+                4153,
+                4108
+              ]
+            }
+          ]
+        }
+      },
+      "manualOrLocked": {
+        "label": "\u1043"
+      }
+    },
+    {
+      "$": "shift_state_selector",
+      "default": {
+        "$": "multi_text_key",
+        "label": "\u102f\u1036",
+        "codePoints": [
+          4143,
+          4150
+        ],
+        "popup": {
+          "relevant": [
+            {
+              "$": "multi_text_key",
+              "label": "\u1004\u103a\u1039",
+              "codePoints": [
+                4100,
+                4154,
+                4153
+              ]
+            }
+          ]
+        }
+      },
+      "manualOrLocked": {
+        "label": "\u1044"
+      }
+    },
+    {
+      "$": "shift_state_selector",
+      "default": {
+        "$": "multi_text_key",
+        "label": "\u1031\u102c",
+        "codePoints": [
+          4145,
+          4140
+        ],
+        "popup": {
+          "relevant": [
+            {
+              "$": "multi_text_key",
+              "label": "\u1031\u102b",
+              "codePoints": [
+                4145,
+                4139
+              ]
+            }
+          ]
+        }
+      },
+      "manualOrLocked": {
+        "label": "\u1045"
+      }
+    },
+    {
+      "$": "shift_state_selector",
+      "default": {
+        "label": "\u102a",
+        "popup": {
+          "relevant": [
+            {
+              "label": "\u1029"
+            }
+          ]
+        }
+      },
+      "manualOrLocked": {
+        "label": "\u1046"
+      }
+    },
+    {
+      "$": "shift_state_selector",
+      "default": {
+        "label": "\u101b",
+        "popup": {
+          "relevant": [
+            {
+              "label": "\u1052"
+            },
+            {
+              "label": "\u1053"
+            }
+          ]
+        }
+      },
+      "manualOrLocked": {
+        "label": "\u1047"
+      }
+    },
+    {
+      "$": "shift_state_selector",
+      "default": {
+        "label": "\u1002",
+        "popup": {
+          "relevant": [
+            {
+              "label": "\u1054"
+            },
+            {
+              "label": "\u1055"
+            }
+          ]
+        }
+      },
+      "manualOrLocked": {
+        "label": "\u1048"
+      }
+    },
+    {
+      "$": "shift_state_selector",
+      "default": {
+        "label": "\u101f",
+        "popup": {
+          "relevant": [
+            {
+              "label": "\u1050"
+            },
+            {
+              "label": "\u1051"
+            }
+          ]
+        }
+      },
+      "manualOrLocked": {
+        "label": "\u1049"
+      }
+    },
+    {
+      "$": "shift_state_selector",
+      "default": {
+        "label": "\u104f"
+      },
+      "manualOrLocked": {
+        "label": "\u1040"
+      }
+    }
+  ],
+  [
+    {
+      "$": "shift_state_selector",
+      "default": {
+        "label": "\u1006"
+      },
+      "manualOrLocked": {
+        "label": "\u100d"
+      }
+    },
+    {
+      "$": "shift_state_selector",
+      "default": {
+        "label": "\u1010"
+      },
+      "manualOrLocked": {
+        "$": "multi_text_key",
+        "label": "\u100f\u1039\u100d",
+        "codePoints": [
+          4111,
+          4153,
+          4109
+        ]
+      }
+    },
+    {
+      "$": "shift_state_selector",
+      "default": {
+        "label": "\u1014"
+      },
+      "manualOrLocked": {
+        "label": "\u1023"
+      }
+    },
+    {
+      "$": "shift_state_selector",
+      "default": {
+        "label": "\u1019"
+      },
+      "manualOrLocked": {
+        "$": "multi_text_key",
+        "label": "\u104e\u1004\u103a\u1038",
+        "codePoints": [
+          4174,
+          4100,
+          4154,
+          4152
+        ]
+      }
+    },
+    {
+      "$": "shift_state_selector",
+      "default": {
+        "label": "\u1021"
+      },
+      "manualOrLocked": {
+        "label": "\u1024"
+      }
+    },
+    {
+      "$": "shift_state_selector",
+      "default": {
+        "label": "\u1015"
+      },
+      "manualOrLocked": {
+        "label": "\u104c"
+      }
+    },
+    {
+      "$": "shift_state_selector",
+      "default": {
+        "label": "\u1000"
+      },
+      "manualOrLocked": {
+        "label": "\u1025"
+      }
+    },
+    {
+      "$": "shift_state_selector",
+      "default": {
+        "label": "\u1004"
+      },
+      "manualOrLocked": {
+        "label": "\u104d"
+      }
+    },
+    {
+      "$": "shift_state_selector",
+      "default": {
+        "label": "\u101e"
+      },
+      "manualOrLocked": {
+        "label": "\u103f"
+      }
+    },
+    {
+      "$": "shift_state_selector",
+      "default": {
+        "label": "\u1005"
+      },
+      "manualOrLocked": {
+        "label": "\u100f"
+      }
+    }
+  ],
+  [
+    {
+      "$": "shift_state_selector",
+      "default": {
+        "label": "\u1031"
+      },
+      "manualOrLocked": {
+        "label": "\u1017"
+      }
+    },
+    {
+      "$": "shift_state_selector",
+      "default": {
+        "label": "\u103b"
+      },
+      "manualOrLocked": {
+        "label": "\u103e"
+      }
+    },
+    {
+      "$": "shift_state_selector",
+      "default": {
+        "label": "\u102d"
+      },
+      "manualOrLocked": {
+        "label": "\u102e"
+      }
+    },
+    {
+      "$": "shift_state_selector",
+      "default": {
+        "label": "\u103a"
+      },
+      "manualOrLocked": {
+        "label": "\u1039"
+      }
+    },
+    {
+      "$": "shift_state_selector",
+      "default": {
+        "label": "\u102b"
+      },
+      "manualOrLocked": {
+        "label": "\u103d"
+      }
+    },
+    {
+      "$": "shift_state_selector",
+      "default": {
+        "label": "\u1037"
+      },
+      "manualOrLocked": {
+        "label": "\u1036"
+      }
+    },
+    {
+      "$": "shift_state_selector",
+      "default": {
+        "label": "\u103c"
+      },
+      "manualOrLocked": {
+        "label": "\u1032"
+      }
+    },
+    {
+      "$": "shift_state_selector",
+      "default": {
+        "label": "\u102f"
+      },
+      "manualOrLocked": {
+        "label": "\u1012"
+      }
+    },
+    {
+      "$": "shift_state_selector",
+      "default": {
+        "label": "\u1030"
+      },
+      "manualOrLocked": {
+        "label": "\u1013"
+      }
+    },
+    {
+      "$": "shift_state_selector",
+      "default": {
+        "label": "\u1038"
+      },
+      "manualOrLocked": {
+        "$": "multi_text_key",
+        "label": "\u100f\u1039\u100c",
+        "codePoints": [
+          4111,
+          4153,
+          4108
+        ]
+      }
+    }
+  ],
+  [
+    {
+      "$": "shift_state_selector",
+      "default": {
+        "label": "\u1016"
+      },
+      "manualOrLocked": {
+        "label": "\u1007"
+      }
+    },
+    {
+      "$": "shift_state_selector",
+      "default": {
+        "label": "\u1011"
+      },
+      "manualOrLocked": {
+        "label": "\u100c"
+      }
+    },
+    {
+      "$": "shift_state_selector",
+      "default": {
+        "label": "\u1001"
+      },
+      "manualOrLocked": {
+        "label": "\u1003"
+      }
+    },
+    {
+      "$": "shift_state_selector",
+      "default": {
+        "label": "\u101c"
+      },
+      "manualOrLocked": {
+        "label": "\u1020"
+      }
+    },
+    {
+      "$": "shift_state_selector",
+      "default": {
+        "label": "\u1018"
+      },
+      "manualOrLocked": {
+        "label": "\u100e"
+      }
+    },
+    {
+      "$": "shift_state_selector",
+      "default": {
+        "label": "\u100a"
+      },
+      "manualOrLocked": {
+        "label": "\u1009"
+      }
+    },
+    {
+      "$": "shift_state_selector",
+      "default": {
+        "label": "\u102c"
+      },
+      "manualOrLocked": {
+        "label": "\u1026"
+      }
+    },
+    {
+      "$": "shift_state_selector",
+      "default": {
+        "label": "\u101a"
+      },
+      "manualOrLocked": {
+        "label": "\u1027"
+      }
+    }
+  ],
+  [
+    {
+      "$": "shift_state_selector",
+      "default": {
+        "label": "\u104a"
+      },
+      "manualOrLocked": {
+        "label": ","
+      }
+    },
+    {
+      "$": "shift_state_selector",
+      "default": {
+        "label": "\u104b"
+      },
+      "manualOrLocked": {
+        "label": "."
+      }
+    }
+  ]
+]

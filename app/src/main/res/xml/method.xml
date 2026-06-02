@@ -92,6 +92,7 @@
     mr_IN: Marathi (India)/marathi
     ms_MY: Malay (Malaysia)/qwerty
     mwl: Mirandese/qwerty
+    my: Burmese (Myanmar)/myanmar_g
     nb: Norwegian Bokmål/qwerty+
     ne_NP: Nepali (Nepal) Romanized/nepali_romanized
     ne_NP: Nepali (Nepal) Traditional/nepali_traditional
@@ -973,6 +974,15 @@
         android:imeSubtypeMode="keyboard"
         android:imeSubtypeExtraValue="AsciiCapable,EmojiCapable"
         android:isAsciiCapable="true"
+    />
+    <subtype android:icon="@drawable/ic_ime_switcher"
+        android:label="@string/subtype_generic"
+        android:subtypeId="0x1a2e94a1"
+        android:imeSubtypeLocale="my"
+        android:languageTag="my"
+        android:imeSubtypeMode="keyboard"
+        android:imeSubtypeExtraValue="KeyboardLayoutSet=MAIN:myanmar_g,NoShiftProximityCorrection,EmojiCapable"
+        android:isAsciiCapable="false"
     />
     <subtype android:icon="@drawable/ic_ime_switcher"
         android:label="@string/subtype_generic"

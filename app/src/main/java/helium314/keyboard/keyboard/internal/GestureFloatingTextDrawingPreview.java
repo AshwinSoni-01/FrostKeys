@@ -408,7 +408,7 @@ public class GestureFloatingTextDrawingPreview extends AbstractDrawingPreview {
             if (mPopupPreviewDirtyBounds.isEmpty()) {
                 return;
             }
-            postInvalidateOnAnimation(mPopupPreviewDirtyBounds.left, mPopupPreviewDirtyBounds.top,
+            invalidate(mPopupPreviewDirtyBounds.left, mPopupPreviewDirtyBounds.top,
                     mPopupPreviewDirtyBounds.right, mPopupPreviewDirtyBounds.bottom);
         }
 

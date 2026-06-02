@@ -17,6 +17,7 @@ import helium314.keyboard.keyboard.internal.keyboard_parser.floris.TextKeyData
 import helium314.keyboard.latin.common.isEmoji
 import helium314.keyboard.latin.define.DebugFlags
 import helium314.keyboard.latin.settings.Settings
+import helium314.keyboard.latin.utils.LayoutUtils
 import helium314.keyboard.latin.utils.LayoutType
 import helium314.keyboard.latin.utils.POPUP_KEYS_LAYOUT
 import helium314.keyboard.latin.utils.POPUP_KEYS_NUMBER
@@ -138,15 +139,25 @@ class KeyboardParser(private val params: KeyboardParams, private val context: Co
             functionalKeys.add(getFunctionalKeysBySide(functionalKeysFromTop, functionalKeysFromBottom))
 
             row.map { key ->
-                val extraFlags = if (key.label.length > 2 && key.label.codePointCount(0, key.label.length) > 2 && !isEmoji(key.label))
-                        Key.LABEL_FLAGS_AUTO_X_SCALE
-                    else 0
+                val extraFlags = if (params.mId.locale.language == LayoutUtils.LANGUAGE_BURMESE && !isEmoji(key.label)) {
+                    // All Burmese keys get AUTO_SCALE so the font size itself shrinks uniformly
+                    // instead of distorting horizontally or spilling vertically.
+                    Key.LABEL_FLAGS_AUTO_SCALE
+                } else if (needsAutoXScale(key))
+                    Key.LABEL_FLAGS_AUTO_X_SCALE
+                else 0
                 if (DebugFlags.DEBUG_ENABLED)
                     Log.d(TAG, "adding key ${key.label}, ${key.code}")
                 key.toKeyParams(params, defaultLabelFlags or extraFlags)
             }
         }
         return setReasonableWidths(baseKeyParams, functionalKeys)
+    }
+
+    private fun needsAutoXScale(key: KeyData): Boolean {
+        if (isEmoji(key.label)) return false
+        val codePointCount = key.label.codePointCount(0, key.label.length)
+        return key.label.length > 2 && codePointCount > 2
     }
 
     /** interprets key width -1, adjusts row size to nicely fit on screen, adds spacers if necessary */

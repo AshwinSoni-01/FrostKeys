@@ -22,10 +22,15 @@ import android.view.WindowMetrics;
 import helium314.keyboard.latin.R;
 import helium314.keyboard.latin.settings.SettingsValues;
 
+import java.util.Locale;
+
 public final class ResourceUtils {
 
     public static final float UNDEFINED_RATIO = -1.0f;
     public static final int UNDEFINED_DIMENSION = -1;
+    // Burmese/Myanmar layouts use five text rows, which the parser compresses into the default
+    // four-row keyboard height. Scaling by 5/4 restores the normal per-key row height for my.
+    private static final float BURMESE_KEYBOARD_HEIGHT_SCALE = 1.25f;
 
     private ResourceUtils() {
         // This utility class is not publicly instantiable.
@@ -68,6 +73,13 @@ public final class ResourceUtils {
         final int defaultKeyboardHeight = getDefaultKeyboardHeight(res, settingsValues.mShowsNumberRow);
         // mKeyboardHeightScale Ranges from [.5,1.5], from xml/prefs_screen_appearance.xml
         return (int)(defaultKeyboardHeight * settingsValues.mKeyboardHeightScale);
+    }
+
+    public static int getKeyboardHeightForLocale(final int keyboardHeight, final Locale locale) {
+        if (locale != null && LayoutUtils.LANGUAGE_BURMESE.equals(locale.getLanguage())) {
+            return Math.round(keyboardHeight * BURMESE_KEYBOARD_HEIGHT_SCALE);
+        }
+        return keyboardHeight;
     }
 
     public static int getDefaultKeyboardHeight(final Resources res, final boolean showsNumberRow) {

@@ -12,6 +12,11 @@ import java.util.Locale
 
 // for layouts provided by the app
 object LayoutUtils {
+    const val LANGUAGE_BURMESE = "my"
+    const val LAYOUT_MYANMAR_G = "myanmar_g"
+    const val LAYOUT_MYANMAR_BASIC = "myanmar_basic"
+    const val LAYOUT_MYANMAR_BASIC_SYMBOLS = "myanmar_basic_symbols"
+
     fun getAvailableLayouts(layoutType: LayoutType, context: Context, locale: Locale? = null): Collection<String> {
         if (layoutType != LayoutType.MAIN)
             return context.assets.list(layoutType.folder)?.map { it.substringBefore(".") }.orEmpty()
@@ -19,7 +24,9 @@ object LayoutUtils {
             return SubtypeSettings.getAllAvailableSubtypes()
                 .mapTo(HashSet()) { it.mainLayoutNameOrQwerty().substringBefore("+") }
                 .apply { addAll(context.resources.getStringArray(R.array.predefined_layouts)) }
-        val layouts = SubtypeSettings.getResourceSubtypesForLocale(locale).mapNotNullTo(mutableSetOf()) { it.mainLayoutName() }
+        val layouts = SubtypeSettings.getResourceSubtypesForLocale(locale).mapNotNullTo(linkedSetOf()) { it.mainLayoutName() }
+        if (locale.language == LANGUAGE_BURMESE)
+            layouts.add(LAYOUT_MYANMAR_BASIC)
         if (locale.script() == ScriptUtils.SCRIPT_LATIN)
             layouts.addAll(context.resources.getStringArray(R.array.predefined_layouts))
         return layouts

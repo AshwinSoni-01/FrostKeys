@@ -4,6 +4,7 @@ package helium314.keyboard
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodSubtype
 import com.android.inputmethod.keyboard.ProximityInfo
+import helium314.keyboard.keyboard.Key
 import helium314.keyboard.keyboard.Key.KeyParams
 import helium314.keyboard.keyboard.Keyboard
 import helium314.keyboard.keyboard.KeyboardId
@@ -19,6 +20,7 @@ import helium314.keyboard.keyboard.internal.keyboard_parser.addLocaleKeyTextsToP
 import helium314.keyboard.keyboard.internal.keyboard_parser.floris.KeyCode
 import helium314.keyboard.latin.LatinIME
 import helium314.keyboard.latin.RichInputMethodSubtype
+import helium314.keyboard.latin.utils.LayoutUtils
 import helium314.keyboard.latin.utils.LayoutUtilsCustom
 import helium314.keyboard.latin.utils.POPUP_KEYS_LAYOUT
 import helium314.keyboard.latin.utils.SubtypeUtilsAdditional
@@ -480,6 +482,113 @@ f""", // no newline at the end
         }
     }
 
+    @Test fun parseImportableSampleLayouts() {
+        val dir = File("../assets/layouts")
+        dir.walk().forEach {
+            if (it.isDirectory || it.extension != "json") return@forEach
+            val keys = LayoutParser.parseJsonString(it.readText())
+                .map { row -> row.mapNotNull { key -> key.compute(params)?.toKeyParams(params) } }
+            assertTrue(LayoutUtilsCustom.checkKeys(keys), "Invalid importable layout ${it.name}")
+        }
+    }
+
+    @Test fun burmeseLayoutsParseAndPassCustomValidation() {
+        val layouts = listOf(
+            "src/main/assets/layouts/main/${LayoutUtils.LAYOUT_MYANMAR_G}.json" to KeyboardId.ELEMENT_ALPHABET,
+            "src/main/assets/layouts/main/${LayoutUtils.LAYOUT_MYANMAR_BASIC}.json" to KeyboardId.ELEMENT_ALPHABET,
+            "src/main/assets/layouts/symbols/${LayoutUtils.LAYOUT_MYANMAR_BASIC_SYMBOLS}.json" to KeyboardId.ELEMENT_SYMBOLS,
+            "../assets/layouts/${LayoutUtils.LAYOUT_MYANMAR_G}.json" to KeyboardId.ELEMENT_ALPHABET,
+            "../assets/layouts/myanmar_basic_main.json" to KeyboardId.ELEMENT_ALPHABET,
+            "../assets/layouts/${LayoutUtils.LAYOUT_MYANMAR_BASIC_SYMBOLS}.json" to KeyboardId.ELEMENT_SYMBOLS
+        )
+        for ((layoutPath, elementId) in layouts) {
+            val keys = parseJsonLayoutFile(layoutPath, elementId)
+            assertTrue(LayoutUtilsCustom.checkKeys(keys), "Invalid Burmese layout $layoutPath")
+        }
+    }
+
+    @Test fun futoMyanmarGLayoutMatchesSourceRows() {
+        val defaultRows = parseJsonLayoutFile(
+            "src/main/assets/layouts/main/${LayoutUtils.LAYOUT_MYANMAR_G}.json",
+            KeyboardId.ELEMENT_ALPHABET
+        )
+        assertTrue(LayoutUtilsCustom.checkKeys(defaultRows), "Invalid Myanmar G default layout")
+        assertEquals(listOf(10, 10, 10, 8, 2), defaultRows.map { it.size })
+        assertEquals(listOf(
+            "\u1008", "\u101d", "\u100b", "\u102f\u1036", "\u1031\u102c",
+            "\u102a", "\u101b", "\u1002", "\u101f", "\u104f"
+        ), defaultRows[0].map { it.mLabel })
+        assertEquals(listOf(
+            "\u1006", "\u1010", "\u1014", "\u1019", "\u1021",
+            "\u1015", "\u1000", "\u1004", "\u101e", "\u1005"
+        ), defaultRows[1].map { it.mLabel })
+        assertEquals(listOf(
+            "\u1031", "\u103b", "\u102d", "\u103a", "\u102b",
+            "\u1037", "\u103c", "\u102f", "\u1030", "\u1038"
+        ), defaultRows[2].map { it.mLabel })
+        assertEquals(listOf(
+            "\u1016", "\u1011", "\u1001", "\u101c",
+            "\u1018", "\u100a", "\u102c", "\u101a"
+        ), defaultRows[3].map { it.mLabel })
+        assertEquals(listOf("\u104a", "\u104b"), defaultRows[4].map { it.mLabel })
+
+        val shiftedRows = parseJsonLayoutFile(
+            "src/main/assets/layouts/main/${LayoutUtils.LAYOUT_MYANMAR_G}.json",
+            KeyboardId.ELEMENT_ALPHABET_MANUAL_SHIFTED
+        )
+        assertTrue(LayoutUtilsCustom.checkKeys(shiftedRows), "Invalid Myanmar G shifted layout")
+        assertEquals(listOf(
+            "\u1041", "\u1042", "\u1043", "\u1044", "\u1045",
+            "\u1046", "\u1047", "\u1048", "\u1049", "\u1040"
+        ), shiftedRows[0].map { it.mLabel })
+        assertEquals(listOf(
+            "\u100d", "\u100f\u1039\u100d", "\u1023", "\u104e\u1004\u103a\u1038", "\u1024",
+            "\u104c", "\u1025", "\u104d", "\u103f", "\u100f"
+        ), shiftedRows[1].map { it.mLabel })
+        assertEquals(listOf(
+            "\u1017", "\u103e", "\u102e", "\u1039", "\u103d",
+            "\u1036", "\u1032", "\u1012", "\u1013", "\u100f\u1039\u100c"
+        ), shiftedRows[2].map { it.mLabel })
+        assertEquals(listOf(
+            "\u1007", "\u100c", "\u1003", "\u1020",
+            "\u100e", "\u1009", "\u1026", "\u1027"
+        ), shiftedRows[3].map { it.mLabel })
+        assertEquals(listOf(",", "."), shiftedRows[4].map { it.mLabel })
+
+        assertEquals("\u102f\u1036", defaultRows[0][3].outputText)
+        assertEquals("\u1031\u102c", defaultRows[0][4].outputText)
+        assertEquals("\u100f\u1039\u100d", shiftedRows[1][1].outputText)
+        assertEquals("\u104e\u1004\u103a\u1038", shiftedRows[1][3].outputText)
+        assertEquals("\u100f\u1039\u100c", shiftedRows[2][9].outputText)
+        assertEquals(
+            listOf(
+                listOf("\u100d\u1039\u100e"), listOf("\u1000\u103b\u1015\u103a"),
+                listOf("\u100b\u1039\u100c"), listOf("\u1004\u103a\u1039"),
+                listOf("\u1031\u102b"), listOf("\u1029"), listOf("\u1052", "\u1053"),
+                listOf("\u1054", "\u1055"), listOf("\u1050", "\u1051"), emptyList()
+            ),
+            defaultRows[0].map { key -> key.mPopupKeys?.map { it.mLabel } ?: emptyList() }
+        )
+    }
+
+    @Test fun burmeseMultiCodepointLabelsAutoScaleHorizontally() {
+        val subtype = SubtypeUtilsAdditional.createEmojiCapableAdditionalSubtype(
+            Locale(LayoutUtils.LANGUAGE_BURMESE),
+            LayoutUtils.LAYOUT_MYANMAR_G,
+            true
+        )
+        val (_, defaultRows) = buildKeyboard(EditorInfo(), subtype, KeyboardId.ELEMENT_ALPHABET)
+        // All Burmese keys now get AUTO_SCALE
+        assertTrue((defaultRows.flatten().first { it.mLabel == "\u1008" }.mLabelFlags and Key.LABEL_FLAGS_AUTO_SCALE) == Key.LABEL_FLAGS_AUTO_SCALE)
+        assertTrue((defaultRows.flatten().first { it.mLabel == "\u102f\u1036" }.mLabelFlags and Key.LABEL_FLAGS_AUTO_SCALE) == Key.LABEL_FLAGS_AUTO_SCALE)
+        assertTrue((defaultRows.flatten().first { it.mLabel == "\u1031\u102c" }.mLabelFlags and Key.LABEL_FLAGS_AUTO_SCALE) == Key.LABEL_FLAGS_AUTO_SCALE)
+
+        val (_, shiftedRows) = buildKeyboard(EditorInfo(), subtype, KeyboardId.ELEMENT_ALPHABET_MANUAL_SHIFTED)
+        assertTrue((shiftedRows.flatten().first { it.outputText == "\u100f\u1039\u100d" }.mLabelFlags and Key.LABEL_FLAGS_AUTO_SCALE) == Key.LABEL_FLAGS_AUTO_SCALE)
+        assertTrue((shiftedRows.flatten().first { it.outputText == "\u104e\u1004\u103a\u1038" }.mLabelFlags and Key.LABEL_FLAGS_AUTO_SCALE) == Key.LABEL_FLAGS_AUTO_SCALE)
+        assertTrue((shiftedRows.flatten().first { it.outputText == "\u100f\u1039\u100c" }.mLabelFlags and Key.LABEL_FLAGS_AUTO_SCALE) == Key.LABEL_FLAGS_AUTO_SCALE)
+    }
+
     @Test fun simpleWithLabelPopupHasCode() {
         val keys = LayoutParser.parseSimpleString("""
             a symbol
@@ -530,6 +639,17 @@ f""", // no newline at the end
             assertEquals(expected[index].popups?.sortedBy { it.first }, keyParams.mPopupKeys?.mapNotNull { it.mLabel to it.mCode }?.sortedBy { it.first })
             assertEquals(expected[index].text, keyParams.outputText)
             assertTrue(LayoutUtilsCustom.checkKeys(listOf(listOf(keyParams))))
+        }
+    }
+
+    private fun parseJsonLayoutFile(path: String, elementId: Int): List<List<KeyParams>> {
+        val previousId = params.mId
+        params.mId = KeyboardLayoutSet.getFakeKeyboardId(elementId)
+        try {
+            return LayoutParser.parseJsonString(File(path).readText())
+                .map { row -> row.mapNotNull { it.compute(params)?.toKeyParams(params) } }
+        } finally {
+            params.mId = previousId
         }
     }
 

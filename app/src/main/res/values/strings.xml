@@ -578,6 +578,10 @@ language, hence "No language". -->
     <string name="layout_number_row" tools:keep="@string/layout_number_row">Number row</string>
     <!-- Name for number row basic layout -->
     <string name="layout_number_row_basic" tools:keep="@string/layout_number_row_basic">Number row (basic)</string>
+    <!-- Name for the FUTO-derived Burmese/Myanmar mobile layout -->
+    <string name="layout_myanmar_g" tools:keep="@string/layout_myanmar_g">Myanmar G</string>
+    <!-- Name for the Keyman-derived Burmese/Myanmar basic computer layout -->
+    <string name="layout_myanmar_basic" tools:keep="@string/layout_myanmar_basic">Basic</string>
     <!-- Name for bottom row layout in emoji view -->
     <string name="layout_emoji_bottom_row" tools:keep="@string/layout_emoji_bottom_row">Emoji bottom row</string>
     <!-- Name for bottom row layout with action key in emoji view -->

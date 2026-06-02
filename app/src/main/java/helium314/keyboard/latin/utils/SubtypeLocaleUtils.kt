@@ -57,6 +57,8 @@ object SubtypeLocaleUtils {
             val layoutName = predefinedLayouts[i]
             keyboardLayoutToDisplayName[layoutName] = layoutDisplayNames[i]
         }
+        keyboardLayoutToDisplayName[LayoutUtils.LAYOUT_MYANMAR_G] = resources.getString(R.string.layout_myanmar_g)
+        keyboardLayoutToDisplayName[LayoutUtils.LAYOUT_MYANMAR_BASIC] = resources.getString(R.string.layout_myanmar_basic)
 
         val exceptionalLocaleInRootLocale = resources.getStringArray(R.array.subtype_locale_displayed_in_root_locale)
         val exceptionalLocaleInRootLocaleDisplayNames = resources.getStringArray(R.array.subtype_locale_displayed_in_root_locale_display_names)
@@ -169,6 +171,12 @@ object SubtypeLocaleUtils {
         else keyboardLayoutToDisplayName[layoutName]
 
     fun getLayoutDisplayNameInSystemLocale(mainLayoutName: String, locale: Locale): String {
+        if (locale.language == LayoutUtils.LANGUAGE_BURMESE) {
+            when (mainLayoutName) {
+                LayoutUtils.LAYOUT_MYANMAR_G -> return resources.getString(R.string.layout_myanmar_g)
+                LayoutUtils.LAYOUT_MYANMAR_BASIC -> return resources.getString(R.string.layout_myanmar_basic)
+            }
+        }
         getMainLayoutDisplayName(mainLayoutName)?.let { return it } // works for custom and latin layouts
 
         // we have some locale-specific layout, use the subtype name

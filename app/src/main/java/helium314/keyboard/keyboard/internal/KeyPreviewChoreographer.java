@@ -212,8 +212,12 @@ public final class KeyPreviewChoreographer {
                 : Math.max(placement.getPopupX() + placement.getPopupWidth(), placement.mWidth);
         final int rootHeight = rootView.getHeight() > 0 ? rootView.getHeight()
                 : Math.max(placement.getPopupY() + placement.getPopupHeight(), placement.mHeight);
-        final int topOverflow = Math.max(rootHeight,
-                placement.getPopupHeight() + Math.max(0, -placement.getPopupY()));
+        
+        // Use a fixed top overflow (rootHeight) instead of dynamically calculating it based on the popup placement.
+        // This ensures layerY and layerHeight remain constant, preventing extremely expensive PopupWindow.update() 
+        // calls during fast typing that cause dropped frames and lag.
+        final int topOverflow = rootHeight;
+        
         final int layerX = -placement.mShadowPadding;
         final int layerY = -topOverflow - placement.mShadowPadding;
         final int layerWidth = rootWidth + placement.mShadowPadding * 2;

@@ -1,0 +1,464 @@
+[
+  [
+    {
+      "$": "shift_state_selector",
+      "default": {
+        "label": "\u1050"
+      },
+      "manualOrLocked": {
+        "label": "\u100e"
+      }
+    },
+    {
+      "$": "shift_state_selector",
+      "default": {
+        "label": "\u1041"
+      },
+      "manualOrLocked": {
+        "label": "\u100d"
+      }
+    },
+    {
+      "$": "shift_state_selector",
+      "default": {
+        "label": "\u1042"
+      },
+      "manualOrLocked": {
+        "label": "\u1052"
+      }
+    },
+    {
+      "$": "shift_state_selector",
+      "default": {
+        "label": "\u1043"
+      },
+      "manualOrLocked": {
+        "label": "\u100b"
+      }
+    },
+    {
+      "$": "shift_state_selector",
+      "default": {
+        "label": "\u1044"
+      },
+      "manualOrLocked": {
+        "label": "\u1053"
+      }
+    },
+    {
+      "$": "shift_state_selector",
+      "default": {
+        "label": "\u1045"
+      },
+      "manualOrLocked": {
+        "label": "\u1054"
+      }
+    },
+    {
+      "$": "shift_state_selector",
+      "default": {
+        "label": "\u1046"
+      },
+      "manualOrLocked": {
+        "label": "\u1055"
+      }
+    },
+    {
+      "$": "shift_state_selector",
+      "default": {
+        "label": "\u1047"
+      },
+      "manualOrLocked": {
+        "label": "\u101b"
+      }
+    },
+    {
+      "$": "shift_state_selector",
+      "default": {
+        "label": "\u1048"
+      },
+      "manualOrLocked": {
+        "label": "*"
+      }
+    },
+    {
+      "$": "shift_state_selector",
+      "default": {
+        "label": "\u1049"
+      },
+      "manualOrLocked": {
+        "label": "("
+      }
+    },
+    {
+      "$": "shift_state_selector",
+      "default": {
+        "label": "\u1040"
+      },
+      "manualOrLocked": {
+        "label": ")"
+      }
+    }
+  ],
+  [
+    {
+      "$": "shift_state_selector",
+      "default": {
+        "label": "\u1006"
+      },
+      "manualOrLocked": {
+        "label": "\u1008"
+      }
+    },
+    {
+      "$": "shift_state_selector",
+      "default": {
+        "label": "\u1010"
+      },
+      "manualOrLocked": {
+        "label": "\u101d"
+      }
+    },
+    {
+      "$": "shift_state_selector",
+      "default": {
+        "label": "\u1014"
+      },
+      "manualOrLocked": {
+        "label": "\u1023"
+      }
+    },
+    {
+      "$": "shift_state_selector",
+      "default": {
+        "label": "\u1019"
+      },
+      "manualOrLocked": {
+        "label": "\u104e"
+      }
+    },
+    {
+      "$": "shift_state_selector",
+      "default": {
+        "label": "\u1021"
+      },
+      "manualOrLocked": {
+        "label": "\u1024"
+      }
+    },
+    {
+      "$": "shift_state_selector",
+      "default": {
+        "label": "\u1015"
+      },
+      "manualOrLocked": {
+        "label": "\u104c"
+      }
+    },
+    {
+      "$": "shift_state_selector",
+      "default": {
+        "label": "\u1000"
+      },
+      "manualOrLocked": {
+        "label": "\u1025"
+      }
+    },
+    {
+      "$": "shift_state_selector",
+      "default": {
+        "label": "\u1004"
+      },
+      "manualOrLocked": {
+        "label": "\u104d"
+      }
+    },
+    {
+      "$": "shift_state_selector",
+      "default": {
+        "label": "\u101e"
+      },
+      "manualOrLocked": {
+        "label": "\u103f"
+      }
+    },
+    {
+      "$": "shift_state_selector",
+      "default": {
+        "label": "\u1005"
+      },
+      "manualOrLocked": {
+        "label": "\u100f"
+      }
+    },
+    {
+      "$": "shift_state_selector",
+      "default": {
+        "label": "\u1029"
+      },
+      "manualOrLocked": {
+        "label": "\u102a"
+      }
+    }
+  ],
+  [
+    {
+      "$": "shift_state_selector",
+      "default": {
+        "label": "\u1031"
+      },
+      "manualOrLocked": {
+        "label": "\u1017"
+      }
+    },
+    {
+      "$": "shift_state_selector",
+      "default": {
+        "label": "\u103b"
+      },
+      "manualOrLocked": {
+        "label": "\u103e"
+      }
+    },
+    {
+      "$": "shift_state_selector",
+      "default": {
+        "label": "\u102d"
+      },
+      "manualOrLocked": {
+        "label": "\u102e"
+      }
+    },
+    {
+      "$": "shift_state_selector",
+      "default": {
+        "label": "\u103a"
+      },
+      "manualOrLocked": {
+        "label": "\u1039"
+      }
+    },
+    {
+      "$": "shift_state_selector",
+      "default": {
+        "label": "\u102b"
+      },
+      "manualOrLocked": {
+        "label": "\u103d"
+      }
+    },
+    {
+      "$": "shift_state_selector",
+      "default": {
+        "label": "\u1037"
+      },
+      "manualOrLocked": {
+        "label": "\u1036"
+      }
+    },
+    {
+      "$": "shift_state_selector",
+      "default": {
+        "label": "\u103c"
+      },
+      "manualOrLocked": {
+        "label": "\u1032"
+      }
+    },
+    {
+      "$": "shift_state_selector",
+      "default": {
+        "label": "\u102f"
+      },
+      "manualOrLocked": {
+        "label": "\u1012"
+      }
+    },
+    {
+      "$": "shift_state_selector",
+      "default": {
+        "label": "\u1030"
+      },
+      "manualOrLocked": {
+        "label": "\u1013"
+      }
+    },
+    {
+      "$": "shift_state_selector",
+      "default": {
+        "label": "\u1038"
+      },
+      "manualOrLocked": {
+        "label": "\u1002"
+      }
+    },
+    {
+      "$": "shift_state_selector",
+      "default": {
+        "label": "/"
+      },
+      "manualOrLocked": {
+        "label": "?"
+      }
+    }
+  ],
+  [
+    {
+      "$": "shift_state_selector",
+      "default": {
+        "label": "\u104f"
+      },
+      "manualOrLocked": {
+        "label": "\u1051"
+      }
+    },
+    {
+      "$": "shift_state_selector",
+      "default": {
+        "label": "\u1016"
+      },
+      "manualOrLocked": {
+        "label": "\u1007"
+      }
+    },
+    {
+      "$": "shift_state_selector",
+      "default": {
+        "label": "\u1011"
+      },
+      "manualOrLocked": {
+        "label": "\u100c"
+      }
+    },
+    {
+      "$": "shift_state_selector",
+      "default": {
+        "label": "\u1001"
+      },
+      "manualOrLocked": {
+        "label": "\u1003"
+      }
+    },
+    {
+      "$": "shift_state_selector",
+      "default": {
+        "label": "\u101c"
+      },
+      "manualOrLocked": {
+        "label": "\u1020"
+      }
+    },
+    {
+      "$": "shift_state_selector",
+      "default": {
+        "label": "\u1018"
+      },
+      "manualOrLocked": {
+        "label": "\u101a"
+      }
+    },
+    {
+      "$": "shift_state_selector",
+      "default": {
+        "label": "\u100a"
+      },
+      "manualOrLocked": {
+        "label": "\u1009"
+      }
+    },
+    {
+      "$": "shift_state_selector",
+      "default": {
+        "label": "\u102c"
+      },
+      "manualOrLocked": {
+        "label": "\u1026"
+      }
+    },
+    {
+      "$": "shift_state_selector",
+      "default": {
+        "label": "\u101f"
+      },
+      "manualOrLocked": {
+        "label": "\u1027"
+      }
+    }
+  ],
+  [
+    {
+      "$": "shift_state_selector",
+      "default": {
+        "label": ","
+      },
+      "manualOrLocked": {
+        "label": "\u104a"
+      }
+    },
+    {
+      "$": "shift_state_selector",
+      "default": {
+        "label": ".",
+        "popup": {
+          "relevant": [
+            {
+              "label": ","
+            },
+            {
+              "label": "!"
+            },
+            {
+              "label": "?"
+            },
+            {
+              "label": "'"
+            },
+            {
+              "label": "\""
+            },
+            {
+              "label": "\\"
+            },
+            {
+              "label": ":"
+            },
+            {
+              "label": ";"
+            }
+          ]
+        }
+      },
+      "manualOrLocked": {
+        "label": "\u104b",
+        "popup": {
+          "relevant": [
+            {
+              "label": ","
+            },
+            {
+              "label": "!"
+            },
+            {
+              "label": "?"
+            },
+            {
+              "label": "'"
+            },
+            {
+              "label": "\""
+            },
+            {
+              "label": "\\"
+            },
+            {
+              "label": ":"
+            },
+            {
+              "label": ";"
+            }
+          ]
+        }
+      }
+    }
+  ]
+]

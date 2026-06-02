@@ -260,7 +260,7 @@ public class LatinIME extends InputMethodService implements
             switch (msg.what) {
                 case MSG_UPDATE_SUGGESTION_STRIP:
                     cancelUpdateSuggestionStrip();
-                    latinIme.mInputLogic.performUpdateSuggestionStripSync(
+                    latinIme.mInputLogic.performUpdateSuggestionStrip(
                             latinIme.mSettings.getCurrent(), msg.arg1 /* inputStyle */);
                     break;
                 case MSG_UPDATE_SHIFT_STATE:
@@ -317,6 +317,7 @@ public class LatinIME extends InputMethodService implements
         }
 
         public void postUpdateSuggestionStrip(final int inputStyle) {
+            cancelUpdateSuggestionStrip();
             sendMessageDelayed(obtainMessage(MSG_UPDATE_SUGGESTION_STRIP, inputStyle,
                     0 /* ignored */), mDelayInMillisecondsToUpdateSuggestions);
         }
