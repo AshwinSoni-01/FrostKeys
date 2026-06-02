@@ -14,6 +14,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
+import android.content.res.AssetFileDescriptor;
 import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.graphics.Color;
@@ -98,6 +99,7 @@ import kotlin.Unit;
 import java.io.FileDescriptor;
 import java.io.PrintWriter;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.TimeUnit;
@@ -788,7 +790,12 @@ public class LatinIME extends InputMethodService implements
         }
 
         final String[] contentMimeTypes = getKlipyContentMimeTypes(mimeType);
-        if (!isKlipyContentSupported(editorInfo, contentMimeTypes)) {
+        final String[] supportedMimeTypes = EditorInfoCompat.getContentMimeTypes(editorInfo);
+        if (!isKlipyContentSupported(supportedMimeTypes, contentMimeTypes)) {
+            Log.w(TAG, "Target does not advertise rich content support: package=" + editorInfo.packageName
+                    + ", sentMimeTypes=" + Arrays.toString(contentMimeTypes)
+                    + ", supportedMimeTypes=" + Arrays.toString(supportedMimeTypes)
+                    + ", " + describeRichContentForLog(contentUri));
             showContentPasteFailedToast();
             return false;
         }
@@ -809,8 +816,15 @@ public class LatinIME extends InputMethodService implements
             final boolean success = InputConnectionCompat.commitContent(inputConnection, editorInfo, inputContentInfo,
                     InputConnectionCompat.INPUT_CONTENT_GRANT_READ_URI_PERMISSION, null);
             if (success) return true;
+            Log.w(TAG, "Target rejected rich content: package=" + editorInfo.packageName
+                    + ", sentMimeTypes=" + Arrays.toString(contentMimeTypes)
+                    + ", supportedMimeTypes=" + Arrays.toString(supportedMimeTypes)
+                    + ", " + describeRichContentForLog(contentUri));
         } catch (Exception e) {
-            Log.e(TAG, "Failed to commit rich content", e);
+            Log.e(TAG, "Failed to commit rich content: package=" + editorInfo.packageName
+                    + ", sentMimeTypes=" + Arrays.toString(contentMimeTypes)
+                    + ", supportedMimeTypes=" + Arrays.toString(supportedMimeTypes)
+                    + ", " + describeRichContentForLog(contentUri), e);
         }
 
         showContentPasteFailedToast();
@@ -824,8 +838,7 @@ public class LatinIME extends InputMethodService implements
         return new String[]{mimeType};
     }
 
-    private boolean isKlipyContentSupported(final EditorInfo editorInfo, final String[] contentMimeTypes) {
-        final String[] supportedMimeTypes = EditorInfoCompat.getContentMimeTypes(editorInfo);
+    private boolean isKlipyContentSupported(final String[] supportedMimeTypes, final String[] contentMimeTypes) {
         if (supportedMimeTypes == null) return false;
         for (String contentMimeType : contentMimeTypes) {
             for (String supportedMimeType : supportedMimeTypes) {
@@ -835,6 +848,24 @@ public class LatinIME extends InputMethodService implements
             }
         }
         return false;
+    }
+
+    private String describeRichContentForLog(final Uri contentUri) {
+        String providerType = null;
+        long contentLength = -1L;
+        try {
+            providerType = getContentResolver().getType(contentUri);
+        } catch (Exception e) {
+            Log.w(TAG, "Failed to read rich content provider type for " + contentUri, e);
+        }
+        try (AssetFileDescriptor descriptor = getContentResolver().openAssetFileDescriptor(contentUri, "r")) {
+            if (descriptor != null) {
+                contentLength = descriptor.getLength();
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Failed to read rich content length for " + contentUri, e);
+        }
+        return "uri=" + contentUri + ", providerType=" + providerType + ", length=" + contentLength;
     }
 
     private void showContentPasteFailedToast() {

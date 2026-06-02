@@ -22,6 +22,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.ViewOutlineProvider
 import android.view.inputmethod.EditorInfo
+import android.webkit.MimeTypeMap
 import android.widget.ImageView
 import androidx.core.content.edit
 import androidx.core.content.FileProvider
@@ -41,6 +42,9 @@ import helium314.keyboard.latin.utils.Log
 import helium314.keyboard.latin.utils.ToolbarKey
 import helium314.keyboard.latin.utils.prefs
 import java.io.File
+import java.security.MessageDigest
+import java.util.ArrayDeque
+import java.util.Locale
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
@@ -54,7 +58,8 @@ class ClipboardHistoryManager(
     private var clipboardDao: ClipboardDao? = null
     private var screenshotObserver: ContentObserver? = null
     private var lastProcessedImageUri: String? = null
-    private var screenshotInFlightUri: String? = null
+    private val processedScreenshotUris = ArrayDeque<String>()
+    private val screenshotInFlightUris = mutableSetOf<String>()
     @Volatile
     private var latestImageSuggestion: RecentClip.Image? = null
 
@@ -62,6 +67,7 @@ class ClipboardHistoryManager(
         clipboardManager = latinIME.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
         clipboardManager.addPrimaryClipChangedListener(this)
         clipboardDao = ClipboardDao.getInstance(latinIME)
+        restoreProcessedScreenshotUris()
         if (latinIME.mSettings.current.mClipboardHistoryEnabled)
             fetchPrimaryClip()
         syncScreenshotObserver()
@@ -147,31 +153,43 @@ class ClipboardHistoryManager(
         GlobalScope.launch(Dispatchers.IO) {
             try {
                 if (!shouldObserveScreenshots()) return@launch
-                val screenshot = queryLatestScreenshot() ?: return@launch
-                val uriString = screenshot.uri.toString()
-                if (!claimScreenshotUri(uriString)) return@launch
-
-                val imageClip = RecentClip.Image(
-                    uri = screenshot.uri,
-                    mimeType = screenshot.mimeType,
-                    label = "Screenshot",
-                    timeStamp = System.currentTimeMillis()
-                )
-
-                val cachedUri = cacheImageClip(imageClip)
                 val dao = clipboardDao
-                if (cachedUri != null && dao != null) {
-                    val timeStamp = System.currentTimeMillis()
-                    dao.addClip(
-                        timeStamp,
-                        false,
-                        encodeImageHistoryClip(cachedUri, imageClip.mimeType, imageClip.label)
-                    )
-                    rememberImageSuggestion(imageClip.copy(uri = cachedUri, timeStamp = timeStamp))
-                    completeScreenshotUri(uriString, screenshot.dateAdded, true)
+                var processedAny = false
+
+                for (screenshot in queryRecentScreenshots().asReversed()) {
+                    val uriString = screenshot.uri.toString()
+                    if (!claimScreenshotUri(uriString)) continue
+
+                    var processed = false
+                    try {
+                        val timeStamp = System.currentTimeMillis()
+                        val imageClip = RecentClip.Image(
+                            uri = screenshot.uri,
+                            mimeType = normalizeImageMimeType(screenshot.mimeType).mimeType,
+                            label = "Screenshot",
+                            timeStamp = timeStamp
+                        )
+
+                        val cachedUri = cacheImageClip(imageClip)
+                        if (cachedUri != null && dao != null) {
+                            dao.addClip(
+                                timeStamp,
+                                false,
+                                encodeImageHistoryClip(cachedUri, imageClip.mimeType, imageClip.label)
+                            )
+                            rememberImageSuggestion(imageClip.copy(uri = cachedUri))
+                            processed = true
+                            processedAny = true
+                        }
+                    } catch (e: Exception) {
+                        Log.e("ClipboardHistoryManager", "Failed processing screenshot $uriString", e)
+                    } finally {
+                        completeScreenshotUri(uriString, screenshot.dateAdded, processed)
+                    }
+                }
+
+                if (processedAny) {
                     refreshClipboardSuggestion()
-                } else {
-                    completeScreenshotUri(uriString, screenshot.dateAdded, false)
                 }
             } catch (e: Exception) {
                 Log.e("ClipboardHistoryManager", "Failed checking for new screenshot", e)
@@ -185,7 +203,7 @@ class ClipboardHistoryManager(
         val dateAdded: Long
     )
 
-    private fun queryLatestScreenshot(): ScreenshotMedia? {
+    private fun queryRecentScreenshots(): List<ScreenshotMedia> {
         val projection = mutableListOf(
             MediaStore.Images.Media._ID,
             MediaStore.Images.Media.DATE_ADDED,
@@ -201,6 +219,7 @@ class ClipboardHistoryManager(
         val recentSinceSeconds = System.currentTimeMillis() / 1000L - SCREENSHOT_RECENT_WINDOW_SECONDS
         val (selection, selectionArgs) = screenshotSelection(recentSinceSeconds)
         val sortOrder = "${MediaStore.Images.Media.DATE_ADDED} DESC, ${MediaStore.Images.Media._ID} DESC"
+        val screenshots = mutableListOf<ScreenshotMedia>()
         latinIME.contentResolver.query(
             imageCollectionUri(),
             projection,
@@ -217,7 +236,7 @@ class ClipboardHistoryManager(
                 @Suppress("DEPRECATION")
                 cursor.getColumnIndex(MediaStore.Images.Media.DATA)
             }
-            if (idIndex == -1 || dateIndex == -1 || mimeIndex == -1 || pathIndex == -1) return null
+            if (idIndex == -1 || dateIndex == -1 || mimeIndex == -1 || pathIndex == -1) return emptyList()
 
             var checkedRows = 0
             while (cursor.moveToNext() && checkedRows < MAX_SCREENSHOT_ROWS_TO_CHECK) {
@@ -232,10 +251,10 @@ class ClipboardHistoryManager(
                     ?: latinIME.contentResolver.getType(itemUri)
                         ?.takeIf { ClipDescription.compareMimeTypes(it, "image/*") }
                     ?: continue
-                return ScreenshotMedia(itemUri, mimeType, cursor.getLong(dateIndex))
+                screenshots.add(ScreenshotMedia(itemUri, normalizeImageMimeType(mimeType).mimeType, cursor.getLong(dateIndex)))
             }
         }
-        return null
+        return screenshots
     }
 
     private fun imageCollectionUri(): Uri {
@@ -294,25 +313,67 @@ class ClipboardHistoryManager(
     }
 
     private fun claimScreenshotUri(uriString: String): Boolean = synchronized(this) {
-        val lastPersistedUri = latinIME.prefs().getString(PREF_LAST_SCREENSHOT_MEDIA_URI, null)
-        if (uriString == lastProcessedImageUri || uriString == screenshotInFlightUri || uriString == lastPersistedUri) {
+        if (processedScreenshotUris.contains(uriString)
+            || uriString == lastProcessedImageUri
+            || screenshotInFlightUris.contains(uriString)
+        ) {
             false
         } else {
-            screenshotInFlightUri = uriString
+            screenshotInFlightUris.add(uriString)
             true
         }
     }
 
     private fun completeScreenshotUri(uriString: String, dateAdded: Long, processed: Boolean) {
-        synchronized(this) {
-            if (processed) lastProcessedImageUri = uriString
-            if (screenshotInFlightUri == uriString) screenshotInFlightUri = null
+        val processedSnapshot = synchronized(this) {
+            if (processed) rememberProcessedScreenshotUriLocked(uriString)
+            screenshotInFlightUris.remove(uriString)
+            if (processed) processedScreenshotUris.toList() else null
         }
-        if (processed) {
-            latinIME.prefs().edit {
-                putString(PREF_LAST_SCREENSHOT_MEDIA_URI, uriString)
-                putLong(PREF_LAST_SCREENSHOT_DATE_ADDED, dateAdded)
-            }
+        if (processedSnapshot != null) {
+            persistProcessedScreenshotUris(processedSnapshot, uriString, dateAdded)
+        }
+    }
+
+    private fun restoreProcessedScreenshotUris() {
+        synchronized(this) {
+            if (processedScreenshotUris.isNotEmpty()) return
+
+            val persistedUris = latinIME.prefs()
+                .getString(PREF_PROCESSED_SCREENSHOT_MEDIA_URIS, null)
+                ?.lineSequence()
+                ?.map { it.trim() }
+                ?.filter { it.isNotEmpty() }
+                ?.toList()
+                .orEmpty()
+            val migratedUri = latinIME.prefs().getString(PREF_LAST_SCREENSHOT_MEDIA_URI, null)
+                ?.takeIf { it.isNotBlank() && it !in persistedUris }
+
+            (persistedUris + listOfNotNull(migratedUri))
+                .takeLast(MAX_PROCESSED_SCREENSHOT_URIS)
+                .forEach { processedScreenshotUris.addLast(it) }
+            lastProcessedImageUri = processedScreenshotUris.lastOrNull()
+        }
+    }
+
+    private fun rememberProcessedScreenshotUriLocked(uriString: String) {
+        processedScreenshotUris.remove(uriString)
+        processedScreenshotUris.addLast(uriString)
+        while (processedScreenshotUris.size > MAX_PROCESSED_SCREENSHOT_URIS) {
+            processedScreenshotUris.removeFirst()
+        }
+        lastProcessedImageUri = uriString
+    }
+
+    private fun persistProcessedScreenshotUris(
+        processedUris: List<String>,
+        latestUri: String,
+        dateAdded: Long
+    ) {
+        latinIME.prefs().edit {
+            putString(PREF_PROCESSED_SCREENSHOT_MEDIA_URIS, processedUris.joinToString("\n"))
+            putString(PREF_LAST_SCREENSHOT_MEDIA_URI, latestUri)
+            putLong(PREF_LAST_SCREENSHOT_DATE_ADDED, dateAdded)
         }
     }
 
@@ -441,8 +502,11 @@ class ClipboardHistoryManager(
         if (clipData.itemCount == 0) return null
         val uri = clipData.imageUri() ?: return null
         val description = clipData.description
-        val mimeType = description?.imageMimeType()
-            ?: latinIME.contentResolver.getType(uri)?.takeIf { ClipDescription.compareMimeTypes(it, "image/*") }
+        val descriptionMimeType = description?.imageMimeType()
+            ?.takeUnless { it == "image/*" }
+        val resolverMimeType = latinIME.contentResolver.getType(uri)
+            ?.takeIf { ClipDescription.compareMimeTypes(it, "image/*") }
+        val mimeType = descriptionMimeType ?: resolverMimeType ?: description?.imageMimeType()
             ?: return null
         val labelText = description?.label?.toString().orEmpty()
         val uriText = uri.toString()
@@ -454,7 +518,7 @@ class ClipboardHistoryManager(
         } else {
             "Image"
         }
-        return RecentClip.Image(uri, mimeType, label, ClipboardManagerCompat.getClipTimestamp(clipData))
+        return RecentClip.Image(uri, normalizeImageMimeType(mimeType).mimeType, label, ClipboardManagerCompat.getClipTimestamp(clipData))
     }
 
     private fun rememberImageSuggestion(clip: RecentClip.Image) {
@@ -585,27 +649,21 @@ class ClipboardHistoryManager(
     private fun pasteImageClip(clip: RecentClip.Image, chipView: View, feedbackView: View) {
         val cachedUri = cacheImageClip(clip) ?: return
         dontShowCurrentSuggestion = true
-        val pasted = latinIME.commitKlipyContent(cachedUri, clip.label, clip.mimeType)
+        val pasted = latinIME.commitKlipyContent(cachedUri, clip.label, normalizeImageMimeType(clip.mimeType).mimeType)
         AudioAndHapticFeedbackManager.getInstance().performHapticAndAudioFeedback(KeyCode.NOT_SPECIFIED, feedbackView, HapticEvent.KEY_PRESS)
         if (pasted) chipView.isGone = true
     }
 
     private fun cacheImageClip(clip: RecentClip.Image): Uri? {
-        val extension = when (clip.mimeType) {
-            "image/jpeg" -> "jpg"
-            "image/webp" -> "webp"
-            "image/gif" -> "gif"
-            else -> "png"
+        resolveOwnClipboardCacheFile(latinIME, clip.uri)?.let { cachedFile ->
+            return if (cachedFile.exists() && cachedFile.length() > 0L) clip.uri else null
         }
+
+        val mimeInfo = normalizeImageMimeType(clip.mimeType)
         val clipboardDir = File(latinIME.cacheDir, "clipboard").apply { mkdirs() }
-        val imageFile = File(clipboardDir, "clip_${clip.timeStamp}.$extension")
+        val imageFile = File(clipboardDir, cacheFileNameForSource(clip.uri, clip.timeStamp, mimeInfo.mimeType))
         if (!imageFile.exists() || imageFile.length() == 0L) {
-            try {
-                latinIME.contentResolver.openInputStream(clip.uri)?.use { input ->
-                    imageFile.outputStream().use { output -> input.copyTo(output) }
-                } ?: return null
-            } catch (e: Exception) {
-                Log.e("ClipboardHistoryManager", "Failed to cache image clipboard clip", e)
+            if (!copyImageClipAtomically(clip.uri, imageFile)) {
                 return null
             }
         }
@@ -614,7 +672,33 @@ class ClipboardHistoryManager(
 
     fun pasteHistoryEntry(entry: ClipboardHistoryEntry): Boolean {
         val clip = decodeImageHistoryClip(entry.text) ?: return false
-        return latinIME.commitKlipyContent(clip.uri, clip.label, clip.mimeType)
+        return latinIME.commitKlipyContent(clip.uri, clip.label, normalizeImageMimeType(clip.mimeType).mimeType)
+    }
+
+    private fun copyImageClipAtomically(sourceUri: Uri, imageFile: File): Boolean {
+        val tempFile = File.createTempFile("${imageFile.nameWithoutExtension}_", ".tmp", imageFile.parentFile)
+        return try {
+            latinIME.contentResolver.openInputStream(sourceUri)?.use { input ->
+                tempFile.outputStream().use { output -> input.copyTo(output) }
+            } ?: return false
+            if (tempFile.length() == 0L) return false
+
+            if (imageFile.exists() && !imageFile.delete()) {
+                Log.e("ClipboardHistoryManager", "Failed to replace cached image clipboard clip: $imageFile")
+                return false
+            }
+            if (!tempFile.renameTo(imageFile)) {
+                tempFile.copyTo(imageFile, overwrite = true)
+            }
+            imageFile.length() > 0L
+        } catch (e: Exception) {
+            Log.e("ClipboardHistoryManager", "Failed to cache image clipboard clip", e)
+            false
+        } finally {
+            if (tempFile.exists() && !tempFile.delete()) {
+                Log.e("ClipboardHistoryManager", "Failed to delete temp image clipboard clip: $tempFile")
+            }
+        }
     }
 
     private fun removeClipboardSuggestion() {
@@ -629,10 +713,14 @@ class ClipboardHistoryManager(
     }
 
     companion object {
+        data class ImageMimeInfo(val mimeType: String, val extension: String)
+
+        private const val PREF_PROCESSED_SCREENSHOT_MEDIA_URIS = "clipboard_processed_screenshot_media_uris"
         private const val PREF_LAST_SCREENSHOT_MEDIA_URI = "clipboard_last_screenshot_media_uri"
         private const val PREF_LAST_SCREENSHOT_DATE_ADDED = "clipboard_last_screenshot_date_added"
         private const val SCREENSHOT_RECENT_WINDOW_SECONDS = 30L
-        private const val MAX_SCREENSHOT_ROWS_TO_CHECK = 5
+        private const val MAX_SCREENSHOT_ROWS_TO_CHECK = 10
+        private const val MAX_PROCESSED_SCREENSHOT_URIS = 20
         private val SCREENSHOT_RELATIVE_PATHS = listOf(
             "Pictures/Screenshots/",
             "DCIM/Screenshots/",
@@ -645,5 +733,72 @@ class ClipboardHistoryManager(
 
         fun encodeImageHistoryClip(uri: Uri, mimeType: String, label: String) =
             ClipboardImageHistoryClip.encode(uri, mimeType, label)
+
+        internal fun normalizeImageMimeType(mimeType: String?): ImageMimeInfo {
+            val normalized = mimeType
+                ?.substringBefore(';')
+                ?.trim()
+                ?.lowercase(Locale.US)
+                .orEmpty()
+            return when (normalized) {
+                "image/jpg", "image/pjpeg", "image/jpeg" -> ImageMimeInfo("image/jpeg", "jpg")
+                "image/x-png", "image/png", "image/*" -> ImageMimeInfo("image/png", "png")
+                "image/x-webp", "image/webp" -> ImageMimeInfo("image/webp", "webp")
+                "image/gif" -> ImageMimeInfo("image/gif", "gif")
+                "image/heic", "image/heic-sequence" -> ImageMimeInfo("image/heic", "heic")
+                "image/heif", "image/heif-sequence" -> ImageMimeInfo("image/heif", "heif")
+                "image/x-ms-bmp", "image/bmp" -> ImageMimeInfo("image/bmp", "bmp")
+                else -> {
+                    if (!normalized.startsWith("image/")) return ImageMimeInfo("image/png", "png")
+                    val extension = MimeTypeMap.getSingleton().getExtensionFromMimeType(normalized)
+                        ?: normalized.substringAfter("image/")
+                            .substringBefore('+')
+                            .let(::sanitizeImageExtension)
+                    ImageMimeInfo(normalized, extension.ifBlank { "img" })
+                }
+            }
+        }
+
+        internal fun cacheFileNameForSource(sourceUri: Uri, timeStamp: Long, mimeType: String): String {
+            val extension = normalizeImageMimeType(mimeType).extension
+            return "clip_${timeStamp}_${stableCacheToken(sourceUri)}.$extension"
+        }
+
+        internal fun isOwnClipboardCacheUri(context: Context, uri: Uri): Boolean {
+            return resolveOwnClipboardCacheFile(context, uri) != null
+        }
+
+        private fun resolveOwnClipboardCacheFile(context: Context, uri: Uri): File? {
+            if (uri.scheme != "content" || uri.authority != "${context.packageName}.fileprovider") return null
+            val segments = uri.pathSegments
+            if (segments.size < 3 || segments[0] != "cache" || segments[1] != "clipboard") return null
+            val clipboardDir = File(context.cacheDir, "clipboard")
+            val file = File(context.cacheDir, segments.drop(1).joinToString(File.separator))
+            return try {
+                val canonicalDir = clipboardDir.canonicalFile
+                val canonicalFile = file.canonicalFile
+                val dirPath = canonicalDir.path
+                val filePath = canonicalFile.path
+                if (filePath.startsWith("$dirPath${File.separator}")) canonicalFile else null
+            } catch (_: Exception) {
+                null
+            }
+        }
+
+        private fun sanitizeImageExtension(extension: String): String {
+            return extension
+                .lowercase(Locale.US)
+                .filter { it.isLetterOrDigit() }
+                .take(12)
+                .ifBlank { "img" }
+        }
+
+        private fun stableCacheToken(uri: Uri): String {
+            val digest = MessageDigest.getInstance("SHA-256")
+                .digest(uri.toString().toByteArray(Charsets.UTF_8))
+            return digest.take(8).joinToString("") {
+                java.lang.String.format(Locale.US, "%02x", it.toInt() and 0xff)
+            }
+        }
     }
 }

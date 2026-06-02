@@ -610,7 +610,13 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
         val allowPinnedKeys = toolbarMode == ToolbarMode.EXPANDABLE || toolbarMode == ToolbarMode.TOOLBAR_KEYS
         val allowSuggestions = toolbarMode == ToolbarMode.EXPANDABLE || toolbarMode == ToolbarMode.SUGGESTION_STRIP
         val isFieldEmpty = isTextFieldEmpty()
+        val showPinnedKeysForEmptyField = showSuggestions &&
+                allowPinnedKeys &&
+                !isExternalSuggestionVisible &&
+                isFieldEmpty &&
+                pinnedKeys.childCount > 0
         val showSuggestionContent = showSuggestions && allowSuggestions &&
+                !showPinnedKeysForEmptyField &&
                 (isExternalSuggestionVisible || !isFieldEmpty || shouldShowSuggestionContent())
         val showChips = showSuggestionContent && !isExternalSuggestionVisible && shouldUseChipSuggestions()
         suggestionsStrip.isVisible = showSuggestionContent && !showChips
