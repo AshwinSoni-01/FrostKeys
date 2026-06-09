@@ -33,6 +33,7 @@ import android.util.Printer;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.Window;
+import android.view.WindowManager;
 import android.view.inputmethod.CompletionInfo;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InlineSuggestion;
@@ -50,7 +51,6 @@ import helium314.keyboard.event.HapticEvent;
 import helium314.keyboard.keyboard.KeyboardActionListener;
 import helium314.keyboard.keyboard.KeyboardActionListenerImpl;
 import helium314.keyboard.keyboard.emoji.EmojiPalettesView;
-import helium314.keyboard.keyboard.emoji.EmojiSearchActivity;
 import helium314.keyboard.keyboard.internal.KeyboardIconsSet;
 import helium314.keyboard.keyboard.internal.keyboard_parser.floris.KeyCode;
 import helium314.keyboard.latin.common.InsetsOutlineProvider;
@@ -979,7 +979,6 @@ public class LatinIME extends InputMethodService implements
                 settingsValues.mUsePersonalizedDicts, true, "", this);
         mKeyboardSwitcher.setThemeNeedsReload(); // necessary for emoji search
         EmojiPalettesView.closeDictionaryFacilitator();
-        EmojiSearchActivity.Companion.closeDictionaryFacilitator();
     }
 
     // used for debug
@@ -1099,7 +1098,7 @@ public class LatinIME extends InputMethodService implements
     }
 
     public void updateSuggestionStripView(View view) {
-        mSuggestionStripView = mSettings.getCurrent().mToolbarMode == ToolbarMode.HIDDEN || isEmojiSearch() ? null
+        mSuggestionStripView = mSettings.getCurrent().mToolbarMode == ToolbarMode.HIDDEN ? null
                 : view.findViewById(R.id.suggestion_strip_view);
         if (hasSuggestionStripView()) {
             mSuggestionStripView.setRtl(mRichImm.getCurrentSubtype().isRtlSubtype());
@@ -1126,9 +1125,6 @@ public class LatinIME extends InputMethodService implements
 
     @Override
     public void onFinishInputView(final boolean finishingInput) {
-        if (isEmojiSearchActive) {
-            return;
-        }
         StatsUtils.onFinishInputView();
         mHandler.onFinishInputView(finishingInput);
         mStatsUtilsManager.onFinishInputView();
@@ -1398,9 +1394,7 @@ public class LatinIME extends InputMethodService implements
 
     @Override
     public void onWindowHidden() {
-        if (isEmojiSearchActive) {
-            return;
-        }
+        setEmojiSearchAppDimmed(false);
         super.onWindowHidden();
         Log.i(TAG, "onWindowHidden");
 
@@ -1522,6 +1516,21 @@ public class LatinIME extends InputMethodService implements
     }
 
     @Override
+    public void onViewClicked(final boolean focusChanged) {
+        exitEmojiSearchModeFromAppClick();
+        super.onViewClicked(focusChanged);
+    }
+
+    private boolean exitEmojiSearchModeFromAppClick() {
+        final EmojiPalettesView emojiPalettesView = mKeyboardSwitcher.getEmojiPalettesView();
+        if (emojiPalettesView == null || !emojiPalettesView.isSearchMode()) {
+            return false;
+        }
+        emojiPalettesView.exitSearchMode(false);
+        return true;
+    }
+
+    @Override
     public void hideWindow() {
         Log.i(TAG, "hideWindow");
         if (hasSuggestionStripView() && mSettings.getCurrent().mToolbarMode == ToolbarMode.EXPANDABLE)
@@ -1606,25 +1615,18 @@ public class LatinIME extends InputMethodService implements
         final int stripHeight = mKeyboardSwitcher.isShowingStripContainer() ? mKeyboardSwitcher.getStripContainer().getHeight() : 0;
         final int persistentEmojiRowHeight = mKeyboardSwitcher.isShowingPersistentEmojiRow() ? mKeyboardSwitcher.getPersistentEmojiRowHeight() : 0;
 
-        final int emojiSearchHeight = getEmojiSearchActivityHeight();
-        // When emoji search is active, don't subtract the persistent emoji row — the search
-        // activity's own height signal already accounts for the full keyboard area.
-        final int effectivePersistentEmojiRowHeight = (isEmojiSearchActive || emojiSearchHeight > 0)
-            ? 0 : persistentEmojiRowHeight;
-
         int keyboardHeight = 0;
         if (visibleKeyboardView != null && visibleKeyboardView.getHeight() > 0) {
             keyboardHeight = visibleKeyboardView.getHeight();
-        } else if (isEmojiSearchActive || emojiSearchHeight > 0) {
+        } else if (mLastKeyboardHeight > 0) {
             // Fallback to last known height to prevent the gap from closing during transitions
-            keyboardHeight = mLastKeyboardHeight - stripHeight - effectivePersistentEmojiRowHeight;
+            keyboardHeight = mLastKeyboardHeight - stripHeight - persistentEmojiRowHeight;
             if (keyboardHeight < 0) keyboardHeight = 0;
         }
 
         if (keyboardHeight == 0 && visibleKeyboardView == null) return;
 
-        int visibleTopY = inputHeight - keyboardHeight - stripHeight - effectivePersistentEmojiRowHeight;
-        visibleTopY -= emojiSearchHeight;
+        int visibleTopY = inputHeight - keyboardHeight - stripHeight - persistentEmojiRowHeight;
         if (visibleTopY < 0) visibleTopY = 0;
 
         outInsets.contentTopInsets = visibleTopY;
@@ -1637,7 +1639,7 @@ public class LatinIME extends InputMethodService implements
         if (mInsetsUpdater != null) mInsetsUpdater.setInsets(outInsets);
 
         if (keyboardHeight > 0) {
-            mLastKeyboardHeight = keyboardHeight + stripHeight + effectivePersistentEmojiRowHeight;
+            mLastKeyboardHeight = keyboardHeight + stripHeight + persistentEmojiRowHeight;
         }
     }
 
@@ -2141,7 +2143,8 @@ public class LatinIME extends InputMethodService implements
     // Hooks for hardware keyboard
     @Override
     public boolean onKeyDown(final int keyCode, final KeyEvent keyEvent) {
-        if (keyCode == KeyEvent.KEYCODE_BACK && mKeyboardSwitcher.isShowingKlipyPalettes()) {
+        if (keyCode == KeyEvent.KEYCODE_BACK
+                && (mKeyboardSwitcher.isShowingKlipyPalettes() || mKeyboardSwitcher.isShowingEmojiPalettes())) {
             return true;
         }
         if (mKeyboardActionListener.onKeyDown(keyCode, keyEvent))
@@ -2151,6 +2154,14 @@ public class LatinIME extends InputMethodService implements
 
     @Override
     public boolean onKeyUp(final int keyCode, final KeyEvent keyEvent) {
+        if (keyCode == KeyEvent.KEYCODE_BACK && mKeyboardSwitcher.isShowingEmojiPalettes()) {
+            final EmojiPalettesView emojiView = mKeyboardSwitcher.getEmojiPalettesView();
+            if (emojiView != null && emojiView.handleBackPress()) {
+                return true;
+            }
+            mKeyboardSwitcher.setAlphabetKeyboard();
+            return true;
+        }
         if (keyCode == KeyEvent.KEYCODE_BACK && mKeyboardSwitcher.isShowingKlipyPalettes()) {
             final KlipyPalettesView klipyView = mKeyboardSwitcher.getKlipyPalettesView();
             if (klipyView != null) {
@@ -2227,48 +2238,56 @@ public class LatinIME extends InputMethodService implements
         startActivity(intent);
     }
 
-    private boolean isEmojiSearchActive = false;
+    private static final float EMOJI_SEARCH_DIM_AMOUNT = 0.32f;
     private int mLastKeyboardHeight = 0;
+    private boolean mEmojiSearchDimApplied = false;
+    private boolean mEmojiSearchPreviousDimBehind = false;
+    private float mEmojiSearchPreviousDimAmount = 0f;
 
-    public void setEmojiSearchActive(boolean active) {
-        isEmojiSearchActive = active;
+    public void setEmojiSearchAppDimmed(final boolean dimmed) {
+        final Window window = getWindow() == null ? null : getWindow().getWindow();
+        if (window == null) {
+            return;
+        }
+        final WindowManager.LayoutParams attrs = window.getAttributes();
+        if (dimmed) {
+            if (!mEmojiSearchDimApplied) {
+                mEmojiSearchPreviousDimAmount = attrs.dimAmount;
+                mEmojiSearchPreviousDimBehind =
+                        (attrs.flags & WindowManager.LayoutParams.FLAG_DIM_BEHIND) != 0;
+                mEmojiSearchDimApplied = true;
+            }
+            attrs.dimAmount = EMOJI_SEARCH_DIM_AMOUNT;
+            window.setAttributes(attrs);
+            window.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+        } else if (mEmojiSearchDimApplied) {
+            attrs.dimAmount = mEmojiSearchPreviousDimAmount;
+            window.setAttributes(attrs);
+            if (!mEmojiSearchPreviousDimBehind) {
+                window.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+            }
+            mEmojiSearchDimApplied = false;
+        }
     }
 
     public void launchEmojiSearch() {
-        Log.d("emoji-search", "before activity launch");
-        setEmojiSearchActive(true);
-        startActivity(new Intent().setClass(this, EmojiSearchActivity.class)
-                .setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_MULTIPLE_TASK));
-    }
-
-    @Override
-    public int onStartCommand(Intent intent, int flags, int startId) {
-        if (intent != null && EmojiSearchActivity.EMOJI_SEARCH_DONE_ACTION.equals(intent.getAction())
-                && !isEmojiSearch()) {
-            setEmojiSearchActive(false);
-            if (intent.getBooleanExtra(EmojiSearchActivity.IME_CLOSED_KEY, false)) {
-                requestHideSelf(0);
-            } else {
-                mHandler.postDelayed(() -> KeyboardSwitcher.getInstance().setEmojiKeyboard(), 100);
-                if (intent.hasExtra(EmojiSearchActivity.EMOJI_KEY)) {
-                    onTextInput(intent.getStringExtra(EmojiSearchActivity.EMOJI_KEY));
-                }
-            }
-
-            stopSelf(startId); // Allow the service to be destroyed when unbound
-            return START_NOT_STICKY;
+        final EmojiPalettesView emojiPalettesView = mKeyboardSwitcher.getEmojiPalettesView();
+        if (emojiPalettesView != null && mKeyboardSwitcher.isShowingEmojiPalettes()) {
+            emojiPalettesView.enterSearchMode();
+            return;
         }
-
-
-        return super.onStartCommand(intent, flags, startId);
+        mKeyboardSwitcher.setEmojiKeyboard();
+        mHandler.postDelayed(() -> {
+            final EmojiPalettesView view = mKeyboardSwitcher.getEmojiPalettesView();
+            if (view != null) {
+                view.enterSearchMode();
+            }
+        }, 50);
     }
 
     public boolean isEmojiSearch() {
-        return getEmojiSearchActivityHeight() > 0;
-    }
-
-    private int getEmojiSearchActivityHeight() {
-        return EmojiSearchActivity.Companion.decodePrivateImeOptions(getCurrentInputEditorInfo()).height();
+        final EmojiPalettesView emojiPalettesView = mKeyboardSwitcher.getEmojiPalettesView();
+        return emojiPalettesView != null && emojiPalettesView.isSearchMode();
     }
 
     public void dumpDictionaryForDebug(final String dictName) {

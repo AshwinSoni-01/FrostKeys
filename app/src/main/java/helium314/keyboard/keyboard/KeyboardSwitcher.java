@@ -298,7 +298,12 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
                     setMainKeyboardFrame(currentSettingsValues, toggleState);
                     keyboardView.setKeyboard(newKeyboard);
                     mCurrentInputView.setKeyboardTopPadding(newKeyboard.mTopPadding);
-                    setKeyboardPanelOffsets(newKeyboard.mId.mElementId >= KeyboardId.ELEMENT_EMOJI_RECENTS && newKeyboard.mId.mElementId != KeyboardId.ELEMENT_NUMPAD);
+                    final boolean searchPanelActive =
+                            (mKlipyPalettesView != null && mKlipyPalettesView.isSearchMode())
+                                    || (mEmojiPalettesView != null && mEmojiPalettesView.isSearchMode());
+                    setKeyboardPanelOffsets(searchPanelActive
+                            || (newKeyboard.mId.mElementId >= KeyboardId.ELEMENT_EMOJI_RECENTS
+                                    && newKeyboard.mId.mElementId != KeyboardId.ELEMENT_NUMPAD));
                     keyboardView.setKeyPreviewPopupEnabled(currentSettingsValues.mKeyPreviewPopupOn);
                     keyboardView.updateShortcutKey(mRichImm.isShortcutImeReady());
                     final boolean subtypeChanged = (oldKeyboard == null) || !newKeyboard.mId.mSubtype.equals(oldKeyboard.mId.mSubtype);
@@ -492,7 +497,8 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
             @NonNull final KeyboardSwitchState toggleState) {
         final int visibility = isImeSuppressedByHardwareKeyboard(settingsValues, toggleState) ? View.GONE : View.VISIBLE;
         final boolean klipySearchActive = mKlipyPalettesView != null && mKlipyPalettesView.isSearchMode();
-        final int stripVisibility = klipySearchActive ? View.GONE
+        final boolean emojiSearchActive = mEmojiPalettesView != null && mEmojiPalettesView.isSearchMode();
+        final int stripVisibility = (klipySearchActive || emojiSearchActive) ? View.GONE
                 : (mLatinIME.hasSuggestionStripView()? View.VISIBLE : View.GONE);
         mStripContainer.setVisibility(stripVisibility);
         PointerTracker.switchTo(mKeyboardView);
@@ -501,15 +507,19 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
         // @see #getVisibleKeyboardView() and
         // @see LatinIME#onComputeInset(android.inputmethodservice.InputMethodService.Insets)
         mMainKeyboardFrame.setVisibility(visibility);
-        mEmojiPalettesView.setVisibility(View.GONE);
-        mEmojiPalettesView.stopEmojiPalettes();
+        if (!emojiSearchActive) {
+            mEmojiPalettesView.setVisibility(View.GONE);
+            mEmojiPalettesView.stopEmojiPalettes();
+        }
         if (mKlipyPalettesView != null) {
             if (!mKlipyPalettesView.isSearchMode()) {
                 mKlipyPalettesView.setVisibility(View.GONE);
                 mKlipyPalettesView.stopKlipyPalettes();
             }
         }
-        mEmojiTabStripView.setVisibility(View.GONE);
+        if (!emojiSearchActive) {
+            mEmojiTabStripView.setVisibility(View.GONE);
+        }
         mClipboardStripScrollView.setVisibility(View.GONE);
         mSuggestionStripView.setVisibility(stripVisibility);
         mClipboardHistoryView.setVisibility(View.GONE);
@@ -521,7 +531,8 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
         if (mAccessPointMenuView != null) {
             mAccessPointMenuView.setVisibility(View.GONE);
         }
-        setKeyboardPanelOffsets(mKlipyPalettesView != null && mKlipyPalettesView.isSearchMode());
+        setKeyboardPanelOffsets((mKlipyPalettesView != null && mKlipyPalettesView.isSearchMode())
+                || (mEmojiPalettesView != null && mEmojiPalettesView.isSearchMode()));
         updatePersistentEmojiRow();
     }
 

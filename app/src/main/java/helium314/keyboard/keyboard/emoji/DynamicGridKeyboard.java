@@ -58,58 +58,92 @@ final class DynamicGridKeyboard extends Keyboard {
 
     public static DynamicGridKeyboard ofRowCount(final SharedPreferences prefs, final Keyboard templateKeyboard,
             final int maxRowCount, final int categoryId, final int width) {
-        return new DynamicGridKeyboard(prefs, templateKeyboard, maxRowCount, categoryId, width, true);
+        return new DynamicGridKeyboard(prefs, templateKeyboard, maxRowCount, categoryId, width, true, width);
+    }
+
+    public static DynamicGridKeyboard ofPagedRowCount(final SharedPreferences prefs,
+            final Keyboard templateKeyboard, final int maxRowCount, final int categoryId,
+            final int width, final int pageWidth) {
+        return new DynamicGridKeyboard(prefs, templateKeyboard, maxRowCount, categoryId, width, true, pageWidth);
     }
 
     private DynamicGridKeyboard(final SharedPreferences prefs, final Keyboard templateKeyboard,
             final int maxCount, final int categoryId, final int width, boolean fixedRowCount) {
+        this(prefs, templateKeyboard, maxCount, categoryId, width, fixedRowCount, width);
+    }
+
+    private final int mMaxRowCount;
+    private final boolean mPagedFixedRowCount;
+    private final int mPageWidth;
+    private final int mPageCount;
+    private final int mPageColumnsNum;
+    private final ArrayList<Integer> mPageEmptyColumnIndices = new ArrayList<>(4);
+
+    private DynamicGridKeyboard(final SharedPreferences prefs, final Keyboard templateKeyboard,
+            final int maxCount, final int categoryId, final int width, boolean fixedRowCount,
+            final int pageWidth) {
         super(templateKeyboard);
         // todo: would be better to keep them final and not require width, but how to properly set width of the template keyboard?
         //  an alternative would be to always create the templateKeyboard with full width
         final int paddingWidth = mOccupiedWidth - mBaseWidth;
+        final int layoutWidth = Math.max(1, Math.min(width, pageWidth));
+        final int layoutBaseWidth = Math.max(1, layoutWidth - paddingWidth);
         mBaseWidth = width - paddingWidth;
         mOccupiedWidth = width;
-        final float spacerWidth = Settings.getValues().mSplitKeyboardSpacerRelativeWidth * mBaseWidth;
+        final float spacerWidth = Settings.getValues().mSplitKeyboardSpacerRelativeWidth * layoutBaseWidth;
         final Key key0 = getTemplateKey(Constants.RECENTS_TEMPLATE_KEY_CODE_0);
         final Key key1 = getTemplateKey(Constants.RECENTS_TEMPLATE_KEY_CODE_1);
         final int horizontalGap = Math.abs(key1.getX() - key0.getX()) - key0.getWidth();
-        final float widthScale = determineWidthScale(key0.getWidth() + horizontalGap);
+        final float widthScale = determineWidthScale(key0.getWidth() + horizontalGap, layoutBaseWidth);
         mHorizontalGap = (int) (horizontalGap * widthScale);
         mHorizontalStep = (int) ((key0.getWidth() + horizontalGap) * widthScale);
         mVerticalStep = (int) ((key0.getHeight() + mVerticalGap) / Math.sqrt(Settings.getValues().mKeyboardHeightScale));
         mColumnsNum = mBaseWidth / mHorizontalStep;
-        if (spacerWidth > 0)
-            setSpacerColumns(spacerWidth);
-        mMaxKeyCount = fixedRowCount? maxCount * getOccupiedColumnCount() : maxCount;
+        mMaxRowCount = fixedRowCount ? maxCount : 0;
+        mPagedFixedRowCount = fixedRowCount && width > layoutWidth;
+        mPageWidth = layoutWidth;
+        mPageCount = Math.max(1, (width + layoutWidth - 1) / layoutWidth);
+        mPageColumnsNum = Math.max(1, layoutBaseWidth / mHorizontalStep);
+        if (spacerWidth > 0) {
+            if (mPagedFixedRowCount) {
+                setSpacerColumns(spacerWidth, mPageColumnsNum, mPageEmptyColumnIndices);
+            } else {
+                setSpacerColumns(spacerWidth, mColumnsNum, mEmptyColumnIndices);
+            }
+        }
+        mMaxKeyCount = fixedRowCount
+                ? maxCount * getOccupiedColumnCount() * (mPagedFixedRowCount ? mPageCount : 1)
+                : maxCount;
         mFixedRowCount = fixedRowCount;
         mIsRecents = categoryId == EmojiCategory.ID_RECENTS;
         mPrefs = prefs;
     }
 
-    private void setSpacerColumns(final float spacerWidth) {
+    private void setSpacerColumns(final float spacerWidth, final int columnsNum,
+            final ArrayList<Integer> emptyColumnIndices) {
         int spacerColumnsWidth = (int) (spacerWidth / mHorizontalStep);
         if (spacerColumnsWidth == 0) return;
-        if (mColumnsNum % 2 != spacerColumnsWidth % 2)
+        if (columnsNum % 2 != spacerColumnsWidth % 2)
             spacerColumnsWidth++;
         final int leftmost;
         final int rightmost;
         if (spacerColumnsWidth % 2 == 0) {
-            int center = mColumnsNum / 2;
+            int center = columnsNum / 2;
             leftmost = center - (spacerColumnsWidth / 2 - 1);
             rightmost = center + spacerColumnsWidth / 2;
         } else {
-            int center = mColumnsNum / 2 + 1;
+            int center = columnsNum / 2 + 1;
             leftmost = center - spacerColumnsWidth / 2;
             rightmost = center + spacerColumnsWidth / 2;
         }
         for (int i = leftmost; i <= rightmost; i++) {
-            mEmptyColumnIndices.add(i - 1);
+            emptyColumnIndices.add(i - 1);
         }
     }
 
     // determine a width scale so emojis evenly fill the entire width
-    private float determineWidthScale(final float horizontalStep) {
-        final float columnsNumRaw = mBaseWidth / horizontalStep;
+    private float determineWidthScale(final float horizontalStep, final int baseWidth) {
+        final float columnsNumRaw = baseWidth / horizontalStep;
         final float columnsNum = Math.round(columnsNumRaw);
         return columnsNumRaw / columnsNum;
     }
@@ -125,12 +159,18 @@ final class DynamicGridKeyboard extends Keyboard {
 
     // height is dynamic if we don't have a fixed row count
     int getOccupiedHeight() {
+        if (mFixedRowCount) {
+            return mMaxRowCount * mVerticalStep;
+        }
         final int count = mFixedRowCount ? mMaxKeyCount : mGridKeys.size();
         final int row = (count - 1) / getOccupiedColumnCount() + 1;
         return row * mVerticalStep;
     }
 
     public int getOccupiedColumnCount() {
+        if (mPagedFixedRowCount) {
+            return mPageColumnsNum - mPageEmptyColumnIndices.size();
+        }
         return mColumnsNum - mEmptyColumnIndices.size();
     }
 
@@ -269,23 +309,68 @@ final class DynamicGridKeyboard extends Keyboard {
     }
 
     private int getKeyX0(final int index) {
+        if (mPagedFixedRowCount) {
+            final int page = getPagedKeyPage(index);
+            final int column = getPagedKeyPhysicalColumn(index);
+            return page * mPageWidth + column * mHorizontalStep + mHorizontalGap / 2;
+        }
         final int column = index % mColumnsNum;
         return column * mHorizontalStep + mHorizontalGap / 2;
     }
 
     private int getKeyX1(final int index) {
+        if (mPagedFixedRowCount) {
+            final int page = getPagedKeyPage(index);
+            final int column = getPagedKeyPhysicalColumn(index) + 1;
+            return page * mPageWidth + column * mHorizontalStep + mHorizontalGap / 2;
+        }
         final int column = index % mColumnsNum + 1;
         return column * mHorizontalStep + mHorizontalGap / 2;
     }
 
     private int getKeyY0(final int index) {
+        if (mPagedFixedRowCount) {
+            return getPagedKeyRow(index) * mVerticalStep + mVerticalGap / 2;
+        }
         final int row = index / mColumnsNum;
         return row * mVerticalStep + mVerticalGap / 2;
     }
 
     private int getKeyY1(final int index) {
+        if (mPagedFixedRowCount) {
+            return (getPagedKeyRow(index) + 1) * mVerticalStep + mVerticalGap / 2;
+        }
         final int row = index / mColumnsNum + 1;
         return row * mVerticalStep + mVerticalGap / 2;
+    }
+
+    private int getPagedKeyPage(final int index) {
+        final int pageCapacity = Math.max(1, getOccupiedColumnCount() * mMaxRowCount);
+        return index / pageCapacity;
+    }
+
+    private int getPagedKeyIndexInPage(final int index) {
+        final int pageCapacity = Math.max(1, getOccupiedColumnCount() * mMaxRowCount);
+        return index % pageCapacity;
+    }
+
+    private int getPagedKeyRow(final int index) {
+        return getPagedKeyIndexInPage(index) / getOccupiedColumnCount();
+    }
+
+    private int getPagedKeyPhysicalColumn(final int index) {
+        final int occupiedColumn = getPagedKeyIndexInPage(index) % getOccupiedColumnCount();
+        int occupiedIndex = 0;
+        for (int column = 0; column < mPageColumnsNum; column++) {
+            if (mPageEmptyColumnIndices.contains(column)) {
+                continue;
+            }
+            if (occupiedIndex == occupiedColumn) {
+                return column;
+            }
+            occupiedIndex++;
+        }
+        return Math.min(mPageColumnsNum - 1, occupiedColumn);
     }
 
     @NonNull

@@ -10,12 +10,11 @@ import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.res.TypedArray;
 import android.graphics.Canvas;
-import android.graphics.Paint;
-import android.graphics.PorterDuff;
-import android.graphics.PorterDuffXfermode;
+import android.graphics.Color;
 import android.graphics.drawable.Drawable;
 import android.os.Handler;
 import android.util.AttributeSet;
+import android.view.Gravity;
 import android.widget.LinearLayout;
 import helium314.keyboard.keyboard.PopupTextView;
 import helium314.keyboard.latin.utils.Log;
@@ -26,7 +25,7 @@ import android.view.ViewGroup;
 import android.view.ViewParent;
 import android.view.accessibility.AccessibilityEvent;
 
-import android.widget.FrameLayout;
+import android.widget.PopupWindow;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -87,10 +86,10 @@ public final class EmojiPageKeyboardView extends KeyboardView implements
     private final PopupKeysKeyboardView mPopupKeysKeyboardView;
     private final WeakHashMap<Key, Keyboard> mPopupKeysKeyboardCache = new WeakHashMap<>();
     private final boolean mConfigShowPopupKeysKeyboardAtTouchedPoint;
-    private final ViewGroup mPopupKeysPlacerView;
     // More keys panel (used by popup keys keyboard view)
     // TODO: Consider extending to support multiple popup keys panels
     private PopupKeysPanel mPopupKeysPanel;
+    private PopupWindow mPopupWindow;
 
     public EmojiPageKeyboardView(final Context context, final AttributeSet attrs) {
         this(context, attrs, R.attr.keyboardViewStyle);
@@ -100,8 +99,6 @@ public final class EmojiPageKeyboardView extends KeyboardView implements
             final int defStyle) {
         super(context, attrs, defStyle);
         mHandler = new Handler();
-
-        mPopupKeysPlacerView = new FrameLayout(context, attrs);
 
         final TypedArray keyboardViewAttr = context.obtainStyledAttributes(attrs,
                 R.styleable.MainKeyboardView, defStyle, R.style.MainKeyboardView);
@@ -133,10 +130,6 @@ public final class EmojiPageKeyboardView extends KeyboardView implements
     @Override
     public void setHardwareAcceleratedDrawingEnabled(final boolean enabled) {
         super.setHardwareAcceleratedDrawingEnabled(enabled);
-        if (!enabled) return;
-        final Paint layerPaint = new Paint();
-        layerPaint.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.SRC_OVER));
-        mPopupKeysPlacerView.setLayerType(LAYER_TYPE_HARDWARE, layerPaint);
     }
 
     @Override
@@ -144,26 +137,6 @@ public final class EmojiPageKeyboardView extends KeyboardView implements
             @NonNull final Drawable background) {
         // Emoji glyphs already carry their own shape/color. Drawing key bubbles behind them looks
         // inconsistent across emoji fonts, so the emoji page keeps the keys visually transparent.
-    }
-
-    private void installPopupKeysPlacerView(final boolean uninstall) {
-        final View rootView = getRootView();
-        if (rootView == null) {
-            Log.w(TAG, "Cannot find root view");
-            return;
-        }
-        final ViewGroup windowContentView = rootView.findViewById(android.R.id.content);
-        // Note: It'd be very weird if we get null by android.R.id.content.
-        if (windowContentView == null) {
-            Log.w(TAG, "Cannot find android.R.id.content view to add DrawingPreviewPlacerView");
-            return;
-        }
-
-        if (uninstall) {
-            windowContentView.removeView(mPopupKeysPlacerView);
-        } else {
-            windowContentView.addView(mPopupKeysPlacerView);
-        }
     }
 
     public void setEmojiViewCallback(final EmojiViewCallback emojiViewCallback) {
@@ -228,19 +201,64 @@ public final class EmojiPageKeyboardView extends KeyboardView implements
 
     @Override
     public void onShowPopupKeysPanel(final PopupKeysPanel panel) {
-        // install placer view only when needed instead of when this
-        // view is attached to window
-        installPopupKeysPlacerView(false /* uninstall */);
-        panel.showInParent(mPopupKeysPlacerView);
+        onDismissPopupKeysPanel();
+        showFloatingPopup(panel);
         mPopupKeysPanel = panel;
+    }
+
+    private void showFloatingPopup(final PopupKeysPanel panel) {
+        final View container = panel.getContainerView();
+        final View rootView = getRootView();
+        final int popupWidth = container.getMeasuredWidth();
+        final int popupHeight = container.getMeasuredHeight();
+        final int popupX = getClampedPopupX(rootView, Math.round(container.getX()), popupWidth);
+        final int popupY = Math.round(container.getY());
+        if (container.getParent() instanceof ViewGroup) {
+            ((ViewGroup) container.getParent()).removeView(container);
+        }
+        container.setX(0f);
+        container.setY(0f);
+
+        if (mPopupWindow != null) {
+            mPopupWindow.dismiss();
+        }
+        final PopupWindow window = new PopupWindow(
+                container,
+                popupWidth,
+                popupHeight,
+                false
+        );
+        window.setTouchable(true);
+        window.setOutsideTouchable(false);
+        window.setClippingEnabled(false);
+        window.setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(Color.TRANSPARENT));
+
+        mPopupWindow = window;
+        window.setOnDismissListener(() -> {
+            if (mPopupWindow == window) {
+                mPopupWindow = null;
+            }
+        });
+        window.showAtLocation(rootView, Gravity.NO_GRAVITY, popupX, popupY);
+    }
+
+    private int getClampedPopupX(final View rootView, final int popupX, final int popupWidth) {
+        final int[] rootCoords = CoordinateUtils.newInstance();
+        rootView.getLocationInWindow(rootCoords);
+        final int minX = CoordinateUtils.x(rootCoords);
+        final int maxX = Math.max(minX, minX + rootView.getWidth() - popupWidth);
+        return Math.max(minX, Math.min(maxX, popupX));
     }
 
     @Override
     public void onDismissPopupKeysPanel() {
         if (isShowingPopupKeysPanel()) {
+            if (mPopupWindow != null) {
+                mPopupWindow.dismiss();
+                mPopupWindow = null;
+            }
             mPopupKeysPanel.removeFromParent();
             mPopupKeysPanel = null;
-            installPopupKeysPlacerView(true /* uninstall */);
         }
     }
 
@@ -483,5 +501,11 @@ public final class EmojiPageKeyboardView extends KeyboardView implements
             return;
         }
         parent.requestDisallowInterceptTouchEvent(disallow);
+    }
+
+    @Override
+    protected void onDetachedFromWindow() {
+        onDismissPopupKeysPanel();
+        super.onDetachedFromWindow();
     }
 }
