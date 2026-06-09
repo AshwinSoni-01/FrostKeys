@@ -43,6 +43,14 @@ public class KeyPreviewView extends TextView {
     private static final int CIRCULAR_PREVIEW_SPOT_SHADOW_COLOR = 0x1F000000;
     private static final int CIRCULAR_PREVIEW_DARK_TEXT_COLOR = 0xFF202124;
     private static final int CIRCULAR_PREVIEW_LIGHT_TEXT_COLOR = 0xFFE8EAED;
+    private static final android.view.ViewOutlineProvider CIRCULAR_OUTLINE_PROVIDER =
+            new android.view.ViewOutlineProvider() {
+                @Override
+                public void getOutline(final android.view.View view,
+                        final android.graphics.Outline outline) {
+                    outline.setOval(0, 0, view.getWidth(), view.getHeight());
+                }
+            };
 
     private final Rect mBackgroundPadding = new Rect();
     private final RectF mCircularShadowRect = new RectF();
@@ -191,12 +199,7 @@ public class KeyPreviewView extends TextView {
             int diameter = Math.max(Math.max(width, height), minDiameter);
             setMeasuredDimension(diameter, diameter);
 
-            setOutlineProvider(new android.view.ViewOutlineProvider() {
-                @Override
-                public void getOutline(android.view.View view, android.graphics.Outline outline) {
-                    outline.setOval(0, 0, view.getWidth(), view.getHeight());
-                }
-            });
+            setOutlineProvider(CIRCULAR_OUTLINE_PROVIDER);
             setClipToOutline(false);
             updateCircularPreviewShadow(true);
         } else {

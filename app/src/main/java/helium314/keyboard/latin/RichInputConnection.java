@@ -13,6 +13,7 @@ import android.inputmethodservice.InputMethodService;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.SystemClock;
+import android.os.Trace;
 import android.text.SpannableStringBuilder;
 import android.text.TextUtils;
 import android.text.style.CharacterStyle;
@@ -299,9 +300,18 @@ public final class RichInputConnection implements PrivateCommandPerformer {
             // always empty, but looks like things still work normally
             mComposingText.setLength(0);
             mCommittedTextBeforeComposingText.append(textBeforeCursor);
+            trimCommittedTextBeforeComposingText();
             return true;
         } finally {
             mIsReloading = false;
+        }
+    }
+
+    private void trimCommittedTextBeforeComposingText() {
+        final int excessLength = mCommittedTextBeforeComposingText.length()
+                - Constants.EDITOR_CONTENTS_CACHE_SIZE;
+        if (excessLength > 0) {
+            mCommittedTextBeforeComposingText.delete(0, excessLength);
         }
     }
 
@@ -332,6 +342,7 @@ public final class RichInputConnection implements PrivateCommandPerformer {
         // In the practice right now this is only called when input ends so it will be reset so
         // it works, but it's wrong and should be fixed.
         mCommittedTextBeforeComposingText.append(mComposingText);
+        trimCommittedTextBeforeComposingText();
         mComposingText.setLength(0);
         if (isConnected()) {
             try {
@@ -358,6 +369,7 @@ public final class RichInputConnection implements PrivateCommandPerformer {
         if (DebugFlags.DEBUG_ENABLED)
             Log.d(TAG, "committing "+text.length()+" characters");
         mCommittedTextBeforeComposingText.append(text);
+        trimCommittedTextBeforeComposingText();
         // TODO: the following is exceedingly error-prone. Right now when the cursor is in the
         //  middle of the composing word mComposingText only holds the part of the composing text
         //  that is before the cursor, so this actually works, but it's terribly confusing. Fix this.
@@ -587,19 +599,24 @@ public final class RichInputConnection implements PrivateCommandPerformer {
 
     @Nullable private CharSequence getTextAfterCursorAndDetectLaggyConnection(
             final int operation, final long timeout, final int n, final int flags) {
-        mIC = mParent.getCurrentInputConnection();
-        if (!isConnected()) {
-            return null;
-        }
-        final long startTime = SystemClock.uptimeMillis();
-        CharSequence result = null;
+        Trace.beginSection("RichInputConnection#getTextAfterCursor");
         try {
-            result = mIC.getTextAfterCursor(n, flags);
-        } catch (Exception e) {
-            Log.w(TAG, "Exception in getTextAfterCursor", e);
+            mIC = mParent.getCurrentInputConnection();
+            if (!isConnected()) {
+                return null;
+            }
+            final long startTime = SystemClock.uptimeMillis();
+            CharSequence result = null;
+            try {
+                result = mIC.getTextAfterCursor(n, flags);
+            } catch (Exception e) {
+                Log.w(TAG, "Exception in getTextAfterCursor", e);
+            }
+            detectLaggyConnection(operation, timeout, startTime);
+            return result;
+        } finally {
+            Trace.endSection();
         }
-        detectLaggyConnection(operation, timeout, startTime);
-        return result;
     }
 
     private void detectLaggyConnection(final int operation, final long timeout, final long startTime) {
@@ -678,6 +695,7 @@ public final class RichInputConnection implements PrivateCommandPerformer {
             switch (keyEvent.getKeyCode()) {
             case KeyEvent.KEYCODE_ENTER:
                 mCommittedTextBeforeComposingText.append("\n");
+                trimCommittedTextBeforeComposingText();
                 mExpectedSelStart += 1;
                 mExpectedSelEnd = mExpectedSelStart;
                 break;
@@ -700,6 +718,7 @@ public final class RichInputConnection implements PrivateCommandPerformer {
             case KeyEvent.KEYCODE_UNKNOWN:
                 if (null != keyEvent.getCharacters()) {
                     mCommittedTextBeforeComposingText.append(keyEvent.getCharacters());
+                    trimCommittedTextBeforeComposingText();
                     mExpectedSelStart += keyEvent.getCharacters().length();
                     mExpectedSelEnd = mExpectedSelStart;
                 }
@@ -710,6 +729,7 @@ public final class RichInputConnection implements PrivateCommandPerformer {
                     break; // don't append text if there is no actual text
                 final String text = StringUtils.newSingleCodePointString(codePoint);
                 mCommittedTextBeforeComposingText.append(text);
+                trimCommittedTextBeforeComposingText();
                 mExpectedSelStart += text.length();
                 mExpectedSelEnd = mExpectedSelStart;
                 break;
@@ -744,6 +764,7 @@ public final class RichInputConnection implements PrivateCommandPerformer {
                     textBeforeCursor.length()));
             mCommittedTextBeforeComposingText.append(
                     textBeforeCursor.subSequence(0, indexOfStartOfComposingText));
+            trimCommittedTextBeforeComposingText();
         }
         if (isConnected()) {
             try {
@@ -918,6 +939,7 @@ public final class RichInputConnection implements PrivateCommandPerformer {
         // text should never be null, but just in case, it's better to insert nothing than to crash
         if (null == text) text = "";
         mCommittedTextBeforeComposingText.append(text);
+        trimCommittedTextBeforeComposingText();
         mExpectedSelStart += text.length() - mComposingText.length();
         mExpectedSelEnd = mExpectedSelStart;
         mComposingText.setLength(0);

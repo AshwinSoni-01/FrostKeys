@@ -10,6 +10,7 @@ import static helium314.keyboard.latin.common.SuggestionSpanUtilsKt.getTextWithS
 
 import android.graphics.Color;
 import android.os.SystemClock;
+import android.os.Trace;
 import android.text.InputType;
 import android.text.SpannableString;
 import android.text.Spanned;
@@ -1793,62 +1794,67 @@ public final class InputLogic {
     }
 
     public void performUpdateSuggestionStripSync(final SettingsValues settingsValues, final int inputStyle) {
-        long startTimeMillis = 0;
-        if (DebugFlags.DEBUG_ENABLED) {
-            startTimeMillis = SystemClock.elapsedRealtime();
-            Log.d(TAG, "performUpdateSuggestionStripSync()");
-        }
-        // Check if we have a suggestion engine attached.
-        if (!settingsValues.needsToLookupSuggestions()) {
-            if (mWordComposer.isComposingWord()) {
-                Log.w(TAG, "Called updateSuggestionsOrPredictions but suggestions were not "
-                        + "requested!");
+        Trace.beginSection("InputLogic#updateSuggestionsSync");
+        try {
+            long startTimeMillis = 0;
+            if (DebugFlags.DEBUG_ENABLED) {
+                startTimeMillis = SystemClock.elapsedRealtime();
+                Log.d(TAG, "performUpdateSuggestionStripSync()");
             }
-            // Clear the suggestions strip.
-            mSuggestionStripViewAccessor.setSuggestions(SuggestedWords.getEmptyInstance());
-            return;
-        }
+            // Check if we have a suggestion engine attached.
+            if (!settingsValues.needsToLookupSuggestions()) {
+                if (mWordComposer.isComposingWord()) {
+                    Log.w(TAG, "Called updateSuggestionsOrPredictions but suggestions were not "
+                            + "requested!");
+                }
+                // Clear the suggestions strip.
+                mSuggestionStripViewAccessor.setSuggestions(SuggestedWords.getEmptyInstance());
+                return;
+            }
 
-        if (!mWordComposer.isComposingWord() && !settingsValues.mBigramPredictionEnabled) {
-            mSuggestionStripViewAccessor.setNeutralSuggestionStrip();
-            return;
-        }
+            if (!mWordComposer.isComposingWord() && !settingsValues.mBigramPredictionEnabled) {
+                mSuggestionStripViewAccessor.setNeutralSuggestionStrip();
+                return;
+            }
 
-        final AsyncResultHolder<SuggestedWords> holder = new AsyncResultHolder<>("Suggest");
-        mInputLogicHandler.getSuggestedWords(() -> getSuggestedWords(
-            inputStyle, SuggestedWords.NOT_A_SEQUENCE_NUMBER,
-            suggestedWords -> {
-                final String typedWordString = mWordComposer.getTypedWord();
-                final SuggestedWordInfo typedWordInfo = new SuggestedWordInfo(
-                    typedWordString, "", SuggestedWordInfo.MAX_SCORE, SuggestedWordInfo.KIND_TYPED,
-                    Dictionary.DICTIONARY_USER_TYPED, SuggestedWordInfo.NOT_AN_INDEX, SuggestedWordInfo.NOT_A_CONFIDENCE
-                );
-                // Show new suggestions if we have at least one. Otherwise keep the old
-                // suggestions with the new typed word. Exception: if the length of the
-                // typed word is <= 1 (after a deletion typically) we clear old suggestions.
-                if (suggestedWords.size() > 1 || typedWordString.length() <= 1) {
-                    holder.set(suggestedWords);
-                } else {
-                    holder.set(retrieveOlderSuggestions(typedWordInfo, mSuggestedWords));
+            final AsyncResultHolder<SuggestedWords> holder = new AsyncResultHolder<>("Suggest");
+            mInputLogicHandler.getSuggestedWords(() -> getSuggestedWords(
+                inputStyle, SuggestedWords.NOT_A_SEQUENCE_NUMBER,
+                suggestedWords -> {
+                    final String typedWordString = mWordComposer.getTypedWord();
+                    final SuggestedWordInfo typedWordInfo = new SuggestedWordInfo(
+                        typedWordString, "", SuggestedWordInfo.MAX_SCORE, SuggestedWordInfo.KIND_TYPED,
+                        Dictionary.DICTIONARY_USER_TYPED, SuggestedWordInfo.NOT_AN_INDEX, SuggestedWordInfo.NOT_A_CONFIDENCE
+                    );
+                    // Show new suggestions if we have at least one. Otherwise keep the old
+                    // suggestions with the new typed word. Exception: if the length of the
+                    // typed word is <= 1 (after a deletion typically) we clear old suggestions.
+                    if (suggestedWords.size() > 1 || typedWordString.length() <= 1) {
+                        holder.set(suggestedWords);
+                    } else {
+                        holder.set(retrieveOlderSuggestions(typedWordInfo, mSuggestedWords));
+                    }
+                }
+            ));
+            // This line may cause the current thread to wait.
+            final SuggestedWords suggestedWords = holder.get(null,
+                    Constants.GET_SUGGESTED_WORDS_TIMEOUT);
+            if (suggestedWords != null) {
+                // Prefer clipboard suggestions (if available and setting is enabled) over beginning of sentence predictions.
+                if (!(suggestedWords.mInputStyle == SuggestedWords.INPUT_STYLE_BEGINNING_OF_SENTENCE_PREDICTION
+                        && mLatinIME.tryShowClipboardSuggestion())) {
+                    mSuggestionStripViewAccessor.setSuggestions(suggestedWords);
+                }
+                if (! suggestedWords.isEmpty() && settingsValues.isSuggestionsEnabledPerUserSettings() && isInlineEmojiSearchAction()) {
+                    mSuggestionStripViewAccessor.showSuggestionStrip();
                 }
             }
-        ));
-        // This line may cause the current thread to wait.
-        final SuggestedWords suggestedWords = holder.get(null,
-                Constants.GET_SUGGESTED_WORDS_TIMEOUT);
-        if (suggestedWords != null) {
-            // Prefer clipboard suggestions (if available and setting is enabled) over beginning of sentence predictions.
-            if (!(suggestedWords.mInputStyle == SuggestedWords.INPUT_STYLE_BEGINNING_OF_SENTENCE_PREDICTION
-                    && mLatinIME.tryShowClipboardSuggestion())) {
-                mSuggestionStripViewAccessor.setSuggestions(suggestedWords);
+            if (DebugFlags.DEBUG_ENABLED) {
+                long runTimeMillis = SystemClock.elapsedRealtime() - startTimeMillis;
+                Log.d(TAG, "performUpdateSuggestionStripSync() : " + runTimeMillis + " ms to finish");
             }
-            if (! suggestedWords.isEmpty() && settingsValues.isSuggestionsEnabledPerUserSettings() && isInlineEmojiSearchAction()) {
-                mSuggestionStripViewAccessor.showSuggestionStrip();
-            }
-        }
-        if (DebugFlags.DEBUG_ENABLED) {
-            long runTimeMillis = SystemClock.elapsedRealtime() - startTimeMillis;
-            Log.d(TAG, "performUpdateSuggestionStripSync() : " + runTimeMillis + " ms to finish");
+        } finally {
+            Trace.endSection();
         }
     }
 

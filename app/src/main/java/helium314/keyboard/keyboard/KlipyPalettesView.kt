@@ -6,9 +6,13 @@ import android.content.Context
 import android.content.ContextWrapper
 import android.content.res.ColorStateList
 import android.graphics.Color
+import android.graphics.RenderEffect
+import android.graphics.Shader
+import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.InsetDrawable
 import android.graphics.drawable.RippleDrawable
+import android.os.Build
 import android.text.Editable
 import android.text.InputType
 import android.text.TextWatcher
@@ -23,9 +27,11 @@ import android.widget.ImageButton
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+import android.widget.PopupWindow
 import androidx.core.content.FileProvider
 import androidx.core.net.toUri
 import androidx.core.os.ConfigurationCompat
+import androidx.recyclerview.widget.ConcatAdapter
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.recyclerview.widget.StaggeredGridLayoutManager
@@ -76,6 +82,8 @@ class KlipyPalettesView @JvmOverloads constructor(
 
     private lateinit var gifsRecyclerView: RecyclerView
     private lateinit var stickersRecyclerView: RecyclerView
+    private lateinit var gifsPage: KlipyTabPage
+    private lateinit var stickersPage: KlipyTabPage
     private lateinit var viewPager: ViewPager2
     private lateinit var emptyState: TextView
     private lateinit var loadingIndicator: ProgressBar
@@ -83,6 +91,8 @@ class KlipyPalettesView @JvmOverloads constructor(
     private lateinit var clearHistoryConfirmOverlay: View
     private lateinit var clearHistoryConfirmTitle: TextView
     private lateinit var searchEditText: EditText
+    private lateinit var pinnedGifsAdapter: KlipyAdapter
+    private lateinit var pinnedStickersAdapter: KlipyAdapter
     private lateinit var gifsAdapter: KlipyAdapter
     private lateinit var stickersAdapter: KlipyAdapter
     private lateinit var historyDao: KlipyHistoryDao
@@ -115,6 +125,9 @@ class KlipyPalettesView @JvmOverloads constructor(
     lateinit var keyboardActionListener: KeyboardActionListener
     private var viewScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private var searchJob: Job? = null
+    private var mediaPruneJob: Job? = null
+    private var historyActionPopup: PopupWindow? = null
+    private var historyPopupBackdropView: RecyclerView? = null
     private var isInitialized = false
     private var activeSendJobs = 0
     private val inFlightStickerJobs = ConcurrentHashMap<String, Deferred<File?>>()
@@ -149,6 +162,18 @@ class KlipyPalettesView @JvmOverloads constructor(
         private const val TAP_ALPHA = 0.86f
         private const val TAP_PRESS_DURATION_MS = 70L
         private const val TAP_RELEASE_DURATION_MS = 120L
+        private const val MEDIA_PRUNE_IDLE_DELAY_MS = 2500L
+        private const val PREF_KLIPY_HISTORY_LONG_PRESS_HINT_DISMISSED = "klipy_history_long_press_hint_dismissed"
+        private const val VIEW_TYPE_SECTION_HEADING = 20
+        private const val VIEW_TYPE_HISTORY_HINT = 21
+        private const val VIEW_TYPE_PINNED_ROW = 22
+
+        private fun markFullSpan(view: View) {
+            val layoutParams = view.layoutParams
+            if (layoutParams is StaggeredGridLayoutManager.LayoutParams) {
+                layoutParams.isFullSpan = true
+            }
+        }
 
         private fun createStickerProcessorDispatcher(): ExecutorCoroutineDispatcher {
             return Executors.newSingleThreadExecutor { runnable ->
@@ -210,6 +235,8 @@ class KlipyPalettesView @JvmOverloads constructor(
 
         findViewById<View>(R.id.klipyHeader)?.visibility = View.VISIBLE
         viewPager.visibility = View.VISIBLE
+        pinnedGifsAdapter.resumeVisibleResources()
+        pinnedStickersAdapter.resumeVisibleResources()
         gifsAdapter.resumeVisibleResources()
         stickersAdapter.resumeVisibleResources()
         showClearHistoryButton()
@@ -217,6 +244,7 @@ class KlipyPalettesView @JvmOverloads constructor(
         updateTabSelection(currentTab)
 
         loadHistory()
+        scheduleKlipyMediaPrune()
     }
 
     fun stopKlipyPalettes() {
@@ -229,7 +257,10 @@ class KlipyPalettesView @JvmOverloads constructor(
         activeSendJobs = 0
         if (isInitialized) {
             loadingIndicator.visibility = View.GONE
+            dismissHistoryActionPopup()
             hideClearHistoryConfirmation()
+            pinnedGifsAdapter.releaseVisibleResources()
+            pinnedStickersAdapter.releaseVisibleResources()
             gifsAdapter.releaseVisibleResources()
             stickersAdapter.releaseVisibleResources()
             if (isSearchMode) {
@@ -304,27 +335,16 @@ class KlipyPalettesView @JvmOverloads constructor(
             TypedValue.COMPLEX_UNIT_DIP, 4f, resources.displayMetrics
         ).toInt()
 
-        gifsRecyclerView = RecyclerView(context).apply {
-            layoutParams = ViewGroup.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.MATCH_PARENT
-            )
-            setPadding(padding, padding, padding, padding)
-            clipToPadding = false
-            isVerticalScrollBarEnabled = true
-        }
+        gifsPage = createKlipyTabPage(padding, KlipyHistoryDao.TYPE_GIF)
+        stickersPage = createKlipyTabPage(padding, KlipyHistoryDao.TYPE_STICKER)
+        gifsRecyclerView = gifsPage.historyRecyclerView
+        stickersRecyclerView = stickersPage.historyRecyclerView
+        pinnedGifsAdapter = gifsPage.pinnedAdapter
+        pinnedStickersAdapter = stickersPage.pinnedAdapter
+        gifsAdapter = gifsPage.historyAdapter
+        stickersAdapter = stickersPage.historyAdapter
 
-        stickersRecyclerView = RecyclerView(context).apply {
-            layoutParams = ViewGroup.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.MATCH_PARENT
-            )
-            setPadding(padding, padding, padding, padding)
-            clipToPadding = false
-            isVerticalScrollBarEnabled = true
-        }
-
-        viewPager.adapter = KlipyViewPagerAdapter(gifsRecyclerView, stickersRecyclerView)
+        viewPager.adapter = KlipyViewPagerAdapter(gifsPage.root, stickersPage.root)
         viewPager.registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
             private var lastSelectedPosition = -1
 
@@ -346,6 +366,71 @@ class KlipyPalettesView @JvmOverloads constructor(
         applyTheme()
 
         isInitialized = true
+    }
+
+    private fun createKlipyTabPage(contentPadding: Int, type: String): KlipyTabPage {
+        val isStickersMode = type == KlipyHistoryDao.TYPE_STICKER
+        val root = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+            )
+        }
+        val pinnedAdapter = KlipyAdapter(
+            emptyList(),
+            isStickersMode = isStickersMode,
+            forceSquareCells = true,
+            onItemLongClick = ::onHistoryItemLongPressed
+        ) { item -> onItemUsed(item) }
+        val historyAdapter = KlipyAdapter(
+            emptyList(),
+            isStickersMode = isStickersMode,
+            onItemLongClick = ::onHistoryItemLongPressed
+        ) { item -> onItemUsed(item) }
+        val pinnedHeadingAdapter = KlipySectionAdapter(
+            context,
+            context.getString(R.string.klipy_section_pinned),
+            isHint = false
+        )
+        val pinnedRowAdapter = KlipyPinnedRowAdapter(
+            context,
+            pinnedAdapter,
+            KlipyHistoryDao.MAX_PINNED_HISTORY,
+            contentPadding
+        )
+        val historyHeadingAdapter = KlipySectionAdapter(
+            context,
+            context.getString(R.string.klipy_section_history),
+            isHint = false
+        )
+        val historyHintAdapter = KlipySectionAdapter(
+            context,
+            context.getString(R.string.klipy_history_long_press_hint),
+            isHint = true
+        )
+        val historyRecyclerView = RecyclerView(context).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+            )
+            setPadding(contentPadding, contentPadding, contentPadding, contentPadding)
+            clipToPadding = false
+            isVerticalScrollBarEnabled = true
+        }
+
+        root.addView(historyRecyclerView)
+
+        return KlipyTabPage(
+            root = root,
+            historyRecyclerView = historyRecyclerView,
+            pinnedAdapter = pinnedAdapter,
+            historyAdapter = historyAdapter,
+            pinnedHeadingAdapter = pinnedHeadingAdapter,
+            pinnedRowAdapter = pinnedRowAdapter,
+            historyHeadingAdapter = historyHeadingAdapter,
+            historyHintAdapter = historyHintAdapter
+        )
     }
 
     private fun getRecentSearches(): List<String> {
@@ -427,22 +512,49 @@ class KlipyPalettesView @JvmOverloads constructor(
     }
 
     private fun setupRecyclerViews() {
-        gifsAdapter = KlipyAdapter(emptyList()) { item -> onItemUsed(item) }
-        val staggeredLayoutManager = StaggeredGridLayoutManager(2, StaggeredGridLayoutManager.VERTICAL).apply {
+        val staggeredLayoutManager = StaggeredGridLayoutManager(
+            KlipyHistoryDao.GIF_HISTORY_COLUMNS,
+            StaggeredGridLayoutManager.VERTICAL
+        ).apply {
             gapStrategy = StaggeredGridLayoutManager.GAP_HANDLING_MOVE_ITEMS_BETWEEN_SPANS
         }
         gifsRecyclerView.layoutManager = staggeredLayoutManager
-        gifsRecyclerView.adapter = gifsAdapter
+        gifsRecyclerView.adapter = createHistoryConcatAdapter(gifsPage)
         gifsRecyclerView.setItemViewCacheSize(2)
         gifsRecyclerView.addOnScrollListener(createPaginationScrollListener())
 
-        stickersAdapter = KlipyAdapter(emptyList(), isStickersMode = true) { item -> onItemUsed(item) }
-        stickersRecyclerView.layoutManager = GridLayoutManager(context, 4)
-        stickersRecyclerView.adapter = stickersAdapter
+        val stickerLayoutManager = GridLayoutManager(context, KlipyHistoryDao.STICKER_HISTORY_COLUMNS)
+        stickersRecyclerView.layoutManager = stickerLayoutManager
+        stickersRecyclerView.adapter = createHistoryConcatAdapter(stickersPage)
+        stickerLayoutManager.spanSizeLookup = object : GridLayoutManager.SpanSizeLookup() {
+            override fun getSpanSize(position: Int): Int {
+                val adapter = stickersRecyclerView.adapter ?: return 1
+                return if (adapter.getItemViewType(position) == KlipyAdapter.VIEW_TYPE_MEDIA) {
+                    1
+                } else {
+                    KlipyHistoryDao.STICKER_HISTORY_COLUMNS
+                }
+            }
+        }
         stickersRecyclerView.itemAnimator = null // prevent ghosting with translucent backgrounds
         stickersRecyclerView.setItemViewCacheSize(2)
         stickersRecyclerView.setHasFixedSize(true)
         stickersRecyclerView.addOnScrollListener(createPaginationScrollListener())
+    }
+
+    private fun createHistoryConcatAdapter(page: KlipyTabPage): ConcatAdapter {
+        val config = ConcatAdapter.Config.Builder()
+            .setIsolateViewTypes(false)
+            .setStableIdMode(ConcatAdapter.Config.StableIdMode.ISOLATED_STABLE_IDS)
+            .build()
+        return ConcatAdapter(
+            config,
+            page.pinnedHeadingAdapter,
+            page.pinnedRowAdapter,
+            page.historyHeadingAdapter,
+            page.historyHintAdapter,
+            page.historyAdapter
+        )
     }
 
     @SuppressLint("ClickableViewAccessibility")
@@ -477,11 +589,16 @@ class KlipyPalettesView @JvmOverloads constructor(
         return object : RecyclerView.OnScrollListener() {
             override fun onScrollStateChanged(recyclerView: RecyclerView, newState: Int) {
                 super.onScrollStateChanged(recyclerView, newState)
-                val adapter = recyclerView.adapter as? KlipyAdapter ?: return
+                if (newState != RecyclerView.SCROLL_STATE_IDLE) {
+                    dismissHistoryActionPopup()
+                }
+                val page = pageForRecyclerView(recyclerView) ?: return
                 if (newState == RecyclerView.SCROLL_STATE_IDLE) {
-                    adapter.setAnimationsRunning(true)
+                    page.pinnedAdapter.setAnimationsRunning(true)
+                    page.historyAdapter.setAnimationsRunning(true)
                 } else {
-                    adapter.setAnimationsRunning(false)
+                    page.pinnedAdapter.setAnimationsRunning(false)
+                    page.historyAdapter.setAnimationsRunning(false)
                 }
             }
 
@@ -538,6 +655,7 @@ class KlipyPalettesView @JvmOverloads constructor(
 
     private fun onItemUsed(item: KlipyItem) {
         historyDao.addHistory(item.id, item.url, currentTab, item.width, item.height, item.previewUrl)
+        scheduleKlipyMediaPrune()
 
         viewScope.launch {
             showLoading()
@@ -607,6 +725,153 @@ class KlipyPalettesView @JvmOverloads constructor(
         }
     }
 
+    private fun pageForRecyclerView(recyclerView: RecyclerView): KlipyTabPage? {
+        return when (recyclerView) {
+            gifsRecyclerView -> gifsPage
+            stickersRecyclerView -> stickersPage
+            else -> null
+        }
+    }
+
+    private fun onHistoryItemLongPressed(item: KlipyItem, anchor: View): Boolean {
+        if (isSearchActive || isSearchMode) return false
+        performTapFeedback(anchor)
+        dismissLongPressHistoryHint()
+        showHistoryActionPopup(item, anchor, currentTab)
+        return true
+    }
+
+    private fun showHistoryActionPopup(item: KlipyItem, anchor: View, type: String) {
+        dismissHistoryActionPopup()
+
+        val colors = Settings.getValues().mColors
+        val textColor = colors.get(ColorType.TOOL_BAR_KEY)
+        val backgroundColor = ColorUtils.setAlphaComponent(
+            colors.get(ColorType.SPECIAL_KEY_BACKGROUND),
+            232
+        )
+        val cornerRadius = 14f * resources.displayMetrics.density
+        val content = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                setColor(backgroundColor)
+                setStroke(1.dpToPx(resources), ColorUtils.setAlphaComponent(textColor, 36))
+                this.cornerRadius = cornerRadius
+            }
+            setPadding(4.dpToPx(resources), 4.dpToPx(resources), 4.dpToPx(resources), 4.dpToPx(resources))
+        }
+
+        val pinAction = createHistoryPopupAction(
+            text = context.getString(if (item.isPinned) R.string.klipy_action_unpin else R.string.klipy_action_pin),
+            textColor = textColor
+        ) {
+            if (item.isPinned) {
+                historyDao.unpinHistory(item.id, type)
+            } else {
+                historyDao.pinHistory(item.id, type)
+            }
+            dismissHistoryActionPopup()
+            loadHistory()
+            scheduleKlipyMediaPrune()
+        }
+        val deleteAction = createHistoryPopupAction(
+            text = context.getString(R.string.klipy_action_delete_from_history),
+            textColor = textColor
+        ) {
+            historyDao.deleteHistory(item.id, type)
+            dismissHistoryActionPopup()
+            loadHistory()
+            scheduleKlipyMediaPrune()
+        }
+
+        content.addView(pinAction)
+        content.addView(deleteAction)
+
+        val backdropView = if (type == KlipyHistoryDao.TYPE_GIF) gifsRecyclerView else stickersRecyclerView
+        applyHistoryPopupBackdrop(backdropView)
+
+        historyActionPopup = PopupWindow(
+            content,
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+            true
+        ).apply {
+            isOutsideTouchable = true
+            setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+            elevation = 8.dpToPx(resources).toFloat()
+            setOnDismissListener {
+                if (historyActionPopup === this) {
+                    historyActionPopup = null
+                }
+                clearHistoryPopupBackdrop()
+            }
+            showAsDropDown(anchor, 0, -anchor.height)
+        }
+    }
+
+    private fun createHistoryPopupAction(text: String, textColor: Int, onClick: () -> Unit): TextView {
+        return TextView(context).apply {
+            layoutParams = LinearLayout.LayoutParams(176.dpToPx(resources), 40.dpToPx(resources))
+            gravity = android.view.Gravity.CENTER_VERTICAL
+            setPadding(12.dpToPx(resources), 0, 12.dpToPx(resources), 0)
+            this.text = text
+            setTextColor(textColor)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+            KeyboardTypeface.applyToTextView(this)
+            isClickable = true
+            isFocusable = true
+            installTapAnimation(this)
+            setOnClickListener {
+                performTapFeedback(this)
+                onClick()
+            }
+        }
+    }
+
+    private fun dismissHistoryActionPopup() {
+        historyActionPopup?.dismiss()
+        historyActionPopup = null
+        clearHistoryPopupBackdrop()
+    }
+
+    private fun applyHistoryPopupBackdrop(recyclerView: RecyclerView) {
+        clearHistoryPopupBackdrop()
+        historyPopupBackdropView = recyclerView
+        if (isHistoryPopupBlurAvailable(recyclerView)) {
+            recyclerView.setRenderEffect(
+                RenderEffect.createBlurEffect(
+                    8f * resources.displayMetrics.density,
+                    8f * resources.displayMetrics.density,
+                    Shader.TileMode.CLAMP
+                )
+            )
+        } else {
+            recyclerView.foreground = ColorDrawable(ColorUtils.setAlphaComponent(Color.BLACK, 42))
+        }
+    }
+
+    private fun isHistoryPopupBlurAvailable(recyclerView: RecyclerView): Boolean {
+        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && recyclerView.isHardwareAccelerated
+    }
+
+    private fun clearHistoryPopupBackdrop() {
+        val backdropView = historyPopupBackdropView ?: return
+        if (isHistoryPopupBlurAvailable(backdropView)) {
+            backdropView.setRenderEffect(null)
+        }
+        backdropView.foreground = null
+        historyPopupBackdropView = null
+    }
+
+    private fun dismissLongPressHistoryHint() {
+        if (!context.prefs().getBoolean(PREF_KLIPY_HISTORY_LONG_PRESS_HINT_DISMISSED, false)) {
+            context.prefs().edit().putBoolean(PREF_KLIPY_HISTORY_LONG_PRESS_HINT_DISMISSED, true).apply()
+        }
+        if (::gifsPage.isInitialized) gifsPage.historyHintAdapter.setVisible(false)
+        if (::stickersPage.isInitialized) stickersPage.historyHintAdapter.setVisible(false)
+    }
+
     private fun showLoading() {
         activeSendJobs++
         loadingIndicator.visibility = View.VISIBLE
@@ -659,6 +924,62 @@ class KlipyPalettesView @JvmOverloads constructor(
             return null
         }
         return file
+    }
+
+    private fun scheduleKlipyMediaPrune() {
+        mediaPruneJob?.cancel()
+        mediaPruneJob = viewScope.launch(Dispatchers.IO) {
+            delay(MEDIA_PRUNE_IDLE_DELAY_MS)
+            pruneStaleKlipyMediaFiles()
+        }
+    }
+
+    private fun pruneStaleKlipyMediaFiles() {
+        val gifIds = historyDao.getHistory(KlipyHistoryDao.TYPE_GIF).map { it.id }.toSet()
+        val stickerIds = historyDao.getHistory(KlipyHistoryDao.TYPE_STICKER).map { it.id }.toSet()
+
+        val keptGifCacheFiles = mutableSetOf<String>()
+        gifIds.forEach { id ->
+            keptGifCacheFiles.add("klipy_${id}.gif")
+            keptGifCacheFiles.add("klipy_gif_${id}.gif")
+        }
+        deleteStaleKlipyFiles(
+            directory = File(context.cacheDir, "klipy"),
+            keptFileNames = keptGifCacheFiles
+        ) { name ->
+            name.startsWith("klipy_") && name.endsWith(".gif")
+        }
+
+        val keptStickerFiles = mutableSetOf<String>()
+        gifIds.forEach { id ->
+            keptStickerFiles.add("animated_klipy_gif_${id}.webp")
+        }
+        stickerIds.forEach { id ->
+            keptStickerFiles.add("klipy_${id}.webp")
+            keptStickerFiles.add("klipy_sticker_${id}.webp")
+            keptStickerFiles.add("animated_klipy_sticker_${id}.webp")
+        }
+        deleteStaleKlipyFiles(
+            directory = File(context.filesDir, "stickers/klipy"),
+            keptFileNames = keptStickerFiles
+        ) { name ->
+            (name.startsWith("klipy_") || name.startsWith("animated_klipy_")) && name.endsWith(".webp")
+        }
+    }
+
+    private fun deleteStaleKlipyFiles(
+        directory: File,
+        keptFileNames: Set<String>,
+        isGeneratedKlipyFile: (String) -> Boolean
+    ) {
+        if (!directory.isDirectory) return
+        directory.listFiles()?.forEach { file ->
+            if (file.isFile && isGeneratedKlipyFile(file.name) && file.name !in keptFileNames) {
+                if (!file.delete()) {
+                    Log.w("KlipyPalettesView", "Failed to delete stale Klipy file: ${file.absolutePath}")
+                }
+            }
+        }
     }
 
     private fun sendNormalGif(gifFile: File) {
@@ -749,6 +1070,7 @@ class KlipyPalettesView @JvmOverloads constructor(
     private fun onTabSelected(tab: String) {
         val activeAdapter = if (tab == KlipyHistoryDao.TYPE_GIF) gifsAdapter else stickersAdapter
         val shouldLoad = currentTab != tab || activeAdapter.itemCount == 0
+        dismissHistoryActionPopup()
         hideClearHistoryConfirmation()
         currentTab = tab
         updateTabSelection(tab)
@@ -760,8 +1082,10 @@ class KlipyPalettesView @JvmOverloads constructor(
 
     private fun loadHistory() {
         val activeAdapter = if (currentTab == KlipyHistoryDao.TYPE_GIF) gifsAdapter else stickersAdapter
+        val activePinnedAdapter = if (currentTab == KlipyHistoryDao.TYPE_GIF) pinnedGifsAdapter else pinnedStickersAdapter
 
         if (isSearchActive) {
+            setHistorySectionsVisible(currentTab, showPinned = false, showHistoryHeading = false)
             val searchResults = if (currentTab == KlipyHistoryDao.TYPE_GIF) lastGifSearch else lastStickerSearch
             if (searchResults.isNotEmpty()) {
                 activeAdapter.updateItems(searchResults.toList())
@@ -773,10 +1097,27 @@ class KlipyPalettesView @JvmOverloads constructor(
             }
         }
 
-        val history = historyDao.getHistory(currentTab)
+        val pinnedHistory = historyDao.getPinnedHistory(currentTab)
+        val history = historyDao.getRecentHistory(currentTab)
+        activePinnedAdapter.updateItems(pinnedHistory)
         activeAdapter.updateItems(history)
+        setHistorySectionsVisible(
+            currentTab,
+            showPinned = pinnedHistory.isNotEmpty(),
+            showHistoryHeading = history.isNotEmpty()
+        )
         emptyState.text = context.getString(R.string.no_recent_items)
-        emptyState.visibility = if (history.isEmpty()) View.VISIBLE else View.GONE
+        emptyState.visibility = if (pinnedHistory.isEmpty() && history.isEmpty()) View.VISIBLE else View.GONE
+    }
+
+    private fun setHistorySectionsVisible(tab: String, showPinned: Boolean, showHistoryHeading: Boolean) {
+        val page = if (tab == KlipyHistoryDao.TYPE_GIF) gifsPage else stickersPage
+        page.pinnedHeadingAdapter.setVisible(showPinned)
+        page.pinnedRowAdapter.setVisible(showPinned)
+        page.historyHeadingAdapter.setVisible(showHistoryHeading)
+        page.historyHintAdapter.setVisible(
+            showHistoryHeading && !context.prefs().getBoolean(PREF_KLIPY_HISTORY_LONG_PRESS_HINT_DISMISSED, false)
+        )
     }
 
     private fun performSearch(query: String) {
@@ -804,6 +1145,7 @@ class KlipyPalettesView @JvmOverloads constructor(
             loadingIndicator.visibility = View.GONE
             val activeAdapter = if (tabAtRequest == KlipyHistoryDao.TYPE_GIF) gifsAdapter else stickersAdapter
             activeAdapter.updateItems(emptyList())
+            setHistorySectionsVisible(tabAtRequest, showPinned = false, showHistoryHeading = false)
             emptyState.text = "Cloud features are disabled. Please enable them in settings to search."
             emptyState.visibility = View.VISIBLE
             return
@@ -833,6 +1175,7 @@ class KlipyPalettesView @JvmOverloads constructor(
             loadingIndicator.visibility = View.GONE
             val activeAdapter = if (tabAtRequest == KlipyHistoryDao.TYPE_GIF) gifsAdapter else stickersAdapter
             activeAdapter.updateItems(results)
+            setHistorySectionsVisible(tabAtRequest, showPinned = false, showHistoryHeading = false)
 
             val activeRecyclerView = if (tabAtRequest == KlipyHistoryDao.TYPE_GIF) gifsRecyclerView else stickersRecyclerView
             activeRecyclerView.scrollToPosition(0)
@@ -1195,6 +1538,15 @@ class KlipyPalettesView @JvmOverloads constructor(
                 KeyboardTypeface.applyToTextView(it)
             }
 
+            if (::gifsPage.isInitialized && ::stickersPage.isInitialized) {
+                val headingColor = ColorUtils.setAlphaComponent(colors.get(ColorType.TOOL_BAR_KEY), 190)
+                listOf(gifsPage, stickersPage).forEach { page ->
+                    page.pinnedHeadingAdapter.setTextColor(headingColor)
+                    page.historyHeadingAdapter.setTextColor(headingColor)
+                    page.historyHintAdapter.setTextColor(ColorUtils.setAlphaComponent(colors.get(ColorType.TOOL_BAR_KEY), 145))
+                }
+            }
+
             if (::recentSearchesContainer.isInitialized) {
                 val density = resources.displayMetrics.density
                 val cornerRadius = 16f * density
@@ -1273,6 +1625,7 @@ class KlipyPalettesView @JvmOverloads constructor(
 
     private fun showClearHistoryConfirmation() {
         if (!::clearHistoryConfirmOverlay.isInitialized) return
+        dismissHistoryActionPopup()
         clearHistoryConfirmTitle.text = context.getString(
             if (currentTab == KlipyHistoryDao.TYPE_GIF) {
                 R.string.klipy_clear_history_confirm_title_gif
@@ -1293,7 +1646,9 @@ class KlipyPalettesView @JvmOverloads constructor(
     }
 
     private fun clearCurrentHistory() {
+        dismissHistoryActionPopup()
         historyDao.clearHistory(currentTab)
+        scheduleKlipyMediaPrune()
         isSearchActive = false
         setSearchText("", 0)
         if (currentTab == KlipyHistoryDao.TYPE_GIF) {
@@ -1306,6 +1661,10 @@ class KlipyPalettesView @JvmOverloads constructor(
     }
 
     fun handleBackPress(): Boolean {
+        if (historyActionPopup != null) {
+            dismissHistoryActionPopup()
+            return true
+        }
         if (isSearchMode) {
             exitSearchMode(triggerSearch = false)
             return true
@@ -1354,6 +1713,9 @@ class KlipyPalettesView @JvmOverloads constructor(
 
     private fun enterSearchMode(moveCursorToEnd: Boolean = true) {
         isSearchMode = true
+        dismissHistoryActionPopup()
+        pinnedGifsAdapter.setAnimationsRunning(false)
+        pinnedStickersAdapter.setAnimationsRunning(false)
         gifsAdapter.setAnimationsRunning(false)
         stickersAdapter.setAnimationsRunning(false)
         findViewById<View>(R.id.klipyHeader)?.visibility = View.GONE
@@ -1381,6 +1743,8 @@ class KlipyPalettesView @JvmOverloads constructor(
         findViewById<View>(R.id.klipyHeader)?.visibility = View.VISIBLE
         findViewById<View>(R.id.klipySearchBackButton)?.visibility = View.GONE
         viewPager.visibility = View.VISIBLE
+        pinnedGifsAdapter.setAnimationsRunning(true)
+        pinnedStickersAdapter.setAnimationsRunning(true)
         gifsAdapter.setAnimationsRunning(true)
         stickersAdapter.setAnimationsRunning(true)
         showClearHistoryButton()
@@ -1671,6 +2035,134 @@ class KlipyPalettesView @JvmOverloads constructor(
 
         override fun onEndSpaceSwipe() {
             // Nothing to finalize
+        }
+    }
+
+    private data class KlipyTabPage(
+        val root: LinearLayout,
+        val historyRecyclerView: RecyclerView,
+        val pinnedAdapter: KlipyAdapter,
+        val historyAdapter: KlipyAdapter,
+        val pinnedHeadingAdapter: KlipySectionAdapter,
+        val pinnedRowAdapter: KlipyPinnedRowAdapter,
+        val historyHeadingAdapter: KlipySectionAdapter,
+        val historyHintAdapter: KlipySectionAdapter
+    )
+
+    private class KlipySectionAdapter(
+        private val context: Context,
+        private val text: String,
+        private val isHint: Boolean
+    ) : RecyclerView.Adapter<KlipySectionAdapter.ViewHolder>() {
+        private var isVisible = false
+        private var textColor = Color.WHITE
+
+        init {
+            setHasStableIds(true)
+        }
+
+        class ViewHolder(val textView: TextView) : RecyclerView.ViewHolder(textView)
+
+        override fun getItemId(position: Int): Long = text.hashCode().toLong()
+
+        fun setVisible(visible: Boolean) {
+            if (isVisible == visible) return
+            isVisible = visible
+            if (visible) {
+                notifyItemInserted(0)
+            } else {
+                notifyItemRemoved(0)
+            }
+        }
+
+        fun setTextColor(color: Int) {
+            textColor = color
+            if (isVisible) notifyItemChanged(0)
+        }
+
+        override fun getItemCount(): Int = if (isVisible) 1 else 0
+
+        override fun getItemViewType(position: Int): Int {
+            return if (isHint) VIEW_TYPE_HISTORY_HINT else VIEW_TYPE_SECTION_HEADING
+        }
+
+        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
+            val resources = parent.resources
+            val textView = TextView(context).apply {
+                layoutParams = RecyclerView.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+                )
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+                includeFontPadding = false
+                setPadding(
+                    10.dpToPx(resources),
+                    if (isHint) 0 else 8.dpToPx(resources),
+                    6.dpToPx(resources),
+                    if (isHint) 6.dpToPx(resources) else 4.dpToPx(resources)
+                )
+                KeyboardTypeface.applyToTextView(this)
+            }
+            return ViewHolder(textView)
+        }
+
+        override fun onBindViewHolder(holder: ViewHolder, position: Int) {
+            markFullSpan(holder.itemView)
+            holder.textView.text = text
+            holder.textView.setTextColor(textColor)
+        }
+    }
+
+    private class KlipyPinnedRowAdapter(
+        private val context: Context,
+        private val pinnedAdapter: KlipyAdapter,
+        private val spanCount: Int,
+        private val contentPadding: Int
+    ) : RecyclerView.Adapter<KlipyPinnedRowAdapter.ViewHolder>() {
+        private var isVisible = false
+
+        init {
+            setHasStableIds(true)
+        }
+
+        class ViewHolder(val recyclerView: RecyclerView) : RecyclerView.ViewHolder(recyclerView)
+
+        override fun getItemId(position: Int): Long = VIEW_TYPE_PINNED_ROW.toLong()
+
+        fun setVisible(visible: Boolean) {
+            if (isVisible == visible) return
+            isVisible = visible
+            if (visible) {
+                notifyItemInserted(0)
+            } else {
+                notifyItemRemoved(0)
+            }
+        }
+
+        override fun getItemCount(): Int = if (isVisible) 1 else 0
+
+        override fun getItemViewType(position: Int): Int = VIEW_TYPE_PINNED_ROW
+
+        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
+            val recyclerView = RecyclerView(context).apply {
+                layoutParams = RecyclerView.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+                )
+                setPadding(0, 0, 0, contentPadding)
+                clipToPadding = false
+                isNestedScrollingEnabled = false
+                overScrollMode = View.OVER_SCROLL_NEVER
+                layoutManager = GridLayoutManager(context, spanCount)
+                adapter = pinnedAdapter
+                itemAnimator = null
+                setHasFixedSize(true)
+            }
+            return ViewHolder(recyclerView)
+        }
+
+        override fun onBindViewHolder(holder: ViewHolder, position: Int) {
+            markFullSpan(holder.itemView)
         }
     }
 

@@ -13,6 +13,7 @@ import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.graphics.drawable.Drawable;
 import android.os.Build;
+import android.os.Trace;
 import android.view.ContextThemeWrapper;
 import android.view.Gravity;
 import android.view.LayoutInflater;
@@ -282,30 +283,39 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
         final Runnable action = new Runnable() {
             @Override
             public void run() {
-                // Make {@link MainKeyboardView} visible and hide {@link EmojiPalettesView}.
-                final SettingsValues currentSettingsValues = Settings.getValues();
-                setMainKeyboardFrame(currentSettingsValues, toggleState);
-                // TODO: pass this object to setKeyboard instead of getting the current values.
-                final MainKeyboardView keyboardView = mKeyboardView;
-                final Keyboard oldKeyboard = keyboardView.getKeyboard();
-                final Keyboard newKeyboard = mKeyboardLayoutSet.getKeyboard(keyboardId);
-                keyboardView.setKeyboard(newKeyboard);
-                mCurrentInputView.setKeyboardTopPadding(newKeyboard.mTopPadding);
-                setKeyboardPanelOffsets(newKeyboard.mId.mElementId >= KeyboardId.ELEMENT_EMOJI_RECENTS && newKeyboard.mId.mElementId != KeyboardId.ELEMENT_NUMPAD);
-                keyboardView.setKeyPreviewPopupEnabled(currentSettingsValues.mKeyPreviewPopupOn);
-                keyboardView.updateShortcutKey(mRichImm.isShortcutImeReady());
-                final boolean subtypeChanged = (oldKeyboard == null) || !newKeyboard.mId.mSubtype.equals(oldKeyboard.mId.mSubtype);
-                final int languageOnSpacebarFormatType = LanguageOnSpacebarUtils.getLanguageOnSpacebarFormatType(newKeyboard.mId.mSubtype);
-                final boolean hasMultipleEnabledIMEsOrSubtypes = mRichImm.hasMultipleEnabledIMEsOrSubtypes(true);
-                keyboardView.startDisplayLanguageOnSpacebar(subtypeChanged, languageOnSpacebarFormatType, hasMultipleEnabledIMEsOrSubtypes);
+                Trace.beginSection("KeyboardSwitcher#setKeyboard");
+                try {
+                    // Make {@link MainKeyboardView} visible and hide {@link EmojiPalettesView}.
+                    final SettingsValues currentSettingsValues = Settings.getValues();
+                    // TODO: pass this object to setKeyboard instead of getting the current values.
+                    final MainKeyboardView keyboardView = mKeyboardView;
+                    final Keyboard oldKeyboard = keyboardView.getKeyboard();
+                    final Keyboard newKeyboard = mKeyboardLayoutSet.getKeyboard(keyboardId);
+                    if (trySetKeyboardForFastCaseSwitch(keyboardView, oldKeyboard, newKeyboard,
+                            currentSettingsValues, toggleState, animate)) {
+                        return;
+                    }
+                    setMainKeyboardFrame(currentSettingsValues, toggleState);
+                    keyboardView.setKeyboard(newKeyboard);
+                    mCurrentInputView.setKeyboardTopPadding(newKeyboard.mTopPadding);
+                    setKeyboardPanelOffsets(newKeyboard.mId.mElementId >= KeyboardId.ELEMENT_EMOJI_RECENTS && newKeyboard.mId.mElementId != KeyboardId.ELEMENT_NUMPAD);
+                    keyboardView.setKeyPreviewPopupEnabled(currentSettingsValues.mKeyPreviewPopupOn);
+                    keyboardView.updateShortcutKey(mRichImm.isShortcutImeReady());
+                    final boolean subtypeChanged = (oldKeyboard == null) || !newKeyboard.mId.mSubtype.equals(oldKeyboard.mId.mSubtype);
+                    final int languageOnSpacebarFormatType = LanguageOnSpacebarUtils.getLanguageOnSpacebarFormatType(newKeyboard.mId.mSubtype);
+                    final boolean hasMultipleEnabledIMEsOrSubtypes = mRichImm.hasMultipleEnabledIMEsOrSubtypes(true);
+                    keyboardView.startDisplayLanguageOnSpacebar(subtypeChanged, languageOnSpacebarFormatType, hasMultipleEnabledIMEsOrSubtypes);
 
-                if (currentSettingsValues.needsToLookupSuggestions()
-                                            && (currentSettingsValues.mInlineEmojiSearch || currentSettingsValues.mSuggestEmojis)) {
-                    EmojiParserKt.loadEmojiDefaultVersionsAndPopupSpecs(mThemeContext);
-                }
-                updatePersistentEmojiRow();
-                if (mCurrentInputView != null) {
-                    mCurrentInputView.requestLayout();
+                    if (currentSettingsValues.needsToLookupSuggestions()
+                                                && (currentSettingsValues.mInlineEmojiSearch || currentSettingsValues.mSuggestEmojis)) {
+                        EmojiParserKt.loadEmojiDefaultVersionsAndPopupSpecs(mThemeContext);
+                    }
+                    updatePersistentEmojiRow();
+                    if (mCurrentInputView != null) {
+                        mCurrentInputView.requestLayout();
+                    }
+                } finally {
+                    Trace.endSection();
                 }
             }
         };
@@ -315,6 +325,56 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
         } else {
             action.run();
         }
+    }
+
+    private boolean trySetKeyboardForFastCaseSwitch(@NonNull final MainKeyboardView keyboardView,
+            @Nullable final Keyboard oldKeyboard, @NonNull final Keyboard newKeyboard,
+            @NonNull final SettingsValues settingsValues,
+            @NonNull final KeyboardSwitchState toggleState, final boolean animate) {
+        if (!canUseFastCaseSwitch(oldKeyboard, newKeyboard, toggleState, animate)) {
+            return false;
+        }
+        Trace.beginSection("KeyboardSwitcher#fastCaseSwitch");
+        try {
+            keyboardView.setKeyboardForCaseSwitch(newKeyboard);
+            keyboardView.setKeyPreviewPopupEnabled(settingsValues.mKeyPreviewPopupOn);
+            keyboardView.updateShortcutKey(mRichImm.isShortcutImeReady());
+            final boolean subtypeChanged = oldKeyboard == null
+                    || !newKeyboard.mId.mSubtype.equals(oldKeyboard.mId.mSubtype);
+            final int languageOnSpacebarFormatType =
+                    LanguageOnSpacebarUtils.getLanguageOnSpacebarFormatType(newKeyboard.mId.mSubtype);
+            final boolean hasMultipleEnabledIMEsOrSubtypes =
+                    mRichImm.hasMultipleEnabledIMEsOrSubtypes(true);
+            keyboardView.startDisplayLanguageOnSpacebar(subtypeChanged,
+                    languageOnSpacebarFormatType, hasMultipleEnabledIMEsOrSubtypes);
+            return true;
+        } finally {
+            Trace.endSection();
+        }
+    }
+
+    private boolean canUseFastCaseSwitch(@Nullable final Keyboard oldKeyboard,
+            @NonNull final Keyboard newKeyboard, @NonNull final KeyboardSwitchState toggleState,
+            final boolean animate) {
+        if (animate || oldKeyboard == null || toggleState != KeyboardSwitchState.OTHER) {
+            return false;
+        }
+        if (!oldKeyboard.mId.isAlphabetKeyboard() || !newKeyboard.mId.isAlphabetKeyboard()) {
+            return false;
+        }
+        if (oldKeyboard.mId.mElementId == newKeyboard.mId.mElementId) {
+            return true;
+        }
+        return oldKeyboard.mId.mMode == newKeyboard.mId.mMode
+                && oldKeyboard.mId.mSubtype.equals(newKeyboard.mId.mSubtype)
+                && oldKeyboard.mOccupiedWidth == newKeyboard.mOccupiedWidth
+                && oldKeyboard.mOccupiedHeight == newKeyboard.mOccupiedHeight
+                && oldKeyboard.mBaseWidth == newKeyboard.mBaseWidth
+                && oldKeyboard.mBaseHeight == newKeyboard.mBaseHeight
+                && oldKeyboard.mTopPadding == newKeyboard.mTopPadding
+                && oldKeyboard.mVerticalGap == newKeyboard.mVerticalGap
+                && oldKeyboard.mMostCommonKeyWidth == newKeyboard.mMostCommonKeyWidth
+                && oldKeyboard.mMostCommonKeyHeight == newKeyboard.mMostCommonKeyHeight;
     }
 
     public Keyboard getKeyboard() {
@@ -815,12 +875,17 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
         if (isShowingKlipyPalettes() || isShowingEmojiPalettes() || isShowingClipboardHistory() || isShowingAiWritingTools()) {
             return;
         }
+        Trace.beginSection("KeyboardSwitcher#updateShiftState");
+        try {
         if (DEBUG_ACTION) {
             Log.d(TAG, "requestUpdatingShiftState: "
                     + " autoCapsFlags=" + CapsModeUtils.flagsToString(autoCapsFlags)
                     + " recapitalizeMode=" + recapitalizeMode);
         }
         mState.onUpdateShiftState(autoCapsFlags, recapitalizeMode);
+        } finally {
+            Trace.endSection();
+        }
     }
 
     // Implements {@link KeyboardState.SwitchActions}.

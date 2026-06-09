@@ -20,6 +20,7 @@ object KeyboardTypeface {
 
     private var cachedCustomTypeface: Typeface? = null
     private var cachedCustomFontFamily: FontFamily? = null
+    private val cachedStyledCustomTypefaces = HashMap<Int, Typeface>()
     @Volatile
     private var customTypefaceLoaded = false
 
@@ -83,7 +84,11 @@ object KeyboardTypeface {
         }
         val custom = customTypeface() ?: return defaultTypeface
         return if (defaultTypeface.style != Typeface.NORMAL) {
-            Typeface.create(custom, defaultTypeface.style)
+            synchronized(lock) {
+                cachedStyledCustomTypefaces.getOrPut(defaultTypeface.style) {
+                    Typeface.create(custom, defaultTypeface.style)
+                }
+            }
         } else {
             custom
         }
@@ -139,6 +144,7 @@ object KeyboardTypeface {
         synchronized(lock) {
             cachedCustomTypeface = null
             cachedCustomFontFamily = null
+            cachedStyledCustomTypefaces.clear()
             customTypefaceLoaded = false
             cachedEmojiTypeface = null
             emojiTypefaceLoaded = false

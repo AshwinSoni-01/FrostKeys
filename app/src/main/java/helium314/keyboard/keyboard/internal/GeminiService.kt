@@ -94,8 +94,8 @@ object GeminiService : SharedPreferences.OnSharedPreferenceChangeListener {
                             }
                         }
 
-                        // Prioritize 8B models as they are significantly faster
-                        flashModels.sortWith(compareByDescending<String> { it.contains("8b", ignoreCase = true) }.thenByDescending { it })
+                        // Prioritize Lite models as they are significantly faster
+                        flashModels.sortWith(compareByDescending<String> { it.contains("lite", ignoreCase = true) }.thenByDescending { it })
 
                         val cachedString = flashModels.joinToString(",")
                         // Synchronous commit to prevent race conditions

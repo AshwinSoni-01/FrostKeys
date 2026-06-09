@@ -21,6 +21,7 @@ import android.graphics.Rect;
 import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.NinePatchDrawable;
+import android.os.Trace;
 import android.text.TextUtils;
 import android.util.AttributeSet;
 import android.view.View;
@@ -187,27 +188,42 @@ public class KeyboardView extends View {
      * @param keyboard the keyboard to display in this view
      */
     public void setKeyboard(@NonNull final Keyboard keyboard) {
-        if (keyboard instanceof MoreSuggestions) {
-            mColors.setBackground(this, ColorType.MORE_SUGGESTIONS_BACKGROUND);
-        } else if (keyboard instanceof PopupKeysKeyboard) {
-            mColors.setBackground(this, ColorType.POPUP_KEYS_BACKGROUND);
-        } else {
-            // actual background color/drawable is applied to main_keyboard_frame
-            setBackgroundColor(Color.TRANSPARENT);
-        }
+        setKeyboardInternal(keyboard, true /* requestLayout */);
+    }
 
-        mKeyboard = keyboard;
-        mKeyScaleForText = (float) Math.sqrt(1 / Settings.getValues().mKeyboardHeightScale);
-        final int scaledKeyHeight = (int) ((keyboard.mMostCommonKeyHeight - keyboard.mVerticalGap) * mKeyScaleForText);
-        mKeyDrawParams.updateParams(scaledKeyHeight, mKeyVisualAttributes);
-        mKeyDrawParams.updateParams(scaledKeyHeight, keyboard.mKeyVisualAttributes);
-        invalidateAllKeys();
-        requestLayout();
-        mFontSizeMultiplier = mKeyboard.mId.isEmojiKeyboard()
-                // In the case of EmojiKeyFit, the size of emojis is taken care of by the size
-                // of the keys
-                ? (Settings.getValues().mEmojiKeyFit ? 1 : Settings.getValues().mFontSizeMultiplierEmoji)
-                : Settings.getValues().mFontSizeMultiplier;
+    protected void setKeyboardWithoutRequestLayout(@NonNull final Keyboard keyboard) {
+        setKeyboardInternal(keyboard, false /* requestLayout */);
+    }
+
+    private void setKeyboardInternal(@NonNull final Keyboard keyboard, final boolean requestLayout) {
+        Trace.beginSection(requestLayout ? "KeyboardView#setKeyboard" : "KeyboardView#setKeyboardNoLayout");
+        try {
+            if (keyboard instanceof MoreSuggestions) {
+                mColors.setBackground(this, ColorType.MORE_SUGGESTIONS_BACKGROUND);
+            } else if (keyboard instanceof PopupKeysKeyboard) {
+                mColors.setBackground(this, ColorType.POPUP_KEYS_BACKGROUND);
+            } else {
+                // actual background color/drawable is applied to main_keyboard_frame
+                setBackgroundColor(Color.TRANSPARENT);
+            }
+
+            mKeyboard = keyboard;
+            mKeyScaleForText = (float) Math.sqrt(1 / Settings.getValues().mKeyboardHeightScale);
+            final int scaledKeyHeight = (int) ((keyboard.mMostCommonKeyHeight - keyboard.mVerticalGap) * mKeyScaleForText);
+            mKeyDrawParams.updateParams(scaledKeyHeight, mKeyVisualAttributes);
+            mKeyDrawParams.updateParams(scaledKeyHeight, keyboard.mKeyVisualAttributes);
+            invalidateAllKeys();
+            if (requestLayout) {
+                requestLayout();
+            }
+            mFontSizeMultiplier = mKeyboard.mId.isEmojiKeyboard()
+                    // In the case of EmojiKeyFit, the size of emojis is taken care of by the size
+                    // of the keys
+                    ? (Settings.getValues().mEmojiKeyFit ? 1 : Settings.getValues().mFontSizeMultiplierEmoji)
+                    : Settings.getValues().mFontSizeMultiplier;
+        } finally {
+            Trace.endSection();
+        }
     }
 
     /**
@@ -292,53 +308,60 @@ public class KeyboardView extends View {
     }
 
     private void onDrawKeyboard(@NonNull final Canvas canvas) {
-        final Keyboard keyboard = getKeyboard();
-        if (keyboard == null) {
-            return;
-        }
+        Trace.beginSection("KeyboardView#onDrawKeyboard");
+        try {
+            final Keyboard keyboard = getKeyboard();
+            if (keyboard == null) {
+                return;
+            }
 
-        mShowsHints = Settings.getValues().mShowsHints;
-        final float scale = Settings.getValues().mKeyboardHeightScale;
-        mIconScaleFactor = scale < 0.8f ? scale + 0.2f : 1f;
-        final Paint paint = mPaint;
-        final Drawable background = getBackground();
-        // Calculate clip region and set.
-        final boolean drawAllKeys = mInvalidateAllKeys || mInvalidatedKeys.isEmpty();
-        final boolean isHardwareAccelerated = canvas.isHardwareAccelerated();
-        // TODO: Confirm if it's really required to draw all keys when hardware
-        // acceleration is on.
-        if (drawAllKeys || isHardwareAccelerated) {
-            if (!isHardwareAccelerated && background != null) {
-                // Need to draw keyboard background on {@link #mOffscreenBuffer}.
-                canvas.drawColor(Color.BLACK, PorterDuff.Mode.CLEAR);
-                background.draw(canvas);
-            }
-            // Draw all keys.
-            for (final Key key : keyboard.getSortedKeys()) {
-                onDrawKey(key, canvas, paint);
-            }
-        } else {
-            for (final Key key : mInvalidatedKeys) {
-                if (!keyboard.hasKey(key)) {
-                    continue;
-                }
-                if (background != null) {
-                    // Need to redraw key's background on {@link #mOffscreenBuffer}.
-                    final int x = key.getX() + getPaddingLeft();
-                    final int y = key.getY() + getPaddingTop();
-                    mClipRect.set(x, y, x + key.getWidth(), y + key.getHeight());
-                    canvas.save();
-                    canvas.clipRect(mClipRect);
+            mShowsHints = Settings.getValues().mShowsHints;
+            final float scale = Settings.getValues().mKeyboardHeightScale;
+            mIconScaleFactor = scale < 0.8f ? scale + 0.2f : 1f;
+            final Paint paint = mPaint;
+            final Drawable background = getBackground();
+            // Calculate clip region and set.
+            final boolean drawAllKeys = mInvalidateAllKeys || mInvalidatedKeys.isEmpty();
+            final boolean isHardwareAccelerated = canvas.isHardwareAccelerated();
+            // With hardware acceleration, onDraw() records the View display list. If we only emit
+            // the dirty key's draw commands here, untouched keys can disappear until a full
+            // invalidation rebuilds the list. Keep the old full-draw behavior for hardware
+            // canvases, and reserve partial redraws for the software offscreen buffer path.
+            if (drawAllKeys || isHardwareAccelerated) {
+                if (!isHardwareAccelerated && background != null) {
+                    // Need to draw keyboard background on {@link #mOffscreenBuffer}.
                     canvas.drawColor(Color.BLACK, PorterDuff.Mode.CLEAR);
                     background.draw(canvas);
-                    canvas.restore();
                 }
-                onDrawKey(key, canvas, paint);
+                // Draw all keys.
+                for (final Key key : keyboard.getSortedKeys()) {
+                    onDrawKey(key, canvas, paint);
+                }
+            } else {
+                for (final Key key : mInvalidatedKeys) {
+                    if (!keyboard.hasKey(key)) {
+                        continue;
+                    }
+                    if (!isHardwareAccelerated && background != null) {
+                        // Need to redraw key's background on {@link #mOffscreenBuffer}.
+                        final int x = key.getX() + getPaddingLeft();
+                        final int y = key.getY() + getPaddingTop();
+                        mClipRect.set(x, y, x + key.getWidth(), y + key.getHeight());
+                        canvas.save();
+                        canvas.clipRect(mClipRect);
+                        canvas.drawColor(Color.BLACK, PorterDuff.Mode.CLEAR);
+                        background.draw(canvas);
+                        canvas.restore();
+                    }
+                    onDrawKey(key, canvas, paint);
+                }
             }
-        }
 
-        mInvalidatedKeys.clear();
-        mInvalidateAllKeys = false;
+            mInvalidatedKeys.clear();
+            mInvalidateAllKeys = false;
+        } finally {
+            Trace.endSection();
+        }
     }
 
     private void onDrawKey(@NonNull final Key key, @NonNull final Canvas canvas,
@@ -856,7 +879,7 @@ public class KeyboardView extends View {
     public void invalidateAllKeys() {
         mInvalidatedKeys.clear();
         mInvalidateAllKeys = true;
-        invalidate();
+        postInvalidateOnAnimation();
     }
 
     /**
@@ -876,7 +899,7 @@ public class KeyboardView extends View {
         mInvalidatedKeys.add(key);
         final int x = key.getX() + getPaddingLeft();
         final int y = key.getY() + getPaddingTop();
-        invalidate(x, y, x + key.getWidth(), y + key.getHeight());
+        postInvalidateOnAnimation(x, y, x + key.getWidth(), y + key.getHeight());
     }
 
     @Override

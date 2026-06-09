@@ -18,6 +18,7 @@ import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Paint.Align;
 import android.graphics.Typeface;
+import android.os.Trace;
 import android.util.AttributeSet;
 import android.view.ContextThemeWrapper;
 import android.view.Gravity;
@@ -309,25 +310,48 @@ public final class MainKeyboardView extends KeyboardView implements DrawingProxy
      */
     @Override
     public void setKeyboard(@NonNull final Keyboard keyboard) {
-        // Remove any pending messages, except dismissing preview and key repeat.
-        mTimerHandler.cancelLongPressTimers();
-        super.setKeyboard(keyboard);
-        mKeyDetector.setKeyboard(
-                keyboard, -getPaddingLeft(), -getPaddingTop() + getVerticalCorrection());
-        PointerTracker.setKeyDetector(mKeyDetector);
-        mPopupKeysKeyboardCache.clear();
+        setKeyboardInternal(keyboard, true /* requestLayout */);
+    }
 
-        mSpaceKey = keyboard.getKey(Constants.CODE_SPACE);
-        final int keyHeight = keyboard.mMostCommonKeyHeight - keyboard.mVerticalGap;
-        mLanguageOnSpacebarTextSize = keyHeight * mLanguageOnSpacebarTextRatio;
+    public void setKeyboardForCaseSwitch(@NonNull final Keyboard keyboard) {
+        setKeyboardInternal(keyboard, false /* requestLayout */);
+    }
 
-        if (AccessibilityUtils.Companion.getInstance().isAccessibilityEnabled()) {
-            if (mAccessibilityDelegate == null) {
-                mAccessibilityDelegate = new MainKeyboardAccessibilityDelegate(this, mKeyDetector);
+    private void setKeyboardInternal(@NonNull final Keyboard keyboard, final boolean requestLayout) {
+        Trace.beginSection(requestLayout
+                ? "MainKeyboardView#setKeyboard" : "MainKeyboardView#setKeyboardForCase");
+        try {
+            // Remove any pending messages, except dismissing preview and key repeat.
+            mTimerHandler.cancelLongPressTimers();
+            if (requestLayout) {
+                super.setKeyboard(keyboard);
+            } else {
+                super.setKeyboardWithoutRequestLayout(keyboard);
             }
-            mAccessibilityDelegate.setKeyboard(keyboard);
-        } else {
-            mAccessibilityDelegate = null;
+            mKeyDetector.setKeyboard(
+                    keyboard, -getPaddingLeft(), -getPaddingTop() + getVerticalCorrection());
+            PointerTracker.setKeyDetector(mKeyDetector);
+            mPopupKeysKeyboardCache.clear();
+
+            mSpaceKey = keyboard.getKey(Constants.CODE_SPACE);
+            final int keyHeight = keyboard.mMostCommonKeyHeight - keyboard.mVerticalGap;
+            mLanguageOnSpacebarTextSize = keyHeight * mLanguageOnSpacebarTextRatio;
+
+            if (AccessibilityUtils.Companion.getInstance().isAccessibilityEnabled()) {
+                if (mAccessibilityDelegate == null) {
+                    mAccessibilityDelegate = new MainKeyboardAccessibilityDelegate(this, mKeyDetector);
+                }
+                mAccessibilityDelegate.setKeyboard(keyboard);
+            } else {
+                mAccessibilityDelegate = null;
+            }
+            if (requestLayout) {
+                warmUpKeyPreviewLayerSoon();
+            } else {
+                locatePreviewPlacerView();
+            }
+        } finally {
+            Trace.endSection();
         }
     }
 
@@ -428,10 +452,14 @@ public final class MainKeyboardView extends KeyboardView implements DrawingProxy
     }
 
     private void showKeyPreview(@NonNull final Key key) {
-        locatePreviewPlacerView();
-        getLocationInWindow(mOriginCoords);
-        mKeyPreviewChoreographer.placeAndShowKeyPreview(key, getKeyboard().mIconsSet, getKeyDrawParams(),
-                getPreviewPopupBoundsWidth(), mOriginCoords, mDrawingPreviewPlacerView);
+        Trace.beginSection("MainKeyboardView#showKeyPreview");
+        try {
+            getLocationInWindow(mOriginCoords);
+            mKeyPreviewChoreographer.placeAndShowKeyPreview(key, getKeyboard().mIconsSet, getKeyDrawParams(),
+                    getPreviewPopupBoundsWidth(), mOriginCoords, mDrawingPreviewPlacerView, this);
+        } finally {
+            Trace.endSection();
+        }
     }
 
     private int getPreviewPopupBoundsWidth() {
@@ -536,6 +564,29 @@ public final class MainKeyboardView extends KeyboardView implements DrawingProxy
     protected void onAttachedToWindow() {
         super.onAttachedToWindow();
         installPreviewPlacerView();
+        warmUpKeyPreviewLayerSoon();
+    }
+
+    @Override
+    protected void onSizeChanged(final int w, final int h, final int oldw, final int oldh) {
+        super.onSizeChanged(w, h, oldw, oldh);
+        if ((w != oldw || h != oldh) && w > 0 && h > 0) {
+            warmUpKeyPreviewLayerSoon();
+        }
+    }
+
+    private void warmUpKeyPreviewLayerSoon() {
+        if (!mKeyPreviewDrawParams.isPopupEnabled()) {
+            return;
+        }
+        post(() -> {
+            if (!isAttachedToWindow() || getWidth() <= 0 || getHeight() <= 0
+                    || !mKeyPreviewDrawParams.isPopupEnabled()) {
+                return;
+            }
+            locatePreviewPlacerView();
+            mKeyPreviewChoreographer.warmUpPreviewLayer(this);
+        });
     }
 
     @Override

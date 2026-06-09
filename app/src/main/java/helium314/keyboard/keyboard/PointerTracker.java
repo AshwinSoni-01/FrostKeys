@@ -11,6 +11,7 @@ import static java.lang.Math.abs;
 import android.content.res.Resources;
 import android.content.res.TypedArray;
 import android.os.SystemClock;
+import android.os.Trace;
 import android.view.MotionEvent;
 
 import androidx.annotation.NonNull;
@@ -700,39 +701,44 @@ public final class PointerTracker implements PointerTrackerQueue.Element,
     }
 
     private void onDownEventInternal(final int x, final int y, final long eventTime) {
-        Key key = onDownKey(x, y, eventTime);
-        // Key selection by dragging finger is allowed when 1) key selection by dragging finger is
-        // enabled by configuration, 2) this pointer starts dragging from modifier key, or 3) this
-        // pointer's KeyDetector always allows key selection by dragging finger, such as
-        // {@link PopupKeysKeyboard}.
-        mIsAllowedDraggingFinger = sParams.mKeySelectionByDraggingFinger
-                || (key != null && key.isModifier())
-                || mKeyDetector.alwaysAllowsKeySelectionByDraggingFinger();
-        if (key != null && isSwiper(key.getCode()) && !sInGesture) {
-            mKeySwipeAllowed = true;
-            sInKeySwipe = true;
-        }
-        mKeyboardLayoutHasBeenChanged = false;
-        mIsTrackingForActionDisabled = false;
-        resetKeySelectionByDraggingFinger();
-        if (key != null) {
-            // This onPress call may have changed keyboard layout. Those cases are detected at
-            // {@link #setKeyboard}. In those cases, we should update key according to the new
-            // keyboard layout.
-            // Also height difference between keyboards needs to be considered.
-            if (callListenerOnPressAndCheckKeyboardLayoutChange(key, 0)) {
-                final int yOffset = keyboardChangeOccupiedHeightDifference;
-                keyboardChangeOccupiedHeightDifference = 0;
-                CoordinateUtils.set(mDownCoordinates, x, y + yOffset);
-                key = onDownKey(x, y + yOffset, eventTime);
+        Trace.beginSection("PointerTracker#onDown");
+        try {
+            Key key = onDownKey(x, y, eventTime);
+            // Key selection by dragging finger is allowed when 1) key selection by dragging finger is
+            // enabled by configuration, 2) this pointer starts dragging from modifier key, or 3) this
+            // pointer's KeyDetector always allows key selection by dragging finger, such as
+            // {@link PopupKeysKeyboard}.
+            mIsAllowedDraggingFinger = sParams.mKeySelectionByDraggingFinger
+                    || (key != null && key.isModifier())
+                    || mKeyDetector.alwaysAllowsKeySelectionByDraggingFinger();
+            if (key != null && isSwiper(key.getCode()) && !sInGesture) {
+                mKeySwipeAllowed = true;
+                sInKeySwipe = true;
             }
+            mKeyboardLayoutHasBeenChanged = false;
+            mIsTrackingForActionDisabled = false;
+            resetKeySelectionByDraggingFinger();
+            if (key != null) {
+                // This onPress call may have changed keyboard layout. Those cases are detected at
+                // {@link #setKeyboard}. In those cases, we should update key according to the new
+                // keyboard layout.
+                // Also height difference between keyboards needs to be considered.
+                if (callListenerOnPressAndCheckKeyboardLayoutChange(key, 0)) {
+                    final int yOffset = keyboardChangeOccupiedHeightDifference;
+                    keyboardChangeOccupiedHeightDifference = 0;
+                    CoordinateUtils.set(mDownCoordinates, x, y + yOffset);
+                    key = onDownKey(x, y + yOffset, eventTime);
+                }
 
-            startRepeatKey(key);
-            startLongPressTimer(key);
-            setPressedKeyGraphics(key, eventTime);
-            mStartX = x;
-            mStartY = y;
-            mStartTime = SystemClock.elapsedRealtime();
+                startRepeatKey(key);
+                startLongPressTimer(key);
+                setPressedKeyGraphics(key, eventTime);
+                mStartX = x;
+                mStartY = y;
+                mStartTime = SystemClock.elapsedRealtime();
+            }
+        } finally {
+            Trace.endSection();
         }
     }
 

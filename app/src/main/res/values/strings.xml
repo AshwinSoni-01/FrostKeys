@@ -1036,6 +1036,13 @@ New dictionary:
     <string name="klipy_clear_history_confirm_title_sticker">Clear all Sticker history?</string>
     <string name="klipy_clear_history_confirm_message">This only removes recent items from the current Klipy tab.</string>
     <string name="klipy_clear_history_confirm_action">Clear</string>
+    <!-- TODO: Add translations for Klipy pin/delete history labels in a later localization pass. -->
+    <string name="klipy_section_pinned">Pinned</string>
+    <string name="klipy_section_history">History</string>
+    <string name="klipy_action_pin">Pin</string>
+    <string name="klipy_action_unpin">Unpin</string>
+    <string name="klipy_action_delete_from_history">Delete from history</string>
+    <string name="klipy_history_long_press_hint">Long-press an item for Pin/Delete</string>
     <string name="klipy_powered_by">Powered by Klipy</string>
     <string name="cancel">Cancel</string>
 

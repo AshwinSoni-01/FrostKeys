@@ -35,10 +35,13 @@ import helium314.keyboard.latin.database.KlipyHistoryDao
 class KlipyAdapter(
     private var items: List<KlipyHistoryDao.KlipyItem>,
     private val isStickersMode: Boolean = false,
+    private val forceSquareCells: Boolean = false,
+    private val onItemLongClick: ((KlipyHistoryDao.KlipyItem, View) -> Boolean)? = null,
     private val onItemClick: (KlipyHistoryDao.KlipyItem) -> Unit
 ) : RecyclerView.Adapter<KlipyAdapter.ViewHolder>() {
 
     companion object {
+        const val VIEW_TYPE_MEDIA = 1
         private const val TAP_SCALE = 0.97f
         private const val TAP_ALPHA = 0.90f
         private const val TAP_PRESS_DURATION_MS = 70L
@@ -52,6 +55,8 @@ class KlipyAdapter(
     override fun getItemId(position: Int): Long {
         return items[position].id.hashCode().toLong()
     }
+
+    override fun getItemViewType(position: Int): Int = VIEW_TYPE_MEDIA
 
     class ViewHolder(view: View, val parent: ViewGroup, val isStickersMode: Boolean) : RecyclerView.ViewHolder(view) {
         val imageView: ImageView = view.findViewById(R.id.klipyImage)
@@ -86,13 +91,16 @@ class KlipyAdapter(
         val view = LayoutInflater.from(parent.context).inflate(R.layout.klipy_item, parent, false)
 
         // Decorative semi-transparent white rounded background for sticker grid only
-        if (isStickersMode) {
+        if (isStickersMode || forceSquareCells) {
             val density = parent.context.resources.displayMetrics.density
 
-            // Tighter grid spacing for stickers
+            // Tighter grid spacing for stickers and pinned rows.
             val margin = (2f * density).toInt()
             (view.layoutParams as? ViewGroup.MarginLayoutParams)?.setMargins(margin, margin, margin, margin)
+        }
 
+        if (isStickersMode) {
+            val density = parent.context.resources.displayMetrics.density
             val cornerRadius = 8f * density
             val bgDrawable = android.graphics.drawable.GradientDrawable().apply {
                 shape = android.graphics.drawable.GradientDrawable.RECTANGLE
@@ -106,6 +114,8 @@ class KlipyAdapter(
             val pad = (1f * density).toInt()
             view.setPadding(pad, pad, pad, pad)
             view.findViewById<ImageView>(R.id.klipyImage).scaleType = ImageView.ScaleType.FIT_CENTER
+        } else if (forceSquareCells) {
+            view.findViewById<ImageView>(R.id.klipyImage).scaleType = ImageView.ScaleType.CENTER_CROP
         }
 
         return ViewHolder(view, parent, isStickersMode)
@@ -209,7 +219,7 @@ class KlipyAdapter(
             }
             val itemWidth = (parent.width - parent.paddingLeft - parent.paddingRight) / spanCount
             val widthRatio = if (item.width > 0) item.height.toFloat() / item.width.toFloat() else 1f
-            targetHeight = if (isStickersMode) {
+            targetHeight = if (isStickersMode || forceSquareCells) {
                 // Subtract horizontal margins so the cell is visually square
                 // (MATCH_PARENT width = itemWidth - margins, so height must match)
                 val marginLp = holder.itemView.layoutParams as? ViewGroup.MarginLayoutParams
@@ -228,7 +238,7 @@ class KlipyAdapter(
 
             val imageLayoutParams = holder.imageView.layoutParams
             imageLayoutParams.width = ViewGroup.LayoutParams.MATCH_PARENT
-            imageLayoutParams.height = if (isStickersMode) targetHeight else ViewGroup.LayoutParams.MATCH_PARENT
+            imageLayoutParams.height = if (isStickersMode || forceSquareCells) targetHeight else ViewGroup.LayoutParams.MATCH_PARENT
             holder.imageView.layoutParams = imageLayoutParams
         } else {
             val itemLp = holder.itemView.layoutParams
@@ -238,7 +248,7 @@ class KlipyAdapter(
 
             val imageLayoutParams = holder.imageView.layoutParams
             imageLayoutParams.width = ViewGroup.LayoutParams.MATCH_PARENT
-            imageLayoutParams.height = if (isStickersMode) ViewGroup.LayoutParams.WRAP_CONTENT else ViewGroup.LayoutParams.MATCH_PARENT
+            imageLayoutParams.height = if (isStickersMode || forceSquareCells) ViewGroup.LayoutParams.WRAP_CONTENT else ViewGroup.LayoutParams.MATCH_PARENT
             holder.imageView.layoutParams = imageLayoutParams
         }
 
@@ -252,7 +262,7 @@ class KlipyAdapter(
         holder.imageView.setImageDrawable(placeholder)
 
         if (!isImageLoadingEnabled) {
-            setItemClickListener(holder.itemView, item)
+            setItemListeners(holder.itemView, item)
             return
         }
 
@@ -291,10 +301,10 @@ class KlipyAdapter(
 
         holder.itemView.postDelayed(runnable, delay)
 
-        setItemClickListener(holder.itemView, item)
+        setItemListeners(holder.itemView, item)
     }
 
-    private fun setItemClickListener(view: View, item: KlipyHistoryDao.KlipyItem) {
+    private fun setItemListeners(view: View, item: KlipyHistoryDao.KlipyItem) {
         installTapAnimation(view)
         view.setOnClickListener {
             AudioAndHapticFeedbackManager.getInstance().performHapticAndAudioFeedback(
@@ -304,6 +314,15 @@ class KlipyAdapter(
             )
             onItemClick(item)
         }
+        view.setOnLongClickListener(
+            if (onItemLongClick == null) {
+                null
+            } else {
+                View.OnLongClickListener { touchedView ->
+                    onItemLongClick.invoke(item, touchedView)
+                }
+            }
+        )
     }
 
     @SuppressLint("ClickableViewAccessibility")

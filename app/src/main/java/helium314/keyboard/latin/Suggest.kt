@@ -6,6 +6,7 @@
 package helium314.keyboard.latin
 
 import android.text.TextUtils
+import android.util.LruCache
 import com.android.inputmethod.latin.utils.BinaryDictionaryUtils
 import helium314.keyboard.keyboard.Keyboard
 import helium314.keyboard.keyboard.internal.keyboard_parser.getEmojiDefaultVersion
@@ -34,10 +35,11 @@ import kotlin.math.min
 class Suggest(private val mDictionaryFacilitator: DictionaryFacilitator) {
     private var mAutoCorrectionThreshold = 0f
     private val mPlausibilityThreshold = 0f
-    private val nextWordSuggestionsCache = HashMap<NgramContext, SuggestionResults>()
+    private val nextWordSuggestionsCache =
+        LruCache<NgramContext, SuggestionResults>(MAX_NEXT_WORD_SUGGESTIONS_CACHE_SIZE)
 
     // cache cleared whenever LatinIME.loadSettings is called, notably on changing layout and switching input fields
-    fun clearNextWordSuggestionsCache() = nextWordSuggestionsCache.clear()
+    fun clearNextWordSuggestionsCache() = nextWordSuggestionsCache.evictAll()
 
     /**
      * Set the normalized-score threshold for a suggestion to be considered strong enough that we
@@ -353,11 +355,11 @@ class Suggest(private val mDictionaryFacilitator: DictionaryFacilitator) {
     /** get suggestions based on the current ngram context, with an empty typed word (that's what next word suggestions do)  */
     private fun getNextWordSuggestions(ngramContext: NgramContext, keyboard: Keyboard, inputStyle: Int,
                                        settingsValuesForSuggestion: SettingsValuesForSuggestion): SuggestionResults {
-        val cachedResults = nextWordSuggestionsCache[ngramContext]
+        val cachedResults = nextWordSuggestionsCache.get(ngramContext)
         if (cachedResults != null) return cachedResults
         val newResults = mDictionaryFacilitator.getSuggestionResults(ComposedData(InputPointers(1),
             false, ""), ngramContext, keyboard, settingsValuesForSuggestion, SESSION_ID_TYPING, inputStyle)
-        nextWordSuggestionsCache[ngramContext] = newResults
+        nextWordSuggestionsCache.put(ngramContext, newResults)
         return newResults
     }
 
@@ -371,6 +373,7 @@ class Suggest(private val mDictionaryFacilitator: DictionaryFacilitator) {
 
         // Close to -2**31
         private const val SUPPRESS_SUGGEST_THRESHOLD = -2000000000
+        private const val MAX_NEXT_WORD_SUGGESTIONS_CACHE_SIZE = 128
 
         private const val MAXIMUM_AUTO_CORRECT_LENGTH_FOR_GERMAN = 12
         // TODO: should we add Finnish here?

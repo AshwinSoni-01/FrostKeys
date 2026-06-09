@@ -23,14 +23,27 @@ class Database private constructor(context: Context, name: String = NAME) : SQLi
         if (oldVersion <= 2) {
             db.execSQL(KlipyHistoryDao.CREATE_TABLE)
         }
-        if (oldVersion == 3) {
-            db.execSQL("ALTER TABLE ${KlipyHistoryDao.TABLE_NAME} ADD COLUMN ${KlipyHistoryDao.COLUMN_PREVIEW_URL} TEXT")
+        if (oldVersion <= 3) {
+            addColumnIfMissing(db, KlipyHistoryDao.TABLE_NAME, KlipyHistoryDao.COLUMN_PREVIEW_URL, "TEXT")
         }
+        if (oldVersion <= 4) {
+            addColumnIfMissing(db, KlipyHistoryDao.TABLE_NAME, KlipyHistoryDao.COLUMN_PINNED, "INTEGER NOT NULL DEFAULT 0")
+            addColumnIfMissing(db, KlipyHistoryDao.TABLE_NAME, KlipyHistoryDao.COLUMN_PINNED_TIMESTAMP, "INTEGER NOT NULL DEFAULT 0")
+        }
+    }
+
+    private fun addColumnIfMissing(db: SQLiteDatabase, table: String, column: String, definition: String) {
+        db.rawQuery("PRAGMA table_info($table)", null).use { cursor ->
+            while (cursor.moveToNext()) {
+                if (cursor.getString(1) == column) return
+            }
+        }
+        db.execSQL("ALTER TABLE $table ADD COLUMN $column $definition")
     }
 
     companion object {
         private val TAG = Database::class.java.simpleName
-        private const val VERSION = 4
+        private const val VERSION = 5
         const val NAME = "heliboard.db"
         private var instance: Database? = null
         fun getInstance(context: Context): Database {

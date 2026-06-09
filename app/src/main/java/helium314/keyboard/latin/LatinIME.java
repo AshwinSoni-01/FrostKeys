@@ -27,6 +27,7 @@ import android.os.Debug;
 import android.os.Message;
 import android.os.PowerManager;
 import android.os.Process;
+import android.os.Trace;
 import android.util.PrintWriterPrinter;
 import android.util.Printer;
 import android.view.KeyEvent;
@@ -2076,27 +2077,32 @@ public class LatinIME extends InputMethodService implements
      * @param inputTransaction The transaction that has been executed.
      */
     private void updateStateAfterInputTransaction(final InputTransaction inputTransaction) {
-        switch (inputTransaction.getRequiredShiftUpdate()) {
-            case InputTransaction.SHIFT_UPDATE_LATER -> mHandler.postUpdateShiftState();
-            case InputTransaction.SHIFT_UPDATE_NOW -> mKeyboardSwitcher
-                    .requestUpdatingShiftState(getCurrentAutoCapsState(), getCurrentRecapitalizeState());
-            default -> {
-            } // SHIFT_NO_UPDATE
-        }
-        if (inputTransaction.requiresUpdateSuggestions()) {
-            final int inputStyle;
-            if (inputTransaction.getEvent().isSuggestionStripPress()) {
-                // Suggestion strip press: no input.
-                inputStyle = SuggestedWords.INPUT_STYLE_NONE;
-            } else if (inputTransaction.getEvent().isGesture()) {
-                inputStyle = SuggestedWords.INPUT_STYLE_TAIL_BATCH;
-            } else {
-                inputStyle = SuggestedWords.INPUT_STYLE_TYPING;
+        Trace.beginSection("LatinIME#updateStateAfterInput");
+        try {
+            switch (inputTransaction.getRequiredShiftUpdate()) {
+                case InputTransaction.SHIFT_UPDATE_LATER -> mHandler.postUpdateShiftState();
+                case InputTransaction.SHIFT_UPDATE_NOW -> mKeyboardSwitcher
+                        .requestUpdatingShiftState(getCurrentAutoCapsState(), getCurrentRecapitalizeState());
+                default -> {
+                } // SHIFT_NO_UPDATE
             }
-            mHandler.postUpdateSuggestionStrip(inputStyle);
-        }
-        if (inputTransaction.didAffectContents()) {
-            mSubtypeState.setCurrentSubtypeHasBeenUsed();
+            if (inputTransaction.requiresUpdateSuggestions()) {
+                final int inputStyle;
+                if (inputTransaction.getEvent().isSuggestionStripPress()) {
+                    // Suggestion strip press: no input.
+                    inputStyle = SuggestedWords.INPUT_STYLE_NONE;
+                } else if (inputTransaction.getEvent().isGesture()) {
+                    inputStyle = SuggestedWords.INPUT_STYLE_TAIL_BATCH;
+                } else {
+                    inputStyle = SuggestedWords.INPUT_STYLE_TYPING;
+                }
+                mHandler.postUpdateSuggestionStrip(inputStyle);
+            }
+            if (inputTransaction.didAffectContents()) {
+                mSubtypeState.setCurrentSubtypeHasBeenUsed();
+            }
+        } finally {
+            Trace.endSection();
         }
     }
 
