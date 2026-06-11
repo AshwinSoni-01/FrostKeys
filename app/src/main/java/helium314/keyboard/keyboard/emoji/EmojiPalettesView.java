@@ -482,7 +482,7 @@ public final class EmojiPalettesView extends LinearLayout
         mMainKeyboardActionListener = keyboardActionListener;
         mKeyboardActionListener = keyboardActionListener;
         if (mSearchMode) {
-            exitSearchMode(false);
+            exitSearchMode(false, false);
         }
         setSearchText("", 0);
 
@@ -528,9 +528,8 @@ public final class EmojiPalettesView extends LinearLayout
         }
         mSearchResultsView.setVisibility(View.VISIBLE);
 
-        swapKeyboardToEmojiSearch(true);
+        swapKeyboardToEmojiSearch(true, false);
         updateSearchKeyboard();
-        setApplicationDimmed(true);
         focusSearchField(true);
         updateSearchQueryUi();
         searchEmoji(mSearchQuery);
@@ -538,6 +537,10 @@ public final class EmojiPalettesView extends LinearLayout
     }
 
     public void exitSearchMode(final boolean clearQuery) {
+        exitSearchMode(clearQuery, true);
+    }
+
+    public void exitSearchMode(final boolean clearQuery, final boolean restoreViews) {
         if (!mSearchMode && !clearQuery) {
             return;
         }
@@ -567,16 +570,19 @@ public final class EmojiPalettesView extends LinearLayout
         if (mBottomRowKeyboard != null) {
             mBottomRowKeyboard.setVisibility(View.VISIBLE);
         }
-        swapKeyboardToEmojiSearch(false);
-        restoreEmojiCategoryStrip();
-        setApplicationDimmed(false);
+        swapKeyboardToEmojiSearch(false, restoreViews);
+        if (restoreViews) {
+            restoreEmojiCategoryStrip();
+        }
         final MainKeyboardView mainKeyboardView = KeyboardSwitcher.getInstance().getMainKeyboardView();
         if (mainKeyboardView != null) {
             mainKeyboardView.setKeyboardActionListener(mMainKeyboardActionListener);
         }
         PointerTracker.switchTo(mBottomRowKeyboard != null ? mBottomRowKeyboard : mainKeyboardView);
         requestLayout();
-        post(this::restoreEmojiCategoryStrip);
+        if (restoreViews) {
+            post(this::restoreEmojiCategoryStrip);
+        }
     }
 
     public boolean handleBackPress() {
@@ -601,14 +607,9 @@ public final class EmojiPalettesView extends LinearLayout
         }
     }
 
-    private void setApplicationDimmed(final boolean dimmed) {
-        final LatinIME latinIME = getLatinIME();
-        if (latinIME != null) {
-            latinIME.setEmojiSearchAppDimmed(dimmed);
-        }
-    }
 
-    private void swapKeyboardToEmojiSearch(final boolean enter) {
+
+    private void swapKeyboardToEmojiSearch(final boolean enter, final boolean hideKeyboard) {
         final KeyboardSwitcher switcher = KeyboardSwitcher.getInstance();
         final MainKeyboardView keyboardView = switcher.getMainKeyboardView();
         final View wrapperView = switcher.getWrapperView();
@@ -632,8 +633,10 @@ public final class EmojiPalettesView extends LinearLayout
         } else if (currentParent == this) {
             removeView(keyboardView);
             wrapper.addView(keyboardView, 0);
-            keyboardView.setVisibility(View.GONE);
-            switcher.getStripContainer().setVisibility(View.GONE);
+            if (hideKeyboard) {
+                keyboardView.setVisibility(View.GONE);
+                switcher.getStripContainer().setVisibility(View.GONE);
+            }
         }
     }
 
@@ -1499,7 +1502,7 @@ public final class EmojiPalettesView extends LinearLayout
     public void stopEmojiPalettes() {
         if (!initialized) return;
         if (mSearchMode) {
-            exitSearchMode(false);
+            exitSearchMode(false, false);
         }
         getRecentsKeyboard().flushPendingRecentKeys();
     }

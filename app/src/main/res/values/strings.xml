@@ -836,6 +836,10 @@ New dictionary:
     <string name="discussion_section_link">"discussion section"</string>
     <!-- Settings screen title for about -->
     <string name="settings_screen_about">About</string>
+    <!-- Settings screen title for setup wizard -->
+    <string name="settings_screen_setup_wizard">Setup Wizard</string>
+    <!-- Settings screen summary for setup wizard -->
+    <string name="settings_screen_setup_wizard_summary">Run the initial setup screens again</string>
     <!-- version for about screen -->
     <string name="version">Version</string>
     <!-- github repo link for about screen -->

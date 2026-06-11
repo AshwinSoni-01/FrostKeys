@@ -43,6 +43,8 @@ import kotlinx.coroutines.launch
 
 @Composable
 fun SettingsNavHost(
+    showWelcomeWizard: Boolean,
+    onShowWelcomeWizardChanged: (Boolean) -> Unit,
     onClickBack: () -> Unit,
     startDestination: String? = null,
 ) {
@@ -60,7 +62,7 @@ fun SettingsNavHost(
 
     NavHost(
         navController = navController,
-        startDestination = startDestination ?: SettingsDestination.Settings,
+        startDestination = startDestination ?: if (showWelcomeWizard) SettingsDestination.WelcomeWizard else SettingsDestination.Settings,
         enterTransition = { slideInHorizontally(initialOffsetX = { +it * dir }, animationSpec = animation) },
         exitTransition = { slideOutHorizontally(targetOffsetX = { -it * dir }, animationSpec = animation) },
         popEnterTransition = { slideInHorizontally(initialOffsetX = { -it * dir }, animationSpec = animation) },
@@ -80,6 +82,7 @@ fun SettingsNavHost(
                 onClickLayouts = { navController.navigate(SettingsDestination.Layouts) },
                 onClickDictionaries = { navController.navigate(SettingsDestination.Dictionaries) },
                 onClickCloud = { navController.navigate(SettingsDestination.Cloud) },
+                onClickWelcomeWizard = { navController.navigate(SettingsDestination.WelcomeWizard) },
                 onClickBack = ::goBack,
             )
         }
@@ -145,6 +148,17 @@ fun SettingsNavHost(
         composable(SettingsDestination.Subtype + "{subtype}") {
             SubtypeScreen(initialSubtype = it.arguments?.getString("subtype")!!.toSettingsSubtype(), onClickBack = ::goBack)
         }
+        composable(SettingsDestination.WelcomeWizard) {
+            WelcomeWizard(
+                close = {
+                    onShowWelcomeWizardChanged(false)
+                    navController.navigate(SettingsDestination.Settings) {
+                        popUpTo(SettingsDestination.WelcomeWizard) { inclusive = true }
+                    }
+                },
+                finish = onClickBack
+            )
+        }
     }
     LaunchedEffect(target.value) {
         if (target.value != SettingsDestination.Settings
@@ -155,6 +169,7 @@ fun SettingsNavHost(
 
 object SettingsDestination {
     const val Settings = "settings"
+    const val WelcomeWizard = "welcome_wizard"
     const val About = "about"
     const val Cloud = "cloud"
     const val TextCorrection = "text_correction"

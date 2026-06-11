@@ -86,6 +86,7 @@ fun MainSettingsScreen(
     onClickLayouts: () -> Unit,
     onClickDictionaries: () -> Unit,
     onClickCloud: () -> Unit,
+    onClickWelcomeWizard: () -> Unit,
     onClickBack: () -> Unit,
 ) {
     SearchSettingsScreen(
@@ -206,6 +207,14 @@ fun MainSettingsScreen(
                         name = stringResource(R.string.settings_screen_advanced),
                         onClick = onClickAdvanced,
                         icon = R.drawable.ic_settings_advanced
+                    ) { NextScreenIcon() }
+                }
+                item("welcome_wizard") {
+                    Preference(
+                        name = stringResource(R.string.settings_screen_setup_wizard),
+                        description = stringResource(R.string.settings_screen_setup_wizard_summary),
+                        onClick = onClickWelcomeWizard,
+                        icon = R.drawable.ic_setup_key
                     ) { NextScreenIcon() }
                 }
                 item("about") {
@@ -443,7 +452,7 @@ private fun PreviewScreen() {
     initPreview(LocalContext.current)
     Theme(previewDark) {
         Surface {
-            MainSettingsScreen({}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {})
+            MainSettingsScreen({}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {})
         }
     }
 }

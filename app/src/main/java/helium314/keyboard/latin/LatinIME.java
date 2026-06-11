@@ -18,6 +18,8 @@ import android.content.res.AssetFileDescriptor;
 import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.graphics.Color;
+import android.graphics.Rect;
+import android.graphics.Region;
 import android.inputmethodservice.InputMethodService;
 import android.media.AudioManager;
 import android.net.Uri;
@@ -1394,7 +1396,6 @@ public class LatinIME extends InputMethodService implements
 
     @Override
     public void onWindowHidden() {
-        setEmojiSearchAppDimmed(false);
         super.onWindowHidden();
         Log.i(TAG, "onWindowHidden");
 
@@ -2238,37 +2239,7 @@ public class LatinIME extends InputMethodService implements
         startActivity(intent);
     }
 
-    private static final float EMOJI_SEARCH_DIM_AMOUNT = 0.32f;
     private int mLastKeyboardHeight = 0;
-    private boolean mEmojiSearchDimApplied = false;
-    private boolean mEmojiSearchPreviousDimBehind = false;
-    private float mEmojiSearchPreviousDimAmount = 0f;
-
-    public void setEmojiSearchAppDimmed(final boolean dimmed) {
-        final Window window = getWindow() == null ? null : getWindow().getWindow();
-        if (window == null) {
-            return;
-        }
-        final WindowManager.LayoutParams attrs = window.getAttributes();
-        if (dimmed) {
-            if (!mEmojiSearchDimApplied) {
-                mEmojiSearchPreviousDimAmount = attrs.dimAmount;
-                mEmojiSearchPreviousDimBehind =
-                        (attrs.flags & WindowManager.LayoutParams.FLAG_DIM_BEHIND) != 0;
-                mEmojiSearchDimApplied = true;
-            }
-            attrs.dimAmount = EMOJI_SEARCH_DIM_AMOUNT;
-            window.setAttributes(attrs);
-            window.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
-        } else if (mEmojiSearchDimApplied) {
-            attrs.dimAmount = mEmojiSearchPreviousDimAmount;
-            window.setAttributes(attrs);
-            if (!mEmojiSearchPreviousDimBehind) {
-                window.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
-            }
-            mEmojiSearchDimApplied = false;
-        }
-    }
 
     public void launchEmojiSearch() {
         final EmojiPalettesView emojiPalettesView = mKeyboardSwitcher.getEmojiPalettesView();

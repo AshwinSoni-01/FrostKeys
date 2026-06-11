@@ -149,123 +149,127 @@ open class SettingsActivity : ComponentActivity(), SharedPreferences.OnSharedPre
                             }
                         }
                     else {
-                        SettingsNavHost(onClickBack = { this.finish() })
-                        if (showWelcomeWizard) {
-                            WelcomeWizard(close = { showWelcomeWizard = false }, finish = this::finish)
-                        } else if (crashReports.isNotEmpty()) {
-                            ConfirmationDialog(
-                                cancelButtonText = "ignore",
-                                onDismissRequest = { crashReportFiles.value = emptyList() },
-                                neutralButtonText = "delete",
-                                onNeutral = { crashReports.forEach { it.delete() }; crashReportFiles.value = emptyList() },
-                                confirmButtonText = "get",
-                                onConfirmed = {
-                                    val intent = Intent(Intent.ACTION_CREATE_DOCUMENT)
-                                    intent.addCategory(Intent.CATEGORY_OPENABLE)
-                                    intent.putExtra(Intent.EXTRA_TITLE, "crash_reports.zip")
-                                    intent.type = "application/zip"
-                                    crashFilePicker.launch(intent)
-                                },
-                                content = { Text("Crash report files found") },
-                            )
-                        } else {
-                            if (JniUtils.sHaveGestureLib && System.currentTimeMillis() < END_DATE_EPOCH_MILLIS + TWO_WEEKS_IN_MILLIS) {
-                                GestureDataGatheringSettings.GestureDataPromotionReminderDialog()
-                            }
-                             if (showTelegramPopup) {
-                                  androidx.compose.ui.window.Dialog(
-                                      onDismissRequest = {},
-                                      properties = androidx.compose.ui.window.DialogProperties(
-                                          dismissOnBackPress = false,
-                                          dismissOnClickOutside = false
-                                      )
-                                  ) {
-                                     Surface(
-                                         shape = RoundedCornerShape(24.dp),
-                                         color = MaterialTheme.colorScheme.surface,
-                                         contentColor = androidx.compose.material3.contentColorFor(MaterialTheme.colorScheme.surface),
-                                         modifier = Modifier.widthIn(min = 280.dp, max = 340.dp)
-                                     ) {
-                                         Column(
-                                             modifier = Modifier.padding(24.dp),
-                                             horizontalAlignment = Alignment.CenterHorizontally
+                        SettingsNavHost(
+                            showWelcomeWizard = showWelcomeWizard,
+                            onShowWelcomeWizardChanged = { showWelcomeWizard = it },
+                            onClickBack = { this.finish() }
+                        )
+                        if (!showWelcomeWizard) {
+                            if (crashReports.isNotEmpty()) {
+                                ConfirmationDialog(
+                                    cancelButtonText = "ignore",
+                                    onDismissRequest = { crashReportFiles.value = emptyList() },
+                                    neutralButtonText = "delete",
+                                    onNeutral = { crashReports.forEach { it.delete() }; crashReportFiles.value = emptyList() },
+                                    confirmButtonText = "get",
+                                    onConfirmed = {
+                                        val intent = Intent(Intent.ACTION_CREATE_DOCUMENT)
+                                        intent.addCategory(Intent.CATEGORY_OPENABLE)
+                                        intent.putExtra(Intent.EXTRA_TITLE, "crash_reports.zip")
+                                        intent.type = "application/zip"
+                                        crashFilePicker.launch(intent)
+                                    },
+                                    content = { Text("Crash report files found") },
+                                )
+                            } else {
+                                if (JniUtils.sHaveGestureLib && System.currentTimeMillis() < END_DATE_EPOCH_MILLIS + TWO_WEEKS_IN_MILLIS) {
+                                    GestureDataGatheringSettings.GestureDataPromotionReminderDialog()
+                                }
+                                 if (showTelegramPopup) {
+                                      androidx.compose.ui.window.Dialog(
+                                          onDismissRequest = {},
+                                          properties = androidx.compose.ui.window.DialogProperties(
+                                              dismissOnBackPress = false,
+                                              dismissOnClickOutside = false
+                                          )
+                                      ) {
+                                         Surface(
+                                             shape = RoundedCornerShape(24.dp),
+                                             color = MaterialTheme.colorScheme.surface,
+                                             contentColor = androidx.compose.material3.contentColorFor(MaterialTheme.colorScheme.surface),
+                                             modifier = Modifier.widthIn(min = 280.dp, max = 340.dp)
                                          ) {
-                                              Image(
-                                                  painter = painterResource(R.drawable.ic_telegram),
-                                                  contentDescription = "Telegram Logo",
-                                                  modifier = Modifier
-                                                      .size(96.dp)
-                                                      .padding(bottom = 16.dp)
-                                              )
-                                             Text(
-                                                 text = "Stay Connected",
-                                                 style = MaterialTheme.typography.titleLarge,
-                                                 fontWeight = FontWeight.Bold,
-                                                 color = MaterialTheme.colorScheme.onSurface,
-                                                 textAlign = TextAlign.Center,
-                                                 modifier = Modifier.padding(bottom = 12.dp)
-                                             )
-                                             Text(
-                                                 text = "Join my Telegram channel to get update announcements, early sneak peeks, and a chance to share your feedback and ideas. Be part of the app’s active development journey! :)",
-                                                 style = MaterialTheme.typography.bodyMedium,
-                                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                 textAlign = TextAlign.Center,
-                                                 modifier = Modifier.padding(bottom = 24.dp)
-                                             )
-                                             Row(
-                                                 modifier = Modifier.fillMaxWidth(),
-                                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                             Column(
+                                                 modifier = Modifier.padding(24.dp),
+                                                 horizontalAlignment = Alignment.CenterHorizontally
                                              ) {
-                                                 OutlinedButton(
-                                                     onClick = {
-                                                         prefs.edit().putBoolean("pref_telegram_popup_v2_dismissed", true).apply()
-                                                         showTelegramPopup = false
-                                                     },
-                                                     shape = RoundedCornerShape(50),
-                                                     modifier = Modifier.weight(1f),
-                                                     border = androidx.compose.foundation.BorderStroke(
-                                                         width = 1.dp,
-                                                         color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
-                                                     ),
-                                                     colors = androidx.compose.material3.ButtonDefaults.outlinedButtonColors(
-                                                         contentColor = MaterialTheme.colorScheme.onSurface
-                                                     ),
-                                                     contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = 12.dp)
+                                                  Image(
+                                                      painter = painterResource(R.drawable.ic_telegram),
+                                                      contentDescription = "Telegram Logo",
+                                                      modifier = Modifier
+                                                          .size(96.dp)
+                                                          .padding(bottom = 16.dp)
+                                                  )
+                                                 Text(
+                                                     text = "Stay Connected",
+                                                     style = MaterialTheme.typography.titleLarge,
+                                                     fontWeight = FontWeight.Bold,
+                                                     color = MaterialTheme.colorScheme.onSurface,
+                                                     textAlign = TextAlign.Center,
+                                                     modifier = Modifier.padding(bottom = 12.dp)
+                                                 )
+                                                 Text(
+                                                     text = "Join my Telegram channel to get update announcements, early sneak peeks, and a chance to share your feedback and ideas. Be part of the app’s active development journey! :)",
+                                                     style = MaterialTheme.typography.bodyMedium,
+                                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                     textAlign = TextAlign.Center,
+                                                     modifier = Modifier.padding(bottom = 24.dp)
+                                                 )
+                                                 Row(
+                                                     modifier = Modifier.fillMaxWidth(),
+                                                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                                                  ) {
-                                                     Text(
-                                                         text = "Maybe Later",
-                                                         fontWeight = FontWeight.Medium
-                                                     )
-                                                 }
+                                                     OutlinedButton(
+                                                         onClick = {
+                                                             prefs.edit().putBoolean("pref_telegram_popup_v2_dismissed", true).apply()
+                                                             showTelegramPopup = false
+                                                         },
+                                                         shape = RoundedCornerShape(50),
+                                                         modifier = Modifier.weight(1f),
+                                                         border = androidx.compose.foundation.BorderStroke(
+                                                             width = 1.dp,
+                                                             color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+                                                         ),
+                                                         colors = androidx.compose.material3.ButtonDefaults.outlinedButtonColors(
+                                                             contentColor = MaterialTheme.colorScheme.onSurface
+                                                         ),
+                                                         contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = 12.dp)
+                                                     ) {
+                                                         Text(
+                                                             text = "Maybe Later",
+                                                             fontWeight = FontWeight.Medium
+                                                         )
+                                                     }
 
-                                                 Button(
-                                                     onClick = {
-                                                         val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/FrostKeys"))
-                                                         startActivity(intent)
-                                                         prefs.edit()
-                                                             .putBoolean("pref_telegram_popup_v2_dismissed", true)
-                                                             .putBoolean("pref_telegram_joined", true)
-                                                             .apply()
-                                                         showTelegramPopup = false
-                                                     },
-                                                     shape = RoundedCornerShape(50),
-                                                     modifier = Modifier.weight(1f),
-                                                     colors = ButtonDefaults.buttonColors(
-                                                         containerColor = MaterialTheme.colorScheme.primary,
-                                                         contentColor = MaterialTheme.colorScheme.onPrimary
-                                                     ),
-                                                     contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = 12.dp)
-                                                 ) {
-                                                     Text(
-                                                         text = "Join Now",
-                                                         fontWeight = FontWeight.Bold
-                                                     )
+                                                     Button(
+                                                         onClick = {
+                                                             val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/FrostKeys"))
+                                                             startActivity(intent)
+                                                             prefs.edit()
+                                                                 .putBoolean("pref_telegram_popup_v2_dismissed", true)
+                                                                 .putBoolean("pref_telegram_joined", true)
+                                                                 .apply()
+                                                             showTelegramPopup = false
+                                                         },
+                                                         shape = RoundedCornerShape(50),
+                                                         modifier = Modifier.weight(1f),
+                                                         colors = ButtonDefaults.buttonColors(
+                                                             containerColor = MaterialTheme.colorScheme.primary,
+                                                             contentColor = MaterialTheme.colorScheme.onPrimary
+                                                         ),
+                                                         contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = 12.dp)
+                                                     ) {
+                                                         Text(
+                                                             text = "Join Now",
+                                                             fontWeight = FontWeight.Bold
+                                                         )
+                                                     }
                                                  }
                                              }
                                          }
                                      }
                                  }
-                             }
+                            }
                         }
                     }
                     if (dictUri != null) {
