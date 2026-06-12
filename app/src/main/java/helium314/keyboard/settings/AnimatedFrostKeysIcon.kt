@@ -50,18 +50,18 @@ fun AnimatedFrostKeysIcon(
     val keyConfigs = remember {
         listOf(
             // Row 1
-            KeyConfig(centerX = 260.0f, centerY = 360.0f, width = 101.0f, height = 101.0f),
+            KeyConfig(centerX = 260.0f, centerY = 360.0f, width = 100.0f, height = 100.0f),
             KeyConfig(centerX = 420.0f, centerY = 360.0f, width = 100.0f, height = 100.0f),
-            KeyConfig(centerX = 580.0f, centerY = 360.0f, width = 105.0f, height = 105.0f),
-            KeyConfig(centerX = 740.0f, centerY = 360.0f, width = 101.0f, height = 101.0f),
+            KeyConfig(centerX = 580.0f, centerY = 360.0f, width = 100.0f, height = 100.0f),
+            KeyConfig(centerX = 740.0f, centerY = 360.0f, width = 100.0f, height = 100.0f),
             // Row 2
-            KeyConfig(centerX = 260.0f, centerY = 505.0f, width = 109.0f, height = 100.0f),
-            KeyConfig(centerX = 420.0f, centerY = 505.0f, width = 101.0f, height = 101.0f),
-            KeyConfig(centerX = 580.0f, centerY = 505.0f, width = 109.0f, height = 109.0f),
-            KeyConfig(centerX = 740.0f, centerY = 505.0f, width = 99.0f, height = 103.0f),
+            KeyConfig(centerX = 260.0f, centerY = 505.0f, width = 100.0f, height = 100.0f),
+            KeyConfig(centerX = 420.0f, centerY = 505.0f, width = 100.0f, height = 100.0f),
+            KeyConfig(centerX = 580.0f, centerY = 505.0f, width = 100.0f, height = 100.0f),
+            KeyConfig(centerX = 740.0f, centerY = 505.0f, width = 100.0f, height = 100.0f),
             // Row 3
-            KeyConfig(centerX = 275.0f, centerY = 645.0f, width = 101.0f, height = 101.0f),
-            KeyConfig(centerX = 725.0f, centerY = 645.0f, width = 101.0f, height = 101.0f)
+            KeyConfig(centerX = 275.0f, centerY = 645.0f, width = 100.0f, height = 100.0f),
+            KeyConfig(centerX = 725.0f, centerY = 645.0f, width = 100.0f, height = 100.0f)
         )
     }
 
@@ -75,13 +75,13 @@ fun AnimatedFrostKeysIcon(
                     progress.animateTo(
                         targetValue = 1f,
                         animationSpec = spring(
-                            dampingRatio = 0.7f,
-                            stiffness = 70f,
+                            dampingRatio = 0.6f,
+                            stiffness = 200f,
                             visibilityThreshold = 0.1f
                         )
                     )
                 }
-                delay(2300) // One transition for each inhale and exhale breath (2300ms)
+                delay(1150) // Synchronized to match half of the 2300ms breathing duration
                 job.join()
                 currentShapeIndex = (currentShapeIndex + 1) % baseShapes.size
                 progress.snapTo(0f)
@@ -94,7 +94,7 @@ fun AnimatedFrostKeysIcon(
             val shuffled = baseShapesShuffledList[index]
             val currentShape = shuffled[currentShapeIndex]
             val nextShape = shuffled[(currentShapeIndex + 1) % shuffled.size]
-            Morph(currentShape, nextShape)
+            Morph(currentShape.normalized(), nextShape.normalized())
         }
     }
 
@@ -161,11 +161,11 @@ fun AnimatedFrostKeysIcon(
                 matrix.reset()
                 // Translate center of shape to (0, 0)
                 matrix.postTranslate(-currentCenterX, -currentCenterY)
-                // Scale to fit the config dimensions exactly
-                matrix.postScale(
-                    config.width * scale / currentWidth,
-                    config.height * scale / currentHeight
-                )
+                // Scale uniformly to preserve the original aspect ratio
+                val targetWidth = config.width * scale
+                val targetHeight = config.height * scale
+                val scaleFactor = minOf(targetWidth / currentWidth, targetHeight / currentHeight)
+                matrix.postScale(scaleFactor, scaleFactor)
                 // Rotate by current rotation (bouncy clockwise spin settling at 0 degrees)
                 matrix.postRotate(rotation)
                 // Translate to the config center
@@ -191,10 +191,7 @@ private fun getMaterialShapesList(): List<RoundedPolygon> {
         MaterialShapes.Oval,
         MaterialShapes.Arch,
         MaterialShapes.Arrow,
-        MaterialShapes.Boom,
         MaterialShapes.Bun,
-        MaterialShapes.Burst,
-        MaterialShapes.ClamShell,
         MaterialShapes.Clover4Leaf,
         MaterialShapes.Clover8Leaf,
         MaterialShapes.Cookie4Sided,
@@ -207,13 +204,9 @@ private fun getMaterialShapesList(): List<RoundedPolygon> {
         MaterialShapes.Gem,
         MaterialShapes.Ghostish,
         MaterialShapes.Heart,
-        MaterialShapes.PixelCircle,
-        MaterialShapes.PixelTriangle,
         MaterialShapes.Puffy,
         MaterialShapes.PuffyDiamond,
-        MaterialShapes.SemiCircle,
         MaterialShapes.Slanted,
-        MaterialShapes.SoftBoom,
         MaterialShapes.SoftBurst,
         MaterialShapes.Sunny,
         MaterialShapes.VerySunny

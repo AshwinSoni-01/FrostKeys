@@ -362,16 +362,16 @@ fun WelcomeWizard(
                             onClick = buttonOnClick,
                             modifier = Modifier
                                 .wrapContentWidth()
-                                .height(64.dp)
-                                .animateContentSize(spring(stiffness = Spring.StiffnessMediumLow)),
+                                .height(64.dp),
                             shape = RoundedCornerShape(32.dp),
                             color = MaterialTheme.colorScheme.primary,
                             contentColor = MaterialTheme.colorScheme.onPrimary,
-                            shadowElevation = 8.dp
+                            shadowElevation = 0.dp
                         ) {
                             Row(
                                 modifier = Modifier
                                     .fillMaxHeight()
+                                    .animateContentSize(spring(stiffness = Spring.StiffnessMediumLow))
                                     .padding(start = 32.dp, end = 14.dp),
                                 horizontalArrangement = Arrangement.spacedBy(16.dp),
                                 verticalAlignment = Alignment.CenterVertically
@@ -514,9 +514,9 @@ fun SplashScreenView(
         }
 
         val isDark = isSystemInDarkTheme()
-        val glowColor = MaterialTheme.colorScheme.primary
-        val alphaCenter = if (isDark) 0.45f else 0.85f
-        val alphaEdge = if (isDark) 0.18f else 0.4f
+        val glowColor = if (isDark) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primaryContainer
+        val alphaCenter = if (isDark) 0.45f else 0.9f
+        val alphaEdge = if (isDark) 0.18f else 0.7f
         Box(
             modifier = Modifier
                 .align(Alignment.Center)
