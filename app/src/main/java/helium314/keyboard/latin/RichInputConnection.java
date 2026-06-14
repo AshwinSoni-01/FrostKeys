@@ -1436,10 +1436,13 @@ public final class RichInputConnection implements PrivateCommandPerformer {
         // This update is "belated" if we are expecting it. That is, mExpectedSelStart and
         // mExpectedSelEnd match the new values that the TextView is updating TO.
         if (mExpectedSelStart == newSelStart && mExpectedSelEnd == newSelEnd) {
-            if (composingSpanEnd - composingSpanStart < mComposingText.length()) {
-                // composing span is smaller than expected, maybe changed by the app (see #1141)
-                // larger composing span is ok, because mComposingText only contains the word up to the cursor
-                return false;
+            if (!shouldUseKnownLagTextCommitCompatibility(DebugFlags.TEXT_COMMIT_EXPERIMENT_MODE,
+                    mParent.getCurrentInputEditorInfo())) {
+                if (composingSpanEnd - composingSpanStart < mComposingText.length()) {
+                    // composing span is smaller than expected, maybe changed by the app (see #1141)
+                    // larger composing span is ok, because mComposingText only contains the word up to the cursor
+                    return false;
+                }
             }
             return true;
         }
