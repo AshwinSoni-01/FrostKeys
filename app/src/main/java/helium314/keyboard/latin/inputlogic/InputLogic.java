@@ -1139,7 +1139,7 @@ public final class InputLogic {
         // each time. We are already doing this for getTextBeforeCursor().
                 (!settingsValues.mSpacingAndPunctuations.mCurrentLanguageHasSpaces
                         || !mConnection.isCursorTouchingWord(settingsValues.mSpacingAndPunctuations,
-                                !mConnection.hasSlowInputConnection() /* checkTextAfter */)
+                                !mConnection.shouldAvoidEditorRoundTripsForTyping() /* checkTextAfter */)
                         || isCursorAtStartOrAfterSeparator(settingsValues))) {
             // Reset entirely the composing state anyway, then start composing a new word unless
             // the character is a word connector. The idea here is, word connectors are not

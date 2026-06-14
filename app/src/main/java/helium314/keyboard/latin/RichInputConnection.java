@@ -809,8 +809,8 @@ public final class RichInputConnection implements PrivateCommandPerformer {
         // However, if we don't have an expected cursor position, then we should always
         // go fetch the cache again (as it happens, INVALID_CURSOR_POSITION < 0, so we need to
         // test for this explicitly)
-        if (INVALID_CURSOR_POSITION != mExpectedSelStart
-                && (cachedLength >= n || cachedLength >= mExpectedSelStart)) {
+        if (shouldAvoidEditorRoundTripsForTyping() || (INVALID_CURSOR_POSITION != mExpectedSelStart
+                && (cachedLength >= n || cachedLength >= mExpectedSelStart))) {
             final StringBuilder s = new StringBuilder(mCommittedTextBeforeComposingText.toString());
             // We call #toString() here to create a temporary object.
             // In some situations, this method is called on a worker thread, and it's possible
@@ -900,6 +900,9 @@ public final class RichInputConnection implements PrivateCommandPerformer {
     }
 
     @Nullable public CharSequence getTextAfterCursor(final int n, final int flags) {
+        if (shouldAvoidEditorRoundTripsForTyping()) {
+            return "";
+        }
         return getTextAfterCursorAndDetectLaggyConnection(
                 OPERATION_GET_TEXT_AFTER_CURSOR,
                 SLOW_INPUT_CONNECTION_ON_PARTIAL_RELOAD_MS,
