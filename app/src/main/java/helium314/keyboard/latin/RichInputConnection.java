@@ -350,6 +350,12 @@ public final class RichInputConnection implements PrivateCommandPerformer {
         }
     }
 
+    public void flush() {
+        if (mIC instanceof InternalComposingInputConnection) {
+            ((InternalComposingInputConnection) mIC).flush();
+        }
+    }
+
     public void onSelectionUpdateReceived(final int newSelStart, final int newSelEnd) {
         if (mIC instanceof InternalComposingInputConnection) {
             ((InternalComposingInputConnection) mIC).onSelectionUpdate(newSelStart, newSelEnd);
@@ -361,6 +367,9 @@ public final class RichInputConnection implements PrivateCommandPerformer {
         final long latency = now - mLastWriteTime;
         mLastWriteTime = 0L; // Reset so we only track latency on the first update post-write
         final String mode = DebugFlags.TEXT_COMMIT_EXPERIMENT_MODE;
+        if (shouldUseKnownLagTextCommitCompatibility(mode, mParent.getCurrentInputEditorInfo())) {
+            return;
+        }
         if (!DebugSettings.TEXT_COMMIT_EXPERIMENT_MODE_COMPAT_INTERNAL_COMPOSE.equals(mode)) {
             return;
         }

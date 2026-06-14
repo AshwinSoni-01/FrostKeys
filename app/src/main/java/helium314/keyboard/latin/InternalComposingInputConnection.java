@@ -24,6 +24,7 @@ final class InternalComposingInputConnection extends InputConnectionWrapper {
     private static final int INVALID_SELECTION = -1;
 
     private InputConnection mTarget;
+    private InputConnectionWithBufferingWrapper mBufferedTarget;
     @NonNull
     private String mComposingText = "";
     private int mSelectionStart = INVALID_SELECTION;
@@ -33,16 +34,27 @@ final class InternalComposingInputConnection extends InputConnectionWrapper {
 
     InternalComposingInputConnection(@NonNull final InputConnection target) {
         super(target, true);
-        mTarget = target;
+        updateTargetInternal(target);
     }
 
     void updateTarget(@NonNull final InputConnection target) {
         if (mTarget == target) {
             return;
         }
-        mTarget = target;
-        setTarget(target);
+        updateTargetInternal(target);
         resetInternalState();
+    }
+
+    private void updateTargetInternal(@NonNull final InputConnection target) {
+        mTarget = target;
+        mBufferedTarget = new InputConnectionWithBufferingWrapper(target);
+        setTarget(mBufferedTarget);
+    }
+
+    void flush() {
+        if (mBufferedTarget != null) {
+            mBufferedTarget.send();
+        }
     }
 
     void setComposingRegionWithText(final int start, final int end,

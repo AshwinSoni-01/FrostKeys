@@ -229,6 +229,10 @@ public final class Settings implements SharedPreferences.OnSharedPreferenceChang
     public static final String PREF_LAST_SHOWN_EMOJI_CATEGORY_ID = "last_shown_emoji_category_id";
     public static final String PREF_LAST_SHOWN_EMOJI_CATEGORY_PAGE_ID = "last_shown_emoji_category_page_id";
 
+    public static final String PREF_ADAPTIVE_METADATA = "pref_adaptive_emoji_metadata";
+    public static final String PREF_FAST_ROW_CACHE = "pref_adaptive_emoji_fast_row_cache";
+    public static final String PREF_FAST_ROW_LAST_REFRESH = "pref_adaptive_emoji_fast_row_last_refresh";
+
     public static final String PREF_VERSION_CODE = "version_code";
     public static final String PREF_LIBRARY_CHECKSUM = "lib_checksum";
     public static final String PREF_SAVE_SUBTYPE_PER_APP = "save_subtype_per_app";
@@ -272,6 +276,9 @@ public final class Settings implements SharedPreferences.OnSharedPreferenceChang
         add(PREF_FROSTED_DUST_ALPHA_NIGHT);
         add(PREF_FROSTED_GLASS_TRIGGER);
         add(PREF_BLUR_RENDER_OVERRIDE);
+        add(PREF_ADAPTIVE_METADATA);
+        add(PREF_FAST_ROW_CACHE);
+        add(PREF_FAST_ROW_LAST_REFRESH);
     }};
 
     public static Settings getInstance() {

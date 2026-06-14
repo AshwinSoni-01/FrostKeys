@@ -2236,6 +2236,7 @@ public class LatinIME extends InputMethodService implements
         final long diagnosticStart = TextCommitDiagnostics.startOperation();
         Trace.beginSection("LatinIME#updateStateAfterInput");
         try {
+            mInputLogic.mConnection.flush();
             switch (inputTransaction.getRequiredShiftUpdate()) {
                 case InputTransaction.SHIFT_UPDATE_LATER -> mHandler.postUpdateShiftState();
                 case InputTransaction.SHIFT_UPDATE_NOW -> mKeyboardSwitcher

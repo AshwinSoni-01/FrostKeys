@@ -2583,9 +2583,16 @@ public final class InputLogic {
             startTimeMillis = SystemClock.elapsedRealtime();
         }
         if ((mRawTextCommit || mSuppressEditorComposingText) && mLastCommittedLength > 0) {
-            mConnection.deleteTextBeforeCursor(mLastCommittedLength);
+            mConnection.beginBatchEdit();
+            try {
+                mConnection.deleteTextBeforeCursor(mLastCommittedLength);
+                mConnection.commitText(chosenWordWithSuggestions, 1);
+            } finally {
+                mConnection.endBatchEdit();
+            }
+        } else {
+            mConnection.commitText(chosenWordWithSuggestions, 1);
         }
-        mConnection.commitText(chosenWordWithSuggestions, 1);
         mLastCommittedLength = 0;
         if (DebugFlags.DEBUG_ENABLED) {
             long runTimeMillis = SystemClock.elapsedRealtime() - startTimeMillis;
@@ -2738,9 +2745,16 @@ public final class InputLogic {
             final int newCursorPosition, final int backgroundColor, final int coloredTextLength) {
         if (mRawTextCommit || mSuppressEditorComposingText) {
             if (mLastCommittedLength > 0) {
-                mConnection.deleteTextBeforeCursor(mLastCommittedLength);
+                mConnection.beginBatchEdit();
+                try {
+                    mConnection.deleteTextBeforeCursor(mLastCommittedLength);
+                    mConnection.commitText(newComposingText, newCursorPosition);
+                } finally {
+                    mConnection.endBatchEdit();
+                }
+            } else {
+                mConnection.commitText(newComposingText, newCursorPosition);
             }
-            mConnection.commitText(newComposingText, newCursorPosition);
             mLastCommittedLength = newComposingText.length();
             return;
         }
