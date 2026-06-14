@@ -39,6 +39,7 @@ import helium314.keyboard.latin.settings.Settings;
 import helium314.keyboard.latin.settings.SettingsValues;
 import helium314.keyboard.latin.utils.KtxKt;
 import helium314.keyboard.latin.utils.Log;
+import helium314.keyboard.latin.utils.TextCommitDiagnostics;
 
 import java.util.ArrayList;
 import java.util.Locale;
@@ -235,6 +236,16 @@ public final class PointerTracker implements PointerTrackerQueue.Element,
 
     public static void setKeyboardActionListener(final KeyboardActionListener listener) {
         sListener = listener;
+        TextCommitDiagnostics.stage("PointerTracker.setKeyboardActionListener",
+                "listener=" + TextCommitDiagnostics.listenerName(listener));
+    }
+
+    public static boolean isKeyboardActionListener(final KeyboardActionListener listener) {
+        return sListener == listener;
+    }
+
+    public static String getKeyboardActionListenerNameForDebug() {
+        return TextCommitDiagnostics.listenerName(sListener);
     }
 
     public static void setKeyDetector(final KeyDetector keyDetector) {
@@ -325,14 +336,24 @@ public final class PointerTracker implements PointerTrackerQueue.Element,
         // Even if the key is disabled, it should respond if it is in the altCodeWhileTyping state.
         if (key.isEnabled() || altersCode) {
             sTypingTimeRecorder.onCodeInput(code, eventTime);
-            if (code == KeyCode.MULTIPLE_CODE_POINTS) {
-                sListener.onTextInput(key.getOutputText());
-            } else if (code != KeyCode.NOT_SPECIFIED) {
-                if (mKeyboard.hasProximityCharsCorrection(code)) {
-                    sListener.onCodeInput(code, x, y, isKeyRepeat);
-                } else {
-                    sListener.onCodeInput(code, Constants.NOT_A_COORDINATE, Constants.NOT_A_COORDINATE, isKeyRepeat);
+            final String outputText = code == KeyCode.MULTIPLE_CODE_POINTS ? key.getOutputText() : null;
+            final long diagnosticSequence = TextCommitDiagnostics.beginSoftwareKeyDispatch(
+                    code, eventTime, isKeyRepeat, outputText == null ? 0 : outputText.length(),
+                    TextCommitDiagnostics.listenerName(sListener));
+            KeyboardSwitcher.getInstance().logTypingListenerInvariant(
+                    "PointerTracker.dispatch", false /* logWhenOk */);
+            try {
+                if (code == KeyCode.MULTIPLE_CODE_POINTS) {
+                    sListener.onTextInput(outputText);
+                } else if (code != KeyCode.NOT_SPECIFIED) {
+                    if (mKeyboard.hasProximityCharsCorrection(code)) {
+                        sListener.onCodeInput(code, x, y, isKeyRepeat);
+                    } else {
+                        sListener.onCodeInput(code, Constants.NOT_A_COORDINATE, Constants.NOT_A_COORDINATE, isKeyRepeat);
+                    }
                 }
+            } finally {
+                TextCommitDiagnostics.clearCurrentSequence(diagnosticSequence);
             }
         }
     }

@@ -1221,6 +1221,11 @@ New dictionary:
     <string name="blur_render_override_force_native_entry">Force Native Android Blur</string>
     <string name="blur_render_override_force_samsung_entry">Force Samsung Proprietary Blur</string>
     <string name="blur_render_override_force_solid_entry">Force Solid Fallback</string>
+    <string name="pref_preview_render_mode_title">Preview render mode</string>
+    <string name="pref_preview_render_mode_summary">Choose how key and gesture previews are rendered for lag testing.</string>
+    <string name="preview_render_mode_popup_entry">Popup window</string>
+    <string name="preview_render_mode_direct_entry">Direct drawing</string>
+    <string name="preview_render_mode_off_entry">Off</string>
 
     <string-array name="pref_blur_render_override_entries">
         <item>Auto (Default)</item>
@@ -1235,4 +1240,11 @@ New dictionary:
         <item>force_samsung</item>
         <item>force_solid</item>
     </string-array>
+    <string name="pref_compat_input_mode_title">Compatibility input mode</string>
+    <string name="pref_compat_input_mode_summary">Bypasses standard composing underlines to resolve input lag, duplicated text, and typing issues in WebViews and laggy apps.</string>
+    <string name="compat_input_mode_standard">Standard (Android default)</string>
+    <string name="compat_input_mode_auto">Auto (Recommended)</string>
+    <string name="compat_input_mode_auto_shadow">Auto with suggestions (Experimental)</string>
+    <string name="compat_input_mode_force_internal">Force internal composing</string>
+    <string name="compat_input_mode_force_raw">Force composing-less (Raw commit)</string>
 </resources>

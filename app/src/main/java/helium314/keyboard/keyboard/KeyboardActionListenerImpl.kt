@@ -23,6 +23,7 @@ import helium314.keyboard.latin.common.moveStepsToCharCount
 import helium314.keyboard.latin.define.ProductionFlags
 import helium314.keyboard.latin.inputlogic.InputLogic
 import helium314.keyboard.latin.settings.Settings
+import helium314.keyboard.latin.utils.TextCommitDiagnostics
 import helium314.keyboard.latin.utils.SubtypeSettings
 import kotlin.math.abs
 
@@ -85,41 +86,76 @@ class KeyboardActionListenerImpl(private val latinIME: LatinIME, private val inp
         }
 
         if (event.isHandled) {
-            inputLogic.onCodeInput(
-                settings.current, event,
-                keyboardSwitcher.getKeyboardShiftMode(), // TODO: this is not necessarily correct for a hardware keyboard right now
-                keyboardSwitcher.getCurrentKeyboardScript(),
-                latinIME.mHandler
+            val diagnosticSequence = TextCommitDiagnostics.beginHardwareKeyDispatch(
+                event.codePoint,
+                keyEvent.eventTime,
+                keyEvent.repeatCount > 0,
+                TextCommitDiagnostics.listenerName(this)
             )
+            try {
+                inputLogic.onCodeInput(
+                    settings.current, event,
+                    keyboardSwitcher.getKeyboardShiftMode(), // TODO: this is not necessarily correct for a hardware keyboard right now
+                    keyboardSwitcher.getCurrentKeyboardScript(),
+                    latinIME.mHandler
+                )
+            } finally {
+                TextCommitDiagnostics.clearCurrentSequence(diagnosticSequence)
+            }
             return true
         }
         return false
     }
 
     override fun onCodeInput(primaryCode: Int, x: Int, y: Int, isKeyRepeat: Boolean) {
-        when (primaryCode) {
-            KeyCode.TOGGLE_AUTOCORRECT -> return settings.toggleAutoCorrect()
-            KeyCode.TOGGLE_INCOGNITO_MODE -> return settings.toggleAlwaysIncognitoMode()
-        }
-        val mkv = keyboardSwitcher.mainKeyboardView
+        val diagnosticStart = TextCommitDiagnostics.startOperation()
+        TextCommitDiagnostics.stage(
+            "KeyboardActionListenerImpl.onCodeInput",
+            "keyKind=${TextCommitDiagnostics.codeKind(primaryCode, 0)} repeat=$isKeyRepeat"
+        )
+        try {
+            when (primaryCode) {
+                KeyCode.TOGGLE_AUTOCORRECT -> return settings.toggleAutoCorrect()
+                KeyCode.TOGGLE_INCOGNITO_MODE -> return settings.toggleAlwaysIncognitoMode()
+            }
+            val mkv = keyboardSwitcher.mainKeyboardView
 
-        // checking if the character is a combining accent
-        val event = if (primaryCode in combiningRange) { // todo: should this be done later, maybe in inputLogic?
-            Event.createSoftwareDeadEvent(primaryCode, 0, metaState, mkv.getKeyX(x), mkv.getKeyY(y), null)
-        } else {
-            // todo:
-            //  setting meta shift should only be done for arrow and similar cursor movement keys
-            //  should only be enabled once it works more reliably (currently depends on app for some reason)
+            // checking if the character is a combining accent
+            val event = if (primaryCode in combiningRange) { // todo: should this be done later, maybe in inputLogic?
+                Event.createSoftwareDeadEvent(primaryCode, 0, metaState, mkv.getKeyX(x), mkv.getKeyY(y), null)
+            } else {
+                // todo:
+                //  setting meta shift should only be done for arrow and similar cursor movement keys
+                //  should only be enabled once it works more reliably (currently depends on app for some reason)
 //            if (mkv.keyboard?.mId?.isAlphabetShiftedManually == true)
 //                Event.createSoftwareKeypressEvent(primaryCode, metaState or KeyEvent.META_SHIFT_ON, mkv.getKeyX(x), mkv.getKeyY(y), isKeyRepeat)
 //            else Event.createSoftwareKeypressEvent(primaryCode, metaState, mkv.getKeyX(x), mkv.getKeyY(y), isKeyRepeat)
-            Event.createSoftwareKeypressEvent(primaryCode, metaState, mkv.getKeyX(x), mkv.getKeyY(y), isKeyRepeat)
+                Event.createSoftwareKeypressEvent(primaryCode, metaState, mkv.getKeyX(x), mkv.getKeyY(y), isKeyRepeat)
+            }
+            latinIME.onEvent(event)
+            metaAfterCodeInput(primaryCode)
+        } finally {
+            TextCommitDiagnostics.duration(
+                "KeyboardActionListenerImpl.onCodeInput",
+                diagnosticStart,
+                "keyKind=${TextCommitDiagnostics.codeKind(primaryCode, 0)} repeat=$isKeyRepeat"
+            )
         }
-        latinIME.onEvent(event)
-        metaAfterCodeInput(primaryCode)
     }
 
-    override fun onTextInput(text: String?) = latinIME.onTextInput(text)
+    override fun onTextInput(text: String?) {
+        val diagnosticStart = TextCommitDiagnostics.startOperation()
+        TextCommitDiagnostics.stage("KeyboardActionListenerImpl.onTextInput", "textLength=${text?.length ?: 0}")
+        try {
+            latinIME.onTextInput(text)
+        } finally {
+            TextCommitDiagnostics.duration(
+                "KeyboardActionListenerImpl.onTextInput",
+                diagnosticStart,
+                "textLength=${text?.length ?: 0}"
+            )
+        }
+    }
 
     override fun onStartBatchInput() = latinIME.onStartBatchInput()
 

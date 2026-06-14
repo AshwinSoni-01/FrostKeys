@@ -163,8 +163,10 @@ public class GestureFloatingTextDrawingPreview extends AbstractDrawingPreview {
     }
 
     public void setSuggestedWords(@NonNull final SuggestedWords suggestedWords) {
-        if (!isPreviewEnabled()) {
+        if (!isPreviewEnabled() || isPreviewRenderModeOff()) {
+            mSuggestedWords = SuggestedWords.getEmptyInstance();
             dismissFloatingPreviewPopup();
+            invalidateDrawingView();
             return;
         }
         mSuggestedWords = suggestedWords;
@@ -173,8 +175,9 @@ public class GestureFloatingTextDrawingPreview extends AbstractDrawingPreview {
 
     @Override
     public void setPreviewPosition(@NonNull final PointerTracker tracker) {
-        if (!isPreviewEnabled()) {
+        if (!isPreviewEnabled() || isPreviewRenderModeOff()) {
             dismissFloatingPreviewPopup();
+            invalidateDrawingView();
             return;
         }
         tracker.getLastCoordinates(mLastPointerCoords);
@@ -187,7 +190,7 @@ public class GestureFloatingTextDrawingPreview extends AbstractDrawingPreview {
      */
     @Override
     public void drawPreview(@NonNull final Canvas canvas) {
-        if (!isPreviewEnabled() || mSuggestedWords.isEmpty()
+        if (!isPreviewEnabled() || isPreviewRenderModeOff() || mSuggestedWords.isEmpty()
                 || TextUtils.isEmpty(mSuggestedWords.getWord(0))) {
             return;
         }
@@ -235,6 +238,11 @@ public class GestureFloatingTextDrawingPreview extends AbstractDrawingPreview {
      * Updates gesture preview text position based on mLastPointerCoords.
      */
     protected void updatePreviewPosition() {
+        if (isPreviewRenderModeOff()) {
+            dismissFloatingPreviewPopup();
+            invalidateDrawingView();
+            return;
+        }
         if (mSuggestedWords.isEmpty() || TextUtils.isEmpty(mSuggestedWords.getWord(0))) {
             dismissFloatingPreviewPopup();
             invalidateDrawingView();
@@ -269,6 +277,10 @@ public class GestureFloatingTextDrawingPreview extends AbstractDrawingPreview {
     }
 
     private boolean showOrUpdateFloatingPreviewPopup() {
+        if (!Settings.PREVIEW_RENDER_MODE_POPUP.equals(getPreviewRenderMode())) {
+            dismissFloatingPreviewPopup();
+            return false;
+        }
         if (mPopupAnchorView == null || mPopupPreviewView == null
                 || !mPopupAnchorView.isAttachedToWindow()) {
             dismissFloatingPreviewPopup();
@@ -337,6 +349,19 @@ public class GestureFloatingTextDrawingPreview extends AbstractDrawingPreview {
             mPopupWindow.dismiss();
             mPopupWindow = null;
         }
+    }
+
+    private static boolean isPreviewRenderModeOff() {
+        return Settings.PREVIEW_RENDER_MODE_OFF.equals(getPreviewRenderMode());
+    }
+
+    private static String getPreviewRenderMode() {
+        final String renderMode = Settings.getValues().mPreviewRenderMode;
+        if (Settings.PREVIEW_RENDER_MODE_DIRECT.equals(renderMode)
+                || Settings.PREVIEW_RENDER_MODE_OFF.equals(renderMode)) {
+            return renderMode;
+        }
+        return Settings.PREVIEW_RENDER_MODE_POPUP;
     }
 
     private static int getFloatingPreviewBackgroundColor(final int themeColor) {

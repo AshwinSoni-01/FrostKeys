@@ -24,10 +24,36 @@ import java.util.Locale
 object DebugFlags {
     @JvmField
     var DEBUG_ENABLED = false
+    @JvmField
+    var TEXT_COMMIT_DIAGNOSTICS_ENABLED = false
+    @JvmField
+    var TEXT_COMMIT_EXPERIMENT_MODE = Defaults.PREF_TEXT_COMMIT_EXPERIMENT_MODE
 
     fun init(context: Context) {
         DEBUG_ENABLED = context.prefs().getBoolean(DebugSettings.PREF_DEBUG_MODE, Defaults.PREF_DEBUG_MODE)
+        TEXT_COMMIT_DIAGNOSTICS_ENABLED = context.prefs().getBoolean(
+            DebugSettings.PREF_TEXT_COMMIT_DIAGNOSTICS,
+            Defaults.PREF_TEXT_COMMIT_DIAGNOSTICS
+        )
+        TEXT_COMMIT_EXPERIMENT_MODE = if (DEBUG_ENABLED) {
+            context.prefs().getString(
+                DebugSettings.PREF_TEXT_COMMIT_EXPERIMENT_MODE,
+                Defaults.PREF_TEXT_COMMIT_EXPERIMENT_MODE
+            ) ?: Defaults.PREF_TEXT_COMMIT_EXPERIMENT_MODE
+        } else {
+            Defaults.PREF_TEXT_COMMIT_EXPERIMENT_MODE
+        }
         CrashReportExceptionHandler(context.applicationContext).install()
+    }
+
+    @JvmStatic
+    fun setTextCommitDiagnosticsEnabled(enabled: Boolean) {
+        TEXT_COMMIT_DIAGNOSTICS_ENABLED = enabled
+    }
+
+    @JvmStatic
+    fun setTextCommitExperimentMode(mode: String?) {
+        TEXT_COMMIT_EXPERIMENT_MODE = mode ?: Defaults.PREF_TEXT_COMMIT_EXPERIMENT_MODE
     }
 }
 

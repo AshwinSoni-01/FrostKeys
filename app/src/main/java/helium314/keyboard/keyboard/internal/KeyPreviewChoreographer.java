@@ -41,13 +41,29 @@ public final class KeyPreviewChoreographer {
     private static final float CIRCULAR_PREVIEW_BACKGROUND_DARK_BLEND = 0.18f;
     private static final float PREVIEW_LAYER_TOP_OVERFLOW_DP = 128.0f;
 
-    // Free {@link KeyPreviewView} pool that can be used for key preview.
-    private final ArrayDeque<KeyPreviewView> mFreeKeyPreviewViews = new ArrayDeque<>();
-    // Map from {@link Key} to {@link KeyPreviewView} that is currently being displayed as key
-    // preview.
-    private final HashMap<Key,KeyPreviewView> mShowingKeyPreviewViews = new HashMap<>();
-    private final HashMap<Key,View> mShowingKeyPreviewContentViews = new HashMap<>();
-    private final HashMap<KeyPreviewView,FrameLayout> mShadowContainerCache = new HashMap<>();
+    // Recycler holder to pair each key preview view with its shadow container parent.
+    private static final class KeyPreviewHolder {
+        final FrameLayout shadowContainer;
+        final KeyPreviewView keyPreviewView;
+
+        KeyPreviewHolder(final Context context) {
+            shadowContainer = new FrameLayout(context);
+            shadowContainer.setClipChildren(false);
+            shadowContainer.setClipToPadding(false);
+
+            keyPreviewView = new KeyPreviewView(context, null /* attrs */);
+            final FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(0, 0);
+            shadowContainer.addView(keyPreviewView, params);
+
+            shadowContainer.setLayoutParams(new FrameLayout.LayoutParams(0, 0));
+        }
+    }
+
+    private final ArrayDeque<KeyPreviewHolder> mFreeHolders = new ArrayDeque<>();
+    private final HashMap<Key, KeyPreviewHolder> mShowingHolders = new HashMap<>();
+    private final ArrayDeque<KeyPreviewView> mFreeDirectKeyPreviewViews = new ArrayDeque<>();
+    private final HashMap<Key, KeyPreviewView> mShowingDirectKeyPreviewViews = new HashMap<>();
+
     private FrameLayout mPreviewLayer;
     private PopupWindow mPreviewLayerWindow;
     private int mPreviewLayerX;
@@ -61,61 +77,42 @@ public final class KeyPreviewChoreographer {
         mParams = params;
     }
 
-    public KeyPreviewView getKeyPreviewView(final Key key, final ViewGroup placerView) {
-        KeyPreviewView keyPreviewView = mShowingKeyPreviewViews.remove(key);
-        if (keyPreviewView != null) {
-            removeFromParent(mShowingKeyPreviewContentViews.remove(key));
-            removeFromParent(keyPreviewView);
-            return keyPreviewView;
-        }
-        keyPreviewView = mFreeKeyPreviewViews.poll();
-        if (keyPreviewView != null) {
-            removeFromParent(keyPreviewView);
-            return keyPreviewView;
-        }
-        final Context context = placerView.getContext();
-        keyPreviewView = new KeyPreviewView(context, null /* attrs */);
-        keyPreviewView.setLayoutParams(ViewLayoutUtils.newLayoutParam(placerView, 0, 0));
-        return keyPreviewView;
-    }
-
     public boolean isShowingKeyPreview(final Key key) {
-        return mShowingKeyPreviewViews.containsKey(key);
+        return mShowingHolders.containsKey(key) || mShowingDirectKeyPreviewViews.containsKey(key);
     }
 
     public void clear() {
-        mShowingKeyPreviewViews.clear();
-        mShowingKeyPreviewContentViews.clear();
-        if (mPreviewLayer != null) {
-            mPreviewLayer.removeAllViews();
-        }
-        for (final FrameLayout shadowContainer : mShadowContainerCache.values()) {
-            shadowContainer.removeAllViews();
-        }
-        mShadowContainerCache.clear();
-        if (mPreviewLayerWindow != null) {
-            mPreviewLayerWindow.dismiss();
-            mPreviewLayerWindow = null;
-        }
-        mPreviewLayer = null;
-        mFreeKeyPreviewViews.clear();
+        clearPopupLayer();
+        clearDirectPreviews();
     }
 
     public void dismissKeyPreview(final Key key) {
         if (key == null) {
             return;
         }
-        final KeyPreviewView keyPreviewView = mShowingKeyPreviewViews.get(key);
-        if (keyPreviewView == null) {
-            return;
+        dismissPopupKeyPreview(key);
+        dismissDirectKeyPreview(key);
+    }
+
+    private boolean dismissPopupKeyPreview(final Key key) {
+        final KeyPreviewHolder holder = mShowingHolders.remove(key);
+        if (holder == null) {
+            return false;
         }
-        // Dismiss preview
-        mShowingKeyPreviewViews.remove(key);
-        removeFromParent(mShowingKeyPreviewContentViews.remove(key));
-        removeFromParent(keyPreviewView);
+        holder.shadowContainer.setVisibility(View.INVISIBLE);
+        mFreeHolders.add(holder);
+        return true;
+    }
+
+    private boolean dismissDirectKeyPreview(final Key key) {
+        final KeyPreviewView keyPreviewView = mShowingDirectKeyPreviewViews.remove(key);
+        if (keyPreviewView == null) {
+            return false;
+        }
         keyPreviewView.setTag(null);
         keyPreviewView.setVisibility(View.INVISIBLE);
-        mFreeKeyPreviewViews.add(keyPreviewView);
+        mFreeDirectKeyPreviewViews.add(keyPreviewView);
+        return true;
     }
 
     public void placeAndShowKeyPreview(final Key key, final KeyboardIconsSet iconsSet,
@@ -123,16 +120,73 @@ public final class KeyPreviewChoreographer {
             final ViewGroup placerView, final View anchorView) {
         Trace.beginSection("KeyPreview#placeAndShow");
         try {
-            final KeyPreviewView keyPreviewView = getKeyPreviewView(key, placerView);
+            final String renderMode = getPreviewRenderMode();
+            if (Settings.PREVIEW_RENDER_MODE_OFF.equals(renderMode)) {
+                clear();
+                return;
+            }
+            if (Settings.PREVIEW_RENDER_MODE_DIRECT.equals(renderMode)) {
+                clearPopupLayer();
+                final KeyPreviewView keyPreviewView = getDirectKeyPreviewView(key, placerView);
+                placeKeyPreview(key, keyPreviewView, iconsSet, drawParams,
+                        fullKeyboardViewWidth, keyboardOrigin);
+                showDirectKeyPreview(key, keyPreviewView);
+                return;
+            }
+
+            clearDirectPreviews();
+            KeyPreviewHolder holder = mShowingHolders.remove(key);
+            if (holder != null) {
+                holder.shadowContainer.setVisibility(View.INVISIBLE);
+                mFreeHolders.add(holder);
+            }
+            holder = mFreeHolders.poll();
+            if (holder == null) {
+                holder = createNewHolder(placerView.getContext());
+            }
             final PreviewPlacement placement = placeKeyPreview(
-                    key, keyPreviewView, iconsSet, drawParams, fullKeyboardViewWidth, keyboardOrigin);
-            showKeyPreview(key, keyPreviewView, anchorView, placement);
+                    key, holder.keyPreviewView, iconsSet, drawParams, fullKeyboardViewWidth, keyboardOrigin);
+            showKeyPreview(key, holder, anchorView, placement);
         } finally {
             Trace.endSection();
         }
     }
 
+    private KeyPreviewView getDirectKeyPreviewView(final Key key, final ViewGroup placerView) {
+        KeyPreviewView keyPreviewView = mShowingDirectKeyPreviewViews.remove(key);
+        if (keyPreviewView == null) {
+            keyPreviewView = mFreeDirectKeyPreviewViews.poll();
+        }
+        if (keyPreviewView == null) {
+            keyPreviewView = new KeyPreviewView(placerView.getContext(), null /* attrs */);
+            keyPreviewView.setLayoutParams(ViewLayoutUtils.newLayoutParam(placerView, 0, 0));
+        }
+        final ViewParent parent = keyPreviewView.getParent();
+        if (parent != placerView) {
+            removeFromParent(keyPreviewView);
+            placerView.addView(keyPreviewView, ViewLayoutUtils.newLayoutParam(placerView, 0, 0));
+        }
+        return keyPreviewView;
+    }
+
+    private void showDirectKeyPreview(final Key key, final KeyPreviewView keyPreviewView) {
+        keyPreviewView.setVisibility(View.VISIBLE);
+        mShowingDirectKeyPreviewViews.put(key, keyPreviewView);
+    }
+
+    private KeyPreviewHolder createNewHolder(final Context context) {
+        final KeyPreviewHolder holder = new KeyPreviewHolder(context);
+        if (mPreviewLayer != null) {
+            mPreviewLayer.addView(holder.shadowContainer);
+        }
+        return holder;
+    }
+
     public void warmUpPreviewLayer(final View anchorView) {
+        if (!Settings.PREVIEW_RENDER_MODE_POPUP.equals(getPreviewRenderMode())) {
+            clearPopupLayer();
+            return;
+        }
         Trace.beginSection("KeyPreview#warmLayer");
         try {
             final View rootView = getUsableRootView(anchorView);
@@ -164,9 +218,7 @@ public final class KeyPreviewChoreographer {
         final int previewWidth = keyPreviewView.getMeasuredWidth();
         final int previewHeight = keyPreviewView.getMeasuredHeight();
         final int keyDrawWidth = key.getDrawWidth();
-        // The key preview is horizontally aligned with the center of the visible part of the
-        // parent key. If it doesn't fit in this {@link KeyboardView}, it is moved inward to fit and
-        // the left/right background is used if such background is specified.
+
         final int keyPreviewPosition;
         int previewX = key.getDrawX() - (previewWidth - keyDrawWidth) / 2 + CoordinateUtils.x(originCoords);
         if (previewX < 0) {
@@ -178,7 +230,7 @@ public final class KeyPreviewChoreographer {
         } else {
             keyPreviewPosition = KeyPreviewView.POSITION_MIDDLE;
         }
-        // The circular LXX preview has no tail padding, so float it above the key.
+
         final boolean isCircularPreview = isCircularPreviewStyle(colors);
         final boolean hasPopupKeys = (key.getPopupKeys() != null);
         keyPreviewView.setPreviewBackground(hasPopupKeys, keyPreviewPosition);
@@ -214,24 +266,45 @@ public final class KeyPreviewChoreographer {
                 || KeyboardTheme.STYLE_CIRCLE.equals(themeStyle);
     }
 
-    void showKeyPreview(final Key key, final KeyPreviewView keyPreviewView,
+    void showKeyPreview(final Key key, final KeyPreviewHolder holder,
             final View anchorView, final PreviewPlacement placement) {
-        removeFromParent(keyPreviewView);
         if (!ensurePreviewLayer(anchorView, placement)) {
-            keyPreviewView.setTag(null);
-            keyPreviewView.setVisibility(View.INVISIBLE);
-            mFreeKeyPreviewViews.add(keyPreviewView);
+            holder.shadowContainer.setVisibility(View.INVISIBLE);
+            mFreeHolders.add(holder);
             return;
         }
-        keyPreviewView.setVisibility(View.VISIBLE);
-        mShowingKeyPreviewViews.put(key, keyPreviewView);
-        final View popupContentView = getPopupContentView(keyPreviewView, placement);
-        final FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
-                placement.getPopupWidth(), placement.getPopupHeight());
-        params.leftMargin = placement.getPopupX() - mPreviewLayerX;
-        params.topMargin = placement.getPopupY() - mPreviewLayerY;
-        mPreviewLayer.addView(popupContentView, params);
-        mShowingKeyPreviewContentViews.put(key, popupContentView);
+
+        if (holder.shadowContainer.getParent() == null) {
+            mPreviewLayer.addView(holder.shadowContainer);
+        }
+
+        // Apply placement geometry to the KeyPreviewView inside the container
+        final FrameLayout.LayoutParams innerParams = (FrameLayout.LayoutParams) holder.keyPreviewView.getLayoutParams();
+        if (innerParams.width != placement.mWidth || innerParams.height != placement.mHeight
+                || innerParams.leftMargin != placement.mShadowPadding || innerParams.topMargin != placement.mShadowPadding) {
+            innerParams.width = placement.mWidth;
+            innerParams.height = placement.mHeight;
+            innerParams.leftMargin = placement.mShadowPadding;
+            innerParams.topMargin = placement.mShadowPadding;
+            holder.keyPreviewView.setLayoutParams(innerParams);
+        }
+
+        // Adjust the shadow container dimensions to account for shadow padding
+        final FrameLayout.LayoutParams outerParams = (FrameLayout.LayoutParams) holder.shadowContainer.getLayoutParams();
+        final int popupWidth = placement.getPopupWidth();
+        final int popupHeight = placement.getPopupHeight();
+        if (outerParams.width != popupWidth || outerParams.height != popupHeight) {
+            outerParams.width = popupWidth;
+            outerParams.height = popupHeight;
+            holder.shadowContainer.setLayoutParams(outerParams);
+        }
+
+        // Fast GPU translation position update without triggering layout passes
+        holder.shadowContainer.setTranslationX(placement.getPopupX() - mPreviewLayerX);
+        holder.shadowContainer.setTranslationY(placement.getPopupY() - mPreviewLayerY);
+
+        holder.shadowContainer.setVisibility(View.VISIBLE);
+        mShowingHolders.put(key, holder);
     }
 
     private boolean ensurePreviewLayer(final View anchorView, final PreviewPlacement placement) {
@@ -250,8 +323,7 @@ public final class KeyPreviewChoreographer {
                     : Math.max(placement.getPopupX() + placement.getPopupWidth(), placement.mWidth);
             final int rootHeight = rootView.getHeight() > 0 ? rootView.getHeight()
                     : Math.max(placement.getPopupY() + placement.getPopupHeight(), placement.mHeight);
-            // Keep enough stable space above the keyboard for previews, without keeping an extra
-            // full root-height transparent window alive while the user types.
+
             final int topOverflow = Math.max(dpToPx(anchorView, PREVIEW_LAYER_TOP_OVERFLOW_DP),
                     Math.max(0, -placement.getPopupY()));
             final int layerShadowPadding = Math.max(placement.mShadowPadding,
@@ -283,6 +355,49 @@ public final class KeyPreviewChoreographer {
 
     private int getStableLayerShadowPadding(final View anchorView) {
         return dpToPx(anchorView, CIRCULAR_PREVIEW_SHADOW_PADDING_DP);
+    }
+
+    private void clearPopupLayer() {
+        mShowingHolders.clear();
+        mFreeHolders.clear();
+        if (mPreviewLayer != null) {
+            mPreviewLayer.removeAllViews();
+        }
+        if (mPreviewLayerWindow != null) {
+            mPreviewLayerWindow.dismiss();
+            mPreviewLayerWindow = null;
+        }
+        mPreviewLayer = null;
+    }
+
+    private void clearDirectPreviews() {
+        for (final KeyPreviewView keyPreviewView : mShowingDirectKeyPreviewViews.values()) {
+            removeFromParent(keyPreviewView);
+        }
+        for (final KeyPreviewView keyPreviewView : mFreeDirectKeyPreviewViews) {
+            removeFromParent(keyPreviewView);
+        }
+        mShowingDirectKeyPreviewViews.clear();
+        mFreeDirectKeyPreviewViews.clear();
+    }
+
+    private static void removeFromParent(final View view) {
+        if (view == null) {
+            return;
+        }
+        final ViewParent parent = view.getParent();
+        if (parent instanceof ViewGroup) {
+            ((ViewGroup) parent).removeView(view);
+        }
+    }
+
+    private static String getPreviewRenderMode() {
+        final String renderMode = Settings.getValues().mPreviewRenderMode;
+        if (Settings.PREVIEW_RENDER_MODE_DIRECT.equals(renderMode)
+                || Settings.PREVIEW_RENDER_MODE_OFF.equals(renderMode)) {
+            return renderMode;
+        }
+        return Settings.PREVIEW_RENDER_MODE_POPUP;
     }
 
     private void showOrUpdatePreviewLayer(final View rootView, final int layerX, final int layerY,
@@ -326,40 +441,6 @@ public final class KeyPreviewChoreographer {
             } finally {
                 Trace.endSection();
             }
-        }
-    }
-
-    private View getPopupContentView(final KeyPreviewView keyPreviewView,
-            final PreviewPlacement placement) {
-        if (placement.mShadowPadding <= 0) {
-            return keyPreviewView;
-        }
-        FrameLayout shadowContainer = mShadowContainerCache.get(keyPreviewView);
-        if (shadowContainer == null) {
-            shadowContainer = new FrameLayout(keyPreviewView.getContext());
-            shadowContainer.setClipChildren(false);
-            shadowContainer.setClipToPadding(false);
-            mShadowContainerCache.put(keyPreviewView, shadowContainer);
-        }
-        removeFromParent(shadowContainer);
-        shadowContainer.removeAllViews();
-        shadowContainer.setClipChildren(false);
-        shadowContainer.setClipToPadding(false);
-        final FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
-                placement.mWidth, placement.mHeight);
-        params.leftMargin = placement.mShadowPadding;
-        params.topMargin = placement.mShadowPadding;
-        shadowContainer.addView(keyPreviewView, params);
-        return shadowContainer;
-    }
-
-    private static void removeFromParent(final View view) {
-        if (view == null) {
-            return;
-        }
-        final ViewParent parent = view.getParent();
-        if (parent instanceof ViewGroup) {
-            ((ViewGroup) parent).removeView(view);
         }
     }
 

@@ -46,6 +46,7 @@ import java.util.concurrent.Semaphore;
  */
 public final class AndroidSpellCheckerService extends SpellCheckerService
         implements SharedPreferences.OnSharedPreferenceChangeListener {
+    private static final String TAG = AndroidSpellCheckerService.class.getSimpleName();
 
     public static final int SPELLCHECKER_DUMMY_KEYBOARD_WIDTH = 480;
     public static final int SPELLCHECKER_DUMMY_KEYBOARD_HEIGHT = 301;
@@ -62,6 +63,13 @@ public final class AndroidSpellCheckerService extends SpellCheckerService
     private final DictionaryFacilitatorLruCache mDictionaryFacilitatorCache =
             new DictionaryFacilitatorLruCache(this, DICTIONARY_NAME_PREFIX);
     private final ConcurrentHashMap<Locale, Keyboard> mKeyboardCache = new ConcurrentHashMap<>();
+    private final java.util.concurrent.atomic.AtomicInteger mUserDictChangeSequence = new java.util.concurrent.atomic.AtomicInteger(0);
+    private final android.database.ContentObserver mUserDictObserver = new android.database.ContentObserver(null) {
+        @Override
+        public void onChange(boolean self) {
+            mUserDictChangeSequence.incrementAndGet();
+        }
+    };
 
     // The threshold for a suggestion to be considered "recommended".
     private float mRecommendedThreshold;
@@ -87,6 +95,11 @@ public final class AndroidSpellCheckerService extends SpellCheckerService
         onSharedPreferenceChanged(prefs, Settings.PREF_USE_APPS);
         final boolean blockOffensive = prefs.getBoolean(Settings.PREF_BLOCK_POTENTIALLY_OFFENSIVE, Defaults.PREF_BLOCK_POTENTIALLY_OFFENSIVE);
         mSettingsValuesForSuggestion = new SettingsValuesForSuggestion(blockOffensive, false);
+        try {
+            getContentResolver().registerContentObserver(android.provider.UserDictionary.Words.CONTENT_URI, true, mUserDictObserver);
+        } catch (SecurityException e) {
+            android.util.Log.e(TAG, "Cannot register user dictionary observer", e);
+        }
     }
 
     public float getRecommendedThreshold() {
@@ -227,5 +240,21 @@ public final class AndroidSpellCheckerService extends SpellCheckerService
                 .setIsSpellChecker(true)
                 .disableTouchPositionCorrectionData()
                 .build();
+    }
+
+    public int getUserDictChangeSequence() {
+        return mUserDictChangeSequence.get();
+    }
+
+    @Override
+    public void onDestroy() {
+        try {
+            getContentResolver().unregisterContentObserver(mUserDictObserver);
+        } catch (Exception e) {
+            android.util.Log.w(TAG, "Error unregistering observer", e);
+        }
+        final SharedPreferences prefs = KtxKt.prefs(this);
+        prefs.unregisterOnSharedPreferenceChangeListener(this);
+        super.onDestroy();
     }
 }

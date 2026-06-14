@@ -192,6 +192,7 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
 
         // create new dictionary groups and remove dictionaries to re-use from existingDictsToCleanup
         val newDictionaryGroups = mutableListOf<DictionaryGroup>()
+        var isPrimary = true
         for (locale in newLocales) {
             // get existing dictionary group for new locale
             val oldDictGroupForLocale = findDictionaryGroupWithLocale(dictionaryGroups, locale)
@@ -211,6 +212,9 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
             // create new or re-use already loaded sub-dicts
             val subDicts: MutableMap<String, ExpandableBinaryDictionary> = HashMap()
             for (subDictType in newSubDictTypes) {
+                if (!isPrimary && (subDictType == Dictionary.TYPE_CONTACTS || subDictType == Dictionary.TYPE_APPS)) {
+                    continue
+                }
                 val subDict: ExpandableBinaryDictionary
                 if (forceReload || oldDictGroupForLocale == null
                     || !oldDictGroupForLocale.hasDict(subDictType)
@@ -226,6 +230,7 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
             }
             val newDictGroup = DictionaryGroup(locale, mainDict, subDicts, context)
             newDictionaryGroups.add(newDictGroup)
+            isPrimary = false
         }
         return newDictionaryGroups to existingDictsToCleanup
     }

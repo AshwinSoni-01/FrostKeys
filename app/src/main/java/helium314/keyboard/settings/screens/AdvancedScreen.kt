@@ -92,6 +92,8 @@ fun AdvancedSettingsScreen(
         R.string.settings_category_experimental,
         Settings.PREF_EMOJI_MAX_SDK,
         Settings.PREF_BLUR_RENDER_OVERRIDE,
+        Settings.PREF_PREVIEW_RENDER_MODE,
+        DebugSettings.PREF_TEXT_COMMIT_EXPERIMENT_MODE,
         Settings.PREF_URL_DETECTION,
         if (BuildConfig.BUILD_TYPE != "nouserlib") SettingsWithoutKey.LOAD_GESTURE_LIB else null
     )
@@ -278,6 +280,26 @@ fun createAdvancedSettings(context: Context) = listOf(
         ListPreference(it, items, Defaults.PREF_BLUR_RENDER_OVERRIDE) {
             KeyboardSwitcher.getInstance().setThemeNeedsReload()
         }
+    },
+    Setting(context, Settings.PREF_PREVIEW_RENDER_MODE, R.string.pref_preview_render_mode_title, R.string.pref_preview_render_mode_summary) {
+        val items = listOf(
+            stringResource(R.string.preview_render_mode_popup_entry) to Settings.PREVIEW_RENDER_MODE_POPUP,
+            stringResource(R.string.preview_render_mode_direct_entry) to Settings.PREVIEW_RENDER_MODE_DIRECT,
+            stringResource(R.string.preview_render_mode_off_entry) to Settings.PREVIEW_RENDER_MODE_OFF
+        )
+        ListPreference(it, items, Defaults.PREF_PREVIEW_RENDER_MODE) {
+            KeyboardSwitcher.getInstance().reloadKeyboard()
+        }
+    },
+    Setting(context, DebugSettings.PREF_TEXT_COMMIT_EXPERIMENT_MODE, R.string.pref_compat_input_mode_title, R.string.pref_compat_input_mode_summary) {
+        val items = listOf(
+            stringResource(R.string.compat_input_mode_standard) to DebugSettings.TEXT_COMMIT_EXPERIMENT_MODE_NORMAL,
+            stringResource(R.string.compat_input_mode_auto) to DebugSettings.TEXT_COMMIT_EXPERIMENT_MODE_COMPAT_INTERNAL_COMPOSE,
+            stringResource(R.string.compat_input_mode_auto_shadow) to DebugSettings.TEXT_COMMIT_EXPERIMENT_MODE_COMPAT_SHADOW_SUGGESTIONS,
+            stringResource(R.string.compat_input_mode_force_internal) to DebugSettings.TEXT_COMMIT_EXPERIMENT_MODE_INTERNAL_COMPOSE_ALL,
+            stringResource(R.string.compat_input_mode_force_raw) to DebugSettings.TEXT_COMMIT_EXPERIMENT_MODE_RAW_COMMIT_ALL
+        )
+        ListPreference(it, items, Defaults.PREF_TEXT_COMMIT_EXPERIMENT_MODE)
     },
     Setting(context, Settings.PREF_URL_DETECTION, R.string.url_detection_title, R.string.url_detection_summary) {
         SwitchPreference(it, Defaults.PREF_URL_DETECTION)

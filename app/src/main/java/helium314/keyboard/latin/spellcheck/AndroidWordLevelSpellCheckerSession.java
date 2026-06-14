@@ -6,11 +6,8 @@
 
 package helium314.keyboard.latin.spellcheck;
 
-import android.content.ContentResolver;
 import android.content.SharedPreferences;
-import android.database.ContentObserver;
 import android.os.Binder;
-import android.provider.UserDictionary.Words;
 import android.service.textservice.SpellCheckerService.Session;
 import android.text.TextUtils;
 
@@ -57,7 +54,7 @@ public abstract class AndroidWordLevelSpellCheckerSession extends Session {
     private String mScript;
     private final AndroidSpellCheckerService mService;
     protected final SuggestionsCache mSuggestionsCache = new SuggestionsCache();
-    private final ContentObserver mObserver;
+    private int mUserDictChangeSequence = -1;
 
     private static final String quotesRegexp = "([\\u0022\\u0027\\u0060\\u00B4\\u2018\\u2018\\u201C\\u201D])";
 
@@ -108,13 +105,6 @@ public abstract class AndroidWordLevelSpellCheckerSession extends Session {
 
     AndroidWordLevelSpellCheckerSession(final AndroidSpellCheckerService service) {
         mService = service;
-        mObserver = new ContentObserver(null) {
-            @Override
-            public void onChange(boolean self) {
-                mSuggestionsCache.clearCache();
-            }
-        };
-        service.getContentResolver().registerContentObserver(Words.CONTENT_URI, true, mObserver);
     }
 
     private void updateLocale() {
@@ -167,8 +157,6 @@ public abstract class AndroidWordLevelSpellCheckerSession extends Session {
 
     @Override
     public void onClose() {
-        final ContentResolver cres = mService.getContentResolver();
-        cres.unregisterContentObserver(mObserver);
     }
 
     private static final int CHECKABILITY_CHECKABLE = 0;
@@ -268,6 +256,11 @@ public abstract class AndroidWordLevelSpellCheckerSession extends Session {
     protected SuggestionsInfo onGetSuggestionsInternal(
             final TextInfo textInfo, final NgramContext ngramContext, final int suggestionsLimit) {
         try {
+            final int currentSequence = mService.getUserDictChangeSequence();
+            if (mUserDictChangeSequence != currentSequence) {
+                mSuggestionsCache.clearCache();
+                mUserDictChangeSequence = currentSequence;
+            }
             updateLocale();
             // It's good to keep this not local specific since the standard
             // ones may show up in other languages also.

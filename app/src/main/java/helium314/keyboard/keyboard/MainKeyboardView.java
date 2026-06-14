@@ -63,6 +63,7 @@ import helium314.keyboard.latin.settings.Settings;
 import helium314.keyboard.latin.utils.KtxKt;
 import helium314.keyboard.latin.utils.LanguageOnSpacebarUtils;
 import helium314.keyboard.latin.utils.Log;
+import helium314.keyboard.latin.utils.TextCommitDiagnostics;
 import helium314.keyboard.latin.utils.TypefaceUtils;
 
 import java.util.ArrayList;
@@ -289,6 +290,16 @@ public final class MainKeyboardView extends KeyboardView implements DrawingProxy
     public void setKeyboardActionListener(final KeyboardActionListener listener) {
         mKeyboardActionListener = listener;
         PointerTracker.setKeyboardActionListener(listener);
+        TextCommitDiagnostics.stage("MainKeyboardView.setKeyboardActionListener",
+                "listener=" + TextCommitDiagnostics.listenerName(listener));
+    }
+
+    public boolean isKeyboardActionListener(final KeyboardActionListener listener) {
+        return mKeyboardActionListener == listener;
+    }
+
+    public String getKeyboardActionListenerNameForDebug() {
+        return TextCommitDiagnostics.listenerName(mKeyboardActionListener);
     }
 
     // TODO: We should reconsider which coordinate system should be used to represent keyboard event.

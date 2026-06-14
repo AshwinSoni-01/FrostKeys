@@ -79,6 +79,7 @@ import helium314.keyboard.latin.utils.DictionaryInfoUtils;
 import helium314.keyboard.latin.utils.KtxKt;
 import helium314.keyboard.latin.utils.Log;
 import helium314.keyboard.latin.utils.ResourceUtils;
+import helium314.keyboard.latin.utils.TextCommitDiagnostics;
 
 import java.util.List;
 import java.util.ArrayList;
@@ -506,6 +507,8 @@ public final class EmojiPalettesView extends LinearLayout
 
     public void enterSearchMode() {
         initialize();
+        TextCommitDiagnostics.stage("EmojiSearch.enter",
+                "alreadySearchMode=" + mSearchMode);
         if (mSearchMode) {
             focusSearchField(true);
             return;
@@ -541,6 +544,9 @@ public final class EmojiPalettesView extends LinearLayout
     }
 
     public void exitSearchMode(final boolean clearQuery, final boolean restoreViews) {
+        TextCommitDiagnostics.stage("EmojiSearch.exit",
+                "clearQuery=" + clearQuery + " restoreViews=" + restoreViews
+                        + " wasSearchMode=" + mSearchMode);
         if (!mSearchMode && !clearQuery) {
             return;
         }
@@ -550,6 +556,8 @@ public final class EmojiPalettesView extends LinearLayout
         mSearchMode = false;
         if (mSearchEditText != null) {
             mSearchEditText.setCursorVisible(false);
+            TextCommitDiagnostics.stage("EmojiSearch.clearFocus",
+                    "hadFocus=" + mSearchEditText.hasFocus());
             mSearchEditText.clearFocus();
         }
         if (mSearchBarContainer != null) {
@@ -579,6 +587,8 @@ public final class EmojiPalettesView extends LinearLayout
             mainKeyboardView.setKeyboardActionListener(mMainKeyboardActionListener);
         }
         PointerTracker.switchTo(mBottomRowKeyboard != null ? mBottomRowKeyboard : mainKeyboardView);
+        KeyboardSwitcher.getInstance().logTypingListenerInvariant(
+                "EmojiSearch.exit", true /* logWhenOk */);
         requestLayout();
         if (restoreViews) {
             post(this::restoreEmojiCategoryStrip);
@@ -646,6 +656,8 @@ public final class EmojiPalettesView extends LinearLayout
         if (keyboardView == null) {
             return;
         }
+        TextCommitDiagnostics.stage("EmojiSearch.updateSearchKeyboard",
+                "elementId=" + mCurrentSearchKeyboardElementId);
         keyboardView.setKeyboardActionListener(mSearchKeyboardActionListener);
         PointerTracker.switchTo(keyboardView);
         switch (mCurrentSearchKeyboardElementId) {
@@ -685,6 +697,8 @@ public final class EmojiPalettesView extends LinearLayout
         if (mSearchEditText == null) {
             return;
         }
+        TextCommitDiagnostics.stage("EmojiSearch.requestFocus",
+                "moveCursorToEnd=" + moveCursorToEnd + " hadFocus=" + mSearchEditText.hasFocus());
         mSearchEditText.requestFocus();
         mSearchEditText.setCursorVisible(mSearchMode);
         if (moveCursorToEnd) {
@@ -1501,6 +1515,8 @@ public final class EmojiPalettesView extends LinearLayout
 
     public void stopEmojiPalettes() {
         if (!initialized) return;
+        TextCommitDiagnostics.stage("EmojiSearch.stopEmojiPalettes",
+                "searchMode=" + mSearchMode);
         if (mSearchMode) {
             exitSearchMode(false, false);
         }

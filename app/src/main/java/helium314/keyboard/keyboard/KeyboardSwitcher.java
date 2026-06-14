@@ -60,6 +60,7 @@ import helium314.keyboard.latin.utils.RecapitalizeMode;
 import helium314.keyboard.latin.utils.ResourceUtils;
 import helium314.keyboard.latin.utils.ScriptUtils;
 import helium314.keyboard.latin.utils.SubtypeUtilsAdditional;
+import helium314.keyboard.latin.utils.TextCommitDiagnostics;
 import helium314.keyboard.latin.utils.ToolbarMode;
 
 public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
@@ -534,6 +535,7 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
         setKeyboardPanelOffsets((mKlipyPalettesView != null && mKlipyPalettesView.isSearchMode())
                 || (mEmojiPalettesView != null && mEmojiPalettesView.isSearchMode()));
         updatePersistentEmojiRow();
+        logTypingListenerInvariant("KeyboardSwitcher.setMainKeyboardFrame", false /* logWhenOk */);
     }
 
 
@@ -1141,6 +1143,28 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
         return mKeyboardView;
     }
 
+    public boolean isKlipySearchModeActive() {
+        return mKlipyPalettesView != null && mKlipyPalettesView.isSearchMode();
+    }
+
+    public boolean isEmojiSearchModeActive() {
+        return mEmojiPalettesView != null && mEmojiPalettesView.isSearchMode();
+    }
+
+    public void logTypingListenerInvariant(final String reason, final boolean logWhenOk) {
+        if (!TextCommitDiagnostics.isEnabled()) {
+            return;
+        }
+        final boolean searchActive = isKlipySearchModeActive() || isEmojiSearchModeActive();
+        final boolean mainViewMatches = mKeyboardView == null
+                || mKeyboardView.isKeyboardActionListener(mLatinIME.mKeyboardActionListener);
+        final boolean pointerMatches = PointerTracker.isKeyboardActionListener(mLatinIME.mKeyboardActionListener);
+        final String mainViewListener = mKeyboardView == null
+                ? "null" : mKeyboardView.getKeyboardActionListenerNameForDebug();
+        TextCommitDiagnostics.invariant(reason, searchActive, mainViewMatches, pointerMatches,
+                mainViewListener, PointerTracker.getKeyboardActionListenerNameForDebug(), logWhenOk);
+    }
+
     public MainKeyboardView getKeyboardView() {
         return mKeyboardView;
     }
@@ -1240,6 +1264,7 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
         prefs.registerOnSharedPreferenceChangeListener(mSuggestionStripView);
         prefs.registerOnSharedPreferenceChangeListener(mClipboardHistoryView);
         PointerTracker.switchTo(mKeyboardView);
+        logTypingListenerInvariant("KeyboardSwitcher.onCreateInputView", true /* logWhenOk */);
         return mCurrentInputView;
     }
 
