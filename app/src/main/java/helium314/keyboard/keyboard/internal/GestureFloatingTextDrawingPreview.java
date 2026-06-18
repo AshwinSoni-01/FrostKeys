@@ -13,11 +13,7 @@ import android.graphics.Paint;
 import android.graphics.Paint.Align;
 import android.graphics.Rect;
 import android.graphics.RectF;
-import android.graphics.drawable.ColorDrawable;
 import android.text.TextUtils;
-import android.view.Gravity;
-import android.view.View;
-import android.widget.PopupWindow;
 
 import androidx.annotation.NonNull;
 
@@ -39,7 +35,6 @@ public class GestureFloatingTextDrawingPreview extends AbstractDrawingPreview {
     private static final float PREVIEW_BACKGROUND_LIGHT_BLEND = 0.86f;
     private static final float PREVIEW_BACKGROUND_DARK_BLEND = 0.18f;
     private static final float NON_PILL_ROUND_RADIUS_DP = 12.0f;
-    private static final float PREVIEW_SHADOW_PADDING_DP = 8.0f;
     private static final int LIGHT_BACKGROUND_TEXT_COLOR = 0xFF202124;
     private static final int DARK_BACKGROUND_TEXT_COLOR = 0xFFE8EAED;
 
@@ -52,7 +47,6 @@ public class GestureFloatingTextDrawingPreview extends AbstractDrawingPreview {
         public final float mGesturePreviewRoundRadius;
         public final float mDisplayDensity;
         public final int mDisplayWidth;
-        public final int mDisplayHeight;
 
         private final int mGesturePreviewTextSize;
         private final int mGesturePreviewTextColor;
@@ -84,7 +78,6 @@ public class GestureFloatingTextDrawingPreview extends AbstractDrawingPreview {
                     R.styleable.MainKeyboardView_gestureFloatingPreviewRoundRadius, 0.0f);
             mDisplayDensity = mainKeyboardViewAttr.getResources().getDisplayMetrics().density;
             mDisplayWidth = mainKeyboardViewAttr.getResources().getDisplayMetrics().widthPixels;
-            mDisplayHeight = mainKeyboardViewAttr.getResources().getDisplayMetrics().heightPixels;
             mUsePillBackground = KeyboardTheme.STYLE_ROUNDED.equals(colors.getThemeStyle())
                     || KeyboardTheme.STYLE_CIRCLE.equals(colors.getThemeStyle());
             mNonPillRoundRadius = Math.max(mGesturePreviewRoundRadius,
@@ -121,15 +114,6 @@ public class GestureFloatingTextDrawingPreview extends AbstractDrawingPreview {
     private final RectF mGesturePreviewRectangle = new RectF();
     private final RectF mGesturePreviewShadowRectangle = new RectF();
     private final Paint mShadowPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final int[] mKeyboardViewOrigin = CoordinateUtils.newInstance();
-    private FloatingPreviewPopupView mPopupPreviewView;
-    private PopupWindow mPopupWindow;
-    private View mPopupAnchorView;
-    private boolean mDrawInPopup;
-    private int mPopupX;
-    private int mPopupY;
-    private int mPopupWidth;
-    private int mPopupHeight;
     private int mPreviewTextX;
     private int mPreviewTextY;
     private SuggestedWords mSuggestedWords = SuggestedWords.getEmptyInstance();
@@ -140,22 +124,8 @@ public class GestureFloatingTextDrawingPreview extends AbstractDrawingPreview {
     }
 
     @Override
-    public void setDrawingView(@NonNull final DrawingPreviewPlacerView drawingView) {
-        super.setDrawingView(drawingView);
-        mPopupAnchorView = drawingView;
-        mPopupPreviewView = new FloatingPreviewPopupView(drawingView.getContext());
-    }
-
-    @Override
-    public void setKeyboardViewGeometry(@NonNull final int[] originCoords, final int width,
-            final int height) {
-        super.setKeyboardViewGeometry(originCoords, width, height);
-        CoordinateUtils.copy(mKeyboardViewOrigin, originCoords);
-    }
-
-    @Override
     public void onDeallocateMemory() {
-        dismissFloatingPreviewPopup();
+        // Nothing to do.
     }
 
     public void dismissGestureFloatingPreviewText() {
@@ -163,9 +133,8 @@ public class GestureFloatingTextDrawingPreview extends AbstractDrawingPreview {
     }
 
     public void setSuggestedWords(@NonNull final SuggestedWords suggestedWords) {
-        if (!isPreviewEnabled() || isPreviewRenderModeOff()) {
+        if (!isPreviewEnabled()) {
             mSuggestedWords = SuggestedWords.getEmptyInstance();
-            dismissFloatingPreviewPopup();
             invalidateDrawingView();
             return;
         }
@@ -175,8 +144,7 @@ public class GestureFloatingTextDrawingPreview extends AbstractDrawingPreview {
 
     @Override
     public void setPreviewPosition(@NonNull final PointerTracker tracker) {
-        if (!isPreviewEnabled() || isPreviewRenderModeOff()) {
-            dismissFloatingPreviewPopup();
+        if (!isPreviewEnabled()) {
             invalidateDrawingView();
             return;
         }
@@ -190,11 +158,8 @@ public class GestureFloatingTextDrawingPreview extends AbstractDrawingPreview {
      */
     @Override
     public void drawPreview(@NonNull final Canvas canvas) {
-        if (!isPreviewEnabled() || isPreviewRenderModeOff() || mSuggestedWords.isEmpty()
+        if (!isPreviewEnabled() || mSuggestedWords.isEmpty()
                 || TextUtils.isEmpty(mSuggestedWords.getWord(0))) {
-            return;
-        }
-        if (mDrawInPopup) {
             return;
         }
         drawStyledPreview(canvas, mGesturePreviewRectangle, mPreviewTextX, mPreviewTextY);
@@ -238,13 +203,7 @@ public class GestureFloatingTextDrawingPreview extends AbstractDrawingPreview {
      * Updates gesture preview text position based on mLastPointerCoords.
      */
     protected void updatePreviewPosition() {
-        if (isPreviewRenderModeOff()) {
-            dismissFloatingPreviewPopup();
-            invalidateDrawingView();
-            return;
-        }
         if (mSuggestedWords.isEmpty() || TextUtils.isEmpty(mSuggestedWords.getWord(0))) {
-            dismissFloatingPreviewPopup();
             invalidateDrawingView();
             return;
         }
@@ -268,101 +227,10 @@ public class GestureFloatingTextDrawingPreview extends AbstractDrawingPreview {
 
         mPreviewTextX = (int)(rectX + hPad + textWidth / 2.0f);
         mPreviewTextY = (int)(rectY + vPad) + textHeight;
-        final boolean wasDrawnInPopup = mDrawInPopup;
-        mDrawInPopup = showOrUpdateFloatingPreviewPopup();
-        // TODO: Should narrow the invalidate region.
-        if (!mDrawInPopup || !wasDrawnInPopup) {
-            invalidateDrawingView();
-        }
+        invalidateDrawingView();
     }
 
-    private boolean showOrUpdateFloatingPreviewPopup() {
-        if (!Settings.PREVIEW_RENDER_MODE_POPUP.equals(getPreviewRenderMode())) {
-            dismissFloatingPreviewPopup();
-            return false;
-        }
-        if (mPopupAnchorView == null || mPopupPreviewView == null
-                || !mPopupAnchorView.isAttachedToWindow()) {
-            dismissFloatingPreviewPopup();
-            return false;
-        }
-        final View rootView = mPopupAnchorView.getRootView();
-        if (rootView == null) {
-            dismissFloatingPreviewPopup();
-            return false;
-        }
 
-        final int shadowPadding = Math.round(PREVIEW_SHADOW_PADDING_DP * mParams.mDisplayDensity);
-        final int rootWidth = rootView.getWidth() > 0 ? rootView.getWidth() : mParams.mDisplayWidth;
-        final int rootHeight = rootView.getHeight() > 0 ? rootView.getHeight() : mParams.mDisplayHeight;
-        final int requiredTopOverflow = Math.round(mParams.mGesturePreviewTextOffset
-                + mParams.mGesturePreviewTextHeight
-                + mParams.mGesturePreviewVerticalPadding * 2.0f
-                + shadowPadding * 2.0f);
-        final int topOverflow = Math.min(mParams.mDisplayHeight,
-                Math.max(rootHeight, requiredTopOverflow));
-        final int popupX = -shadowPadding;
-        final int popupY = -topOverflow - shadowPadding;
-        final int popupWidth = rootWidth + shadowPadding * 2;
-        final int popupHeight = rootHeight + topOverflow + shadowPadding * 2;
-        final int previewOffsetX = CoordinateUtils.x(mKeyboardViewOrigin) - popupX;
-        final int previewOffsetY = CoordinateUtils.y(mKeyboardViewOrigin) - popupY;
-
-        mPopupPreviewView.setPreviewGeometry(mGesturePreviewRectangle, mPreviewTextX,
-                mPreviewTextY, previewOffsetX, previewOffsetY, shadowPadding);
-        try {
-            if (mPopupWindow == null) {
-                mPopupWindow = new PopupWindow(mPopupPreviewView, popupWidth, popupHeight, false);
-                mPopupWindow.setTouchable(false);
-                mPopupWindow.setOutsideTouchable(false);
-                mPopupWindow.setClippingEnabled(false);
-                mPopupWindow.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
-                mPopupX = popupX;
-                mPopupY = popupY;
-                mPopupWidth = popupWidth;
-                mPopupHeight = popupHeight;
-            }
-            if (mPopupWindow.isShowing()) {
-                if (popupX != mPopupX || popupY != mPopupY
-                        || popupWidth != mPopupWidth || popupHeight != mPopupHeight) {
-                    mPopupWindow.update(popupX, popupY, popupWidth, popupHeight, false);
-                    mPopupX = popupX;
-                    mPopupY = popupY;
-                    mPopupWidth = popupWidth;
-                    mPopupHeight = popupHeight;
-                }
-            } else {
-                mPopupWindow.setWidth(popupWidth);
-                mPopupWindow.setHeight(popupHeight);
-                mPopupWindow.showAtLocation(rootView, Gravity.NO_GRAVITY, popupX, popupY);
-            }
-            return true;
-        } catch (final RuntimeException e) {
-            dismissFloatingPreviewPopup();
-            return false;
-        }
-    }
-
-    private void dismissFloatingPreviewPopup() {
-        mDrawInPopup = false;
-        if (mPopupWindow != null) {
-            mPopupWindow.dismiss();
-            mPopupWindow = null;
-        }
-    }
-
-    private static boolean isPreviewRenderModeOff() {
-        return Settings.PREVIEW_RENDER_MODE_OFF.equals(getPreviewRenderMode());
-    }
-
-    private static String getPreviewRenderMode() {
-        final String renderMode = Settings.getValues().mPreviewRenderMode;
-        if (Settings.PREVIEW_RENDER_MODE_DIRECT.equals(renderMode)
-                || Settings.PREVIEW_RENDER_MODE_OFF.equals(renderMode)) {
-            return renderMode;
-        }
-        return Settings.PREVIEW_RENDER_MODE_POPUP;
-    }
 
     private static int getFloatingPreviewBackgroundColor(final int themeColor) {
         final int opaqueThemeColor = Color.rgb(
@@ -398,52 +266,5 @@ public class GestureFloatingTextDrawingPreview extends AbstractDrawingPreview {
         final int blue = Color.blue(color);
         final double brightness = red * red * 0.241 + green * green * 0.691 + blue * blue * 0.068;
         return brightness >= 180.0 * 180.0;
-    }
-
-    private final class FloatingPreviewPopupView extends View {
-        private final RectF mPopupPreviewRectangle = new RectF();
-        private final Rect mPopupPreviewDirtyBounds = new Rect();
-        private float mTextX;
-        private float mTextY;
-
-        FloatingPreviewPopupView(final android.content.Context context) {
-            super(context);
-        }
-
-        void setPreviewGeometry(@NonNull final RectF previewRectangle, final float textX,
-                final float textY, final int previewOffsetX, final int previewOffsetY,
-                final int dirtyPadding) {
-            invalidatePreviewBounds();
-            mPopupPreviewRectangle.set(
-                    previewRectangle.left + previewOffsetX,
-                    previewRectangle.top + previewOffsetY,
-                    previewRectangle.right + previewOffsetX,
-                    previewRectangle.bottom + previewOffsetY);
-            mTextX = textX + previewOffsetX;
-            mTextY = textY + previewOffsetY;
-            mPopupPreviewDirtyBounds.set(
-                    (int)Math.floor(mPopupPreviewRectangle.left) - dirtyPadding,
-                    (int)Math.floor(mPopupPreviewRectangle.top) - dirtyPadding,
-                    (int)Math.ceil(mPopupPreviewRectangle.right) + dirtyPadding,
-                    (int)Math.ceil(mPopupPreviewRectangle.bottom) + dirtyPadding);
-            invalidatePreviewBounds();
-        }
-
-        private void invalidatePreviewBounds() {
-            if (mPopupPreviewDirtyBounds.isEmpty()) {
-                return;
-            }
-            invalidate(mPopupPreviewDirtyBounds.left, mPopupPreviewDirtyBounds.top,
-                    mPopupPreviewDirtyBounds.right, mPopupPreviewDirtyBounds.bottom);
-        }
-
-        @Override
-        protected void onDraw(final Canvas canvas) {
-            super.onDraw(canvas);
-            if (mSuggestedWords.isEmpty() || TextUtils.isEmpty(mSuggestedWords.getWord(0))) {
-                return;
-            }
-            drawStyledPreview(canvas, mPopupPreviewRectangle, mTextX, mTextY);
-        }
     }
 }

@@ -87,10 +87,7 @@ public final class Settings implements SharedPreferences.OnSharedPreferenceChang
     public static final String PREF_FROSTED_DUST_ALPHA_NIGHT = "pref_frosted_dust_alpha_night";
     public static final String PREF_FROSTED_GLASS_TRIGGER = "frosted_glass_trigger";
     public static final String PREF_BLUR_RENDER_OVERRIDE = "blur_render_override";
-    public static final String PREF_PREVIEW_RENDER_MODE = "preview_render_mode";
-    public static final String PREVIEW_RENDER_MODE_POPUP = "popup";
-    public static final String PREVIEW_RENDER_MODE_DIRECT = "direct";
-    public static final String PREVIEW_RENDER_MODE_OFF = "off";
+    public static final String PREF_NATIVE_BACKGROUND_BLUR_ONLY = "native_background_blur_only";
 
     public static final String PREF_CUSTOM_ICON_NAMES = "custom_icon_names";
     public static final String PREF_TOOLBAR_CUSTOM_KEY_CODES = "toolbar_custom_key_codes";
@@ -131,6 +128,8 @@ public final class Settings implements SharedPreferences.OnSharedPreferenceChang
     public static final int KEYBOARD_CORNER_RADIUS_MAX_DP = 32;
     public static final String PREF_SPLIT_SPACER_SCALE_PREFIX = "split_spacer_scale";
     public static final String PREF_KEYBOARD_HEIGHT_SCALE_PREFIX = "keyboard_height_scale";
+    public static final float KEYBOARD_HEIGHT_SCALE_MIN = 0.3f;
+    public static final float KEYBOARD_HEIGHT_SCALE_MAX = 1.5f;
     public static final String PREF_BOTTOM_ROW_SCALE_PREFIX = "bottom_row_scale";
     public static final String PREF_BOTTOM_PADDING_SCALE_PREFIX = "bottom_padding_scale";
     public static final String PREF_SIDE_PADDING_SCALE_PREFIX = "side_padding_scale";
@@ -276,6 +275,7 @@ public final class Settings implements SharedPreferences.OnSharedPreferenceChang
         add(PREF_FROSTED_DUST_ALPHA_NIGHT);
         add(PREF_FROSTED_GLASS_TRIGGER);
         add(PREF_BLUR_RENDER_OVERRIDE);
+        add(PREF_NATIVE_BACKGROUND_BLUR_ONLY);
         add(PREF_ADAPTIVE_METADATA);
         add(PREF_FAST_ROW_CACHE);
         add(PREF_FAST_ROW_LAST_REFRESH);
@@ -521,6 +521,27 @@ public final class Settings implements SharedPreferences.OnSharedPreferenceChang
         final Float[] defaults = Defaults.PREF_KEYBOARD_HEIGHT_SCALE;
         final float defaultValue = defaults[index];
         return prefs.getFloat(SettingsKt.createPrefKeyForBooleanSettings(PREF_KEYBOARD_HEIGHT_SCALE_PREFIX, index, 2), defaultValue);
+    }
+
+    public void writeHeightScale(float scale) {
+        final boolean landscape = mSettingsValues.mDisplayOrientation == Configuration.ORIENTATION_LANDSCAPE;
+        final boolean folded = FoldableUtils.INSTANCE.isFolded();
+        int index = SettingsKt.findIndexOfDefaultSetting(landscape, folded);
+        String key = SettingsKt.createPrefKeyForBooleanSettings(PREF_KEYBOARD_HEIGHT_SCALE_PREFIX, index, 2);
+        float clampedScale = Math.max(KEYBOARD_HEIGHT_SCALE_MIN, Math.min(scale, KEYBOARD_HEIGHT_SCALE_MAX));
+        if (clampedScale == Defaults.PREF_KEYBOARD_HEIGHT_SCALE[index]) {
+            mPrefs.edit().remove(key).apply();
+        } else {
+            mPrefs.edit().putFloat(key, clampedScale).apply();
+        }
+    }
+
+    public void resetHeightScale() {
+        final boolean landscape = mSettingsValues.mDisplayOrientation == Configuration.ORIENTATION_LANDSCAPE;
+        final boolean folded = FoldableUtils.INSTANCE.isFolded();
+        int index = SettingsKt.findIndexOfDefaultSetting(landscape, folded);
+        String key = SettingsKt.createPrefKeyForBooleanSettings(PREF_KEYBOARD_HEIGHT_SCALE_PREFIX, index, 2);
+        mPrefs.edit().remove(key).apply();
     }
 
     public static float readBottomRowScale(SharedPreferences prefs, boolean landscape, boolean folded) {

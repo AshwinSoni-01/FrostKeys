@@ -151,7 +151,8 @@ class AccessPointMenuView @JvmOverloads constructor(
                     code != helium314.keyboard.keyboard.internal.keyboard_parser.floris.KeyCode.EMOJI &&
                     code != helium314.keyboard.keyboard.internal.keyboard_parser.floris.KeyCode.NUMPAD &&
                     code != helium314.keyboard.keyboard.internal.keyboard_parser.floris.KeyCode.GIFS &&
-                    code != helium314.keyboard.keyboard.internal.keyboard_parser.floris.KeyCode.STICKERS) {
+                    code != helium314.keyboard.keyboard.internal.keyboard_parser.floris.KeyCode.STICKERS &&
+                    code != helium314.keyboard.keyboard.internal.keyboard_parser.floris.KeyCode.RESIZE_KEYBOARD) {
                     KeyboardSwitcher.getInstance().setAlphabetKeyboard()
                 }
             }

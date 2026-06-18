@@ -268,9 +268,9 @@ fun createAppearanceSettings(context: Context) = listOf(
             baseKey = setting.key,
             dimensions = listOf(stringResource(R.string.landscape), stringResource(R.string.folded)),
             defaults = Defaults.PREF_KEYBOARD_HEIGHT_SCALE,
-            range = 0.3f..1.5f,
+            range = Settings.KEYBOARD_HEIGHT_SCALE_MIN..Settings.KEYBOARD_HEIGHT_SCALE_MAX,
             description = { "${(100 * it).toInt()}%" }
-        ) { KeyboardSwitcher.getInstance().setThemeNeedsReload() }
+        ) { KeyboardSwitcher.getInstance().onKeyboardHeightScaleChanged() }
     },
     Setting(context, Settings.PREF_BOTTOM_ROW_SCALE_PREFIX, R.string.prefs_bottom_row_scale) { setting ->
         KeyboardScalePreference(

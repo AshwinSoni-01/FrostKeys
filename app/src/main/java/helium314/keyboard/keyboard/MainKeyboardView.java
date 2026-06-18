@@ -63,7 +63,6 @@ import helium314.keyboard.latin.settings.Settings;
 import helium314.keyboard.latin.utils.KtxKt;
 import helium314.keyboard.latin.utils.LanguageOnSpacebarUtils;
 import helium314.keyboard.latin.utils.Log;
-import helium314.keyboard.latin.utils.TextCommitDiagnostics;
 import helium314.keyboard.latin.utils.TypefaceUtils;
 
 import java.util.ArrayList;
@@ -290,16 +289,6 @@ public final class MainKeyboardView extends KeyboardView implements DrawingProxy
     public void setKeyboardActionListener(final KeyboardActionListener listener) {
         mKeyboardActionListener = listener;
         PointerTracker.setKeyboardActionListener(listener);
-        TextCommitDiagnostics.stage("MainKeyboardView.setKeyboardActionListener",
-                "listener=" + TextCommitDiagnostics.listenerName(listener));
-    }
-
-    public boolean isKeyboardActionListener(final KeyboardActionListener listener) {
-        return mKeyboardActionListener == listener;
-    }
-
-    public String getKeyboardActionListenerNameForDebug() {
-        return TextCommitDiagnostics.listenerName(mKeyboardActionListener);
     }
 
     // TODO: We should reconsider which coordinate system should be used to represent keyboard event.
@@ -356,11 +345,7 @@ public final class MainKeyboardView extends KeyboardView implements DrawingProxy
             } else {
                 mAccessibilityDelegate = null;
             }
-            if (requestLayout) {
-                warmUpKeyPreviewLayerSoon();
-            } else {
-                locatePreviewPlacerView();
-            }
+            locatePreviewPlacerView();
         } finally {
             Trace.endSection();
         }
@@ -467,7 +452,7 @@ public final class MainKeyboardView extends KeyboardView implements DrawingProxy
         try {
             getLocationInWindow(mOriginCoords);
             mKeyPreviewChoreographer.placeAndShowKeyPreview(key, getKeyboard().mIconsSet, getKeyDrawParams(),
-                    getPreviewPopupBoundsWidth(), mOriginCoords, mDrawingPreviewPlacerView, this);
+                    getPreviewPopupBoundsWidth(), mOriginCoords, mDrawingPreviewPlacerView);
         } finally {
             Trace.endSection();
         }
@@ -575,29 +560,15 @@ public final class MainKeyboardView extends KeyboardView implements DrawingProxy
     protected void onAttachedToWindow() {
         super.onAttachedToWindow();
         installPreviewPlacerView();
-        warmUpKeyPreviewLayerSoon();
+        locatePreviewPlacerView();
     }
 
     @Override
     protected void onSizeChanged(final int w, final int h, final int oldw, final int oldh) {
         super.onSizeChanged(w, h, oldw, oldh);
         if ((w != oldw || h != oldh) && w > 0 && h > 0) {
-            warmUpKeyPreviewLayerSoon();
-        }
-    }
-
-    private void warmUpKeyPreviewLayerSoon() {
-        if (!mKeyPreviewDrawParams.isPopupEnabled()) {
-            return;
-        }
-        post(() -> {
-            if (!isAttachedToWindow() || getWidth() <= 0 || getHeight() <= 0
-                    || !mKeyPreviewDrawParams.isPopupEnabled()) {
-                return;
-            }
             locatePreviewPlacerView();
-            mKeyPreviewChoreographer.warmUpPreviewLayer(this);
-        });
+        }
     }
 
     @Override

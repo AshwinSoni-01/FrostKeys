@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <item name="keyboard_resize_overlay" type="id" />
+    <item name="keyboard_contents" type="id" />
+    <item name="keyboard_visual_contents" type="id" />
+</resources>

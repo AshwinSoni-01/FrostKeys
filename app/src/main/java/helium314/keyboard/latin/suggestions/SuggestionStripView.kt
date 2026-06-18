@@ -609,15 +609,8 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
         val toolbarMode = Settings.getValues().mToolbarMode
         val allowPinnedKeys = toolbarMode == ToolbarMode.EXPANDABLE || toolbarMode == ToolbarMode.TOOLBAR_KEYS
         val allowSuggestions = toolbarMode == ToolbarMode.EXPANDABLE || toolbarMode == ToolbarMode.SUGGESTION_STRIP
-        val isFieldEmpty = isTextFieldEmpty()
-        val showPinnedKeysForEmptyField = showSuggestions &&
-                allowPinnedKeys &&
-                !isExternalSuggestionVisible &&
-                isFieldEmpty &&
-                pinnedKeys.childCount > 0
         val showSuggestionContent = showSuggestions && allowSuggestions &&
-                !showPinnedKeysForEmptyField &&
-                (isExternalSuggestionVisible || !isFieldEmpty || shouldShowSuggestionContent())
+                (isExternalSuggestionVisible || shouldShowSuggestionContent())
         val showChips = showSuggestionContent && !isExternalSuggestionVisible && shouldUseChipSuggestions()
         suggestionsStrip.isVisible = showSuggestionContent && !showChips
         suggestionsChipScroll.isVisible = showChips
@@ -931,23 +924,6 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
         applyAlphabetIconTint(accessPointTriggerBtn, colors)
         applySuggestionStripButtonIconSizing(accessPointTriggerBtn)
         updateSuggestionContainersVisibility(true)
-    }
-
-    private fun isTextFieldEmpty(): Boolean {
-        val ime = getLatinIME() ?: return true
-        val connection = ime.currentInputConnection ?: return true
-        val before = connection.getTextBeforeCursor(1, 0)
-        val after = connection.getTextAfterCursor(1, 0)
-        return (before == null || before.isEmpty()) && (after == null || after.isEmpty())
-    }
-
-    private fun getLatinIME(): helium314.keyboard.latin.LatinIME? {
-        var ctx = context
-        while (ctx is android.content.ContextWrapper) {
-            if (ctx is helium314.keyboard.latin.LatinIME) return ctx
-            ctx = ctx.baseContext
-        }
-        return ctx as? helium314.keyboard.latin.LatinIME
     }
 
     companion object {

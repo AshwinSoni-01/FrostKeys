@@ -73,7 +73,6 @@ import helium314.keyboard.latin.common.InputPointers;
 import helium314.keyboard.latin.common.ViewOutlineProviderUtilsKt;
 import helium314.keyboard.latin.define.DebugFlags;
 import helium314.keyboard.latin.inputlogic.InputLogic;
-import helium314.keyboard.latin.settings.DebugSettings;
 import helium314.keyboard.latin.personalization.PersonalizationHelper;
 import helium314.keyboard.latin.settings.Settings;
 import helium314.keyboard.latin.settings.SettingsValues;
@@ -95,7 +94,6 @@ import helium314.keyboard.latin.utils.StatsUtils;
 import helium314.keyboard.latin.utils.StatsUtilsManager;
 import helium314.keyboard.latin.utils.SubtypeLocaleUtils;
 import helium314.keyboard.latin.utils.SubtypeSettings;
-import helium314.keyboard.latin.utils.TextCommitDiagnostics;
 import helium314.keyboard.latin.utils.SubtypeState;
 import helium314.keyboard.latin.utils.ToolbarMode;
 import helium314.keyboard.settings.SettingsActivity2;
@@ -138,7 +136,6 @@ public class LatinIME extends InputMethodService implements
     private static final int PENDING_IMS_CALLBACK_DURATION_MILLIS = 800;
     static final long DELAY_WAIT_FOR_DICTIONARY_LOAD_MILLIS = TimeUnit.SECONDS.toMillis(2);
     static final long DELAY_DEALLOCATE_MEMORY_MILLIS = TimeUnit.SECONDS.toMillis(10);
-
 
     /**
      * The name of the scheme used by the Package Manager to warn of a new package
@@ -266,7 +263,7 @@ public class LatinIME extends InputMethodService implements
             switch (msg.what) {
                 case MSG_UPDATE_SUGGESTION_STRIP:
                     cancelUpdateSuggestionStrip();
-                    latinIme.mInputLogic.performUpdateSuggestionStrip(
+                    latinIme.mInputLogic.performUpdateSuggestionStripSync(
                             latinIme.mSettings.getCurrent(), msg.arg1 /* inputStyle */);
                     break;
                 case MSG_UPDATE_SHIFT_STATE:
@@ -323,7 +320,6 @@ public class LatinIME extends InputMethodService implements
         }
 
         public void postUpdateSuggestionStrip(final int inputStyle) {
-            cancelUpdateSuggestionStrip();
             sendMessageDelayed(obtainMessage(MSG_UPDATE_SUGGESTION_STRIP, inputStyle,
                     0 /* ignored */), mDelayInMillisecondsToUpdateSuggestions);
         }
@@ -1259,9 +1255,6 @@ public class LatinIME extends InputMethodService implements
         if (DebugFlags.DEBUG_ENABLED) {
             EditorInfoCompatUtils.INSTANCE.debugLog(editorInfo, TAG);
         }
-        TextCommitDiagnostics.lifecycle("onStartInputView", editorInfo, currentSettingsValues,
-                mKeyboardSwitcher.isKlipySearchModeActive(), mKeyboardSwitcher.isEmojiSearchModeActive());
-        mKeyboardSwitcher.logTypingListenerInvariant("LatinIME.onStartInputView", true /* logWhenOk */);
 
         // In landscape mode, this method gets called without the input view being
         // created.
@@ -1404,8 +1397,6 @@ public class LatinIME extends InputMethodService implements
     public void onWindowHidden() {
         super.onWindowHidden();
         Log.i(TAG, "onWindowHidden");
-        TextCommitDiagnostics.lifecycle("onWindowHidden", getCurrentInputEditorInfo(), mSettings.getCurrent(),
-                mKeyboardSwitcher.isKlipySearchModeActive(), mKeyboardSwitcher.isEmojiSearchModeActive());
 
         mKeyboardSwitcher.clearCachedPersistentEmojis();
 
@@ -1424,14 +1415,11 @@ public class LatinIME extends InputMethodService implements
         // Reset to the main alphabet keyboard so that reopening always shows the ABC view
         // instead of whatever panel (emoji, clipboard, AI tools, klipy) was active.
         mKeyboardSwitcher.setAlphabetKeyboard();
-        mKeyboardSwitcher.logTypingListenerInvariant("LatinIME.onWindowHidden", true /* logWhenOk */);
     }
 
     void onFinishInputInternal() {
         super.onFinishInput();
         Log.i(TAG, "onFinishInput");
-        TextCommitDiagnostics.lifecycle("onFinishInput", getCurrentInputEditorInfo(), mSettings.getCurrent(),
-                mKeyboardSwitcher.isKlipySearchModeActive(), mKeyboardSwitcher.isEmojiSearchModeActive());
 
         mDictionaryFacilitator.onFinishInput();
         final MainKeyboardView mainKeyboardView = mKeyboardSwitcher.getMainKeyboardView();
@@ -1443,10 +1431,7 @@ public class LatinIME extends InputMethodService implements
     void onFinishInputViewInternal(final boolean finishingInput) {
         super.onFinishInputView(finishingInput);
         Log.i(TAG, "onFinishInputView");
-        TextCommitDiagnostics.lifecycle("onFinishInputView", getCurrentInputEditorInfo(), mSettings.getCurrent(),
-                mKeyboardSwitcher.isKlipySearchModeActive(), mKeyboardSwitcher.isEmojiSearchModeActive());
         cleanupInternalStateForFinishInput();
-        mKeyboardSwitcher.logTypingListenerInvariant("LatinIME.onFinishInputView", true /* logWhenOk */);
     }
 
     private void cleanupInternalStateForFinishInput() {
@@ -1457,6 +1442,7 @@ public class LatinIME extends InputMethodService implements
         mInputLogic.finishInput();
         mKeyboardActionListener.resetMetaState();
     }
+
     protected void deallocateMemory() {
         mKeyboardSwitcher.deallocateMemory();
     }
@@ -1465,15 +1451,9 @@ public class LatinIME extends InputMethodService implements
     public void onUpdateSelection(final int oldSelStart, final int oldSelEnd,
             final int newSelStart, final int newSelEnd,
             final int composingSpanStart, final int composingSpanEnd) {
-        if (mInputLogic.mConnection.maybeAcceptKnownLagSelectionUpdate(oldSelStart, newSelStart, oldSelEnd, newSelEnd, composingSpanStart, composingSpanEnd)) {
-            mInputLogic.mConnection.onSelectionUpdateReceived(newSelStart, newSelEnd);
-            return;
-        }
-        mInputLogic.mConnection.onSelectionUpdateReceived(newSelStart, newSelEnd);
         super.onUpdateSelection(oldSelStart, oldSelEnd, newSelStart, newSelEnd,
                 composingSpanStart, composingSpanEnd);
-        if (DebugFlags.DEBUG_ENABLED
-                && !mInputLogic.mConnection.shouldAvoidEditorRoundTripsForTyping()) {
+        if (DebugFlags.DEBUG_ENABLED) {
             Log.i(TAG, "onUpdateSelection: oss=" + oldSelStart + ", ose=" + oldSelEnd
                     + ", nss=" + newSelStart + ", nse=" + newSelEnd
                     + ", cs=" + composingSpanStart + ", ce=" + composingSpanEnd);
@@ -1481,9 +1461,6 @@ public class LatinIME extends InputMethodService implements
 
         // This call happens whether our view is displayed or not, but if it's not then
         final SettingsValues settingsValues = mSettings.getCurrent();
-        TextCommitDiagnostics.updateSelection(oldSelStart, oldSelEnd, newSelStart, newSelEnd,
-                composingSpanStart, composingSpanEnd, getCurrentInputEditorInfo(), settingsValues,
-                mKeyboardSwitcher.isKlipySearchModeActive(), mKeyboardSwitcher.isEmojiSearchModeActive());
         if (isInputViewShown()
                 && mInputLogic.onUpdateSelection(oldSelStart, oldSelEnd, newSelStart, newSelEnd,
                         composingSpanStart, composingSpanEnd, settingsValues)) {
@@ -1540,9 +1517,6 @@ public class LatinIME extends InputMethodService implements
 
     @Override
     public void onViewClicked(final boolean focusChanged) {
-        TextCommitDiagnostics.lifecycle("onViewClicked focusChanged=" + focusChanged,
-                getCurrentInputEditorInfo(), mSettings.getCurrent(),
-                mKeyboardSwitcher.isKlipySearchModeActive(), mKeyboardSwitcher.isEmojiSearchModeActive());
         exitEmojiSearchModeFromAppClick();
         super.onViewClicked(focusChanged);
     }
@@ -1834,184 +1808,57 @@ public class LatinIME extends InputMethodService implements
     // should
     // completely replace #onCodeInput.
     public void onEvent(@NonNull final Event event) {
-        final long diagnosticStart = TextCommitDiagnostics.startOperation();
-        TextCommitDiagnostics.stage("LatinIME.onEvent",
-                "eventKind=" + TextCommitDiagnostics.eventKind(event) + " "
-                        + TextCommitDiagnostics.metadata(getCurrentInputEditorInfo(), mSettings.getCurrent(),
-                                mKeyboardSwitcher.isKlipySearchModeActive(), mKeyboardSwitcher.isEmojiSearchModeActive()));
-        try {
-            if (event.getKeyCode() == KeyCode.ALPHA) {
-                final KeyboardSwitcher switcher = KeyboardSwitcher.getInstance();
-                if (switcher.isShowingEmojiPalettes() || switcher.isShowingKlipyPalettes()
-                        || switcher.isShowingClipboardHistory() || switcher.isShowingAiWritingTools()) {
-                    switcher.setAlphabetKeyboard();
-                    return;
-                }
-            }
-            if (KeyCode.VOICE_INPUT == event.getKeyCode()) {
-                mRichImm.switchToShortcutIme(this);
-            }
-            if (event.getKeyCode() == KeyCode.AI_TOOLS || event.getKeyCode() == -214) {
-                KeyboardSwitcher.getInstance().onToggleKeyboard(KeyboardSwitcher.KeyboardSwitchState.AI_TOOLS);
+        if (event.getKeyCode() == KeyCode.ALPHA) {
+            final KeyboardSwitcher switcher = KeyboardSwitcher.getInstance();
+            if (switcher.isShowingEmojiPalettes() || switcher.isShowingKlipyPalettes()
+                    || switcher.isShowingClipboardHistory() || switcher.isShowingAiWritingTools()) {
+                switcher.setAlphabetKeyboard();
                 return;
             }
-            if (event.getKeyCode() == KeyCode.GIFS) {
-                final KeyboardSwitcher switcher = KeyboardSwitcher.getInstance();
-                if (!switcher.isShowingKlipyPalettes()) {
-                    switcher.onToggleKeyboard(KeyboardSwitcher.KeyboardSwitchState.KLIPY);
-                }
-                if (switcher.isShowingKlipyPalettes()) {
-                    switcher.getKlipyPalettesView().selectTab("GIF");
-                }
-                return;
-            }
-            if (event.getKeyCode() == KeyCode.STICKERS) {
-                final KeyboardSwitcher switcher = KeyboardSwitcher.getInstance();
-                if (!switcher.isShowingKlipyPalettes()) {
-                    switcher.onToggleKeyboard(KeyboardSwitcher.KeyboardSwitchState.KLIPY);
-                }
-                if (switcher.isShowingKlipyPalettes()) {
-                    switcher.getKlipyPalettesView().selectTab("STICKER");
-                }
-                return;
-            }
-            final boolean skipBatchEdit = shouldSkipTextCommitBatchEditForCurrentEditor(event);
-            final boolean combineWordAndSeparatorCommit =
-                    shouldCombineWordAndSeparatorCommitForCurrentEditor(event);
-            final boolean rawTextCommit = shouldRawTextCommitForCurrentEditor(event);
-            final boolean shadowTextCommit = shouldShadowTextCommitForCurrentEditor(event);
-            final InputTransaction completeInputTransaction = mInputLogic.onCodeInput(mSettings.getCurrent(), event,
-                    mKeyboardSwitcher.getKeyboardShiftMode(),
-                    mKeyboardSwitcher.getCurrentKeyboardScript(), mHandler, skipBatchEdit,
-                    combineWordAndSeparatorCommit, rawTextCommit, shadowTextCommit);
-            updateStateAfterInputTransaction(completeInputTransaction);
-            mKeyboardSwitcher.onEvent(event, getCurrentAutoCapsState(), getCurrentRecapitalizeState());
-        } finally {
-            TextCommitDiagnostics.duration("LatinIME.onEvent", diagnosticStart,
-                    "eventKind=" + TextCommitDiagnostics.eventKind(event));
         }
+        if (KeyCode.VOICE_INPUT == event.getKeyCode()) {
+            mRichImm.switchToShortcutIme(this);
+        }
+        if (event.getKeyCode() == KeyCode.AI_TOOLS || event.getKeyCode() == -214) {
+            KeyboardSwitcher.getInstance().onToggleKeyboard(KeyboardSwitcher.KeyboardSwitchState.AI_TOOLS);
+            return;
+        }
+        if (event.getKeyCode() == KeyCode.GIFS) {
+            final KeyboardSwitcher switcher = KeyboardSwitcher.getInstance();
+            if (!switcher.isShowingKlipyPalettes()) {
+                switcher.onToggleKeyboard(KeyboardSwitcher.KeyboardSwitchState.KLIPY);
+            }
+            if (switcher.isShowingKlipyPalettes()) {
+                switcher.getKlipyPalettesView().selectTab("GIF");
+            }
+            return;
+        }
+        if (event.getKeyCode() == KeyCode.STICKERS) {
+            final KeyboardSwitcher switcher = KeyboardSwitcher.getInstance();
+            if (!switcher.isShowingKlipyPalettes()) {
+                switcher.onToggleKeyboard(KeyboardSwitcher.KeyboardSwitchState.KLIPY);
+            }
+            if (switcher.isShowingKlipyPalettes()) {
+                switcher.getKlipyPalettesView().selectTab("STICKER");
+            }
+            return;
+        }
+        final InputTransaction completeInputTransaction = mInputLogic.onCodeInput(mSettings.getCurrent(), event,
+                mKeyboardSwitcher.getKeyboardShiftMode(),
+                mKeyboardSwitcher.getCurrentKeyboardScript(), mHandler);
+        updateStateAfterInputTransaction(completeInputTransaction);
+        mKeyboardSwitcher.onEvent(event, getCurrentAutoCapsState(), getCurrentRecapitalizeState());
     }
 
     public void onTextInput(final String rawText) {
-        final long diagnosticStart = TextCommitDiagnostics.startOperation();
-        final long generatedSequence = TextCommitDiagnostics.currentSequence() < 0
-                ? TextCommitDiagnostics.beginGeneratedTextDispatch(
-                        rawText == null ? 0 : rawText.length(), "LatinIME.onTextInput")
-                : -1L;
-        TextCommitDiagnostics.stage("LatinIME.onTextInput",
-                "textLength=" + (rawText == null ? 0 : rawText.length()) + " "
-                        + TextCommitDiagnostics.metadata(getCurrentInputEditorInfo(), mSettings.getCurrent(),
-                                mKeyboardSwitcher.isKlipySearchModeActive(), mKeyboardSwitcher.isEmojiSearchModeActive()));
-        try {
-            // TODO: have the keyboard pass the correct key code when we need it.
-            final Event event = Event.createSoftwareTextEvent(rawText, KeyCode.MULTIPLE_CODE_POINTS, null);
-            final boolean skipBatchEdit = shouldSkipTextCommitBatchEditForCurrentEditor(null);
-            final InputTransaction completeInputTransaction = mInputLogic.onTextInput(mSettings.getCurrent(), event,
-                    mKeyboardSwitcher.getKeyboardShiftMode(), mHandler, skipBatchEdit);
-            updateStateAfterInputTransaction(completeInputTransaction);
-            mInputLogic.restartSuggestionsOnWordTouchedByCursor(mSettings.getCurrent(),
-                    mKeyboardSwitcher.getCurrentKeyboardScript());
-            mKeyboardSwitcher.onEvent(event, getCurrentAutoCapsState(), getCurrentRecapitalizeState());
-        } finally {
-            TextCommitDiagnostics.duration("LatinIME.onTextInput", diagnosticStart,
-                    "textLength=" + (rawText == null ? 0 : rawText.length()));
-            TextCommitDiagnostics.clearCurrentSequence(generatedSequence);
-        }
-    }
-
-    private boolean shouldSkipTextCommitBatchEditForCurrentEditor(@Nullable final Event event) {
-        final EditorInfo editorInfo = getCurrentInputEditorInfo();
-        if (!shouldUseBatchlessTextCommitForCurrentEditor(
-                DebugFlags.TEXT_COMMIT_EXPERIMENT_MODE, editorInfo)) {
-            return false;
-        }
-        return event == null || (!event.isFunctionalKeyEvent()
-                && !event.isSuggestionStripPress() && !event.isGesture());
-    }
-
-    private boolean shouldCombineWordAndSeparatorCommitForCurrentEditor(@Nullable final Event event) {
-        if (!DebugSettings.TEXT_COMMIT_EXPERIMENT_MODE_TELEGRAM_NO_BATCH_COMBINED_SEPARATOR.equals(
-                DebugFlags.TEXT_COMMIT_EXPERIMENT_MODE)) {
-            return false;
-        }
-        final EditorInfo editorInfo = getCurrentInputEditorInfo();
-        if (editorInfo == null || !RichInputConnection.isTelegramPackage(editorInfo.packageName)) {
-            return false;
-        }
-        return event != null && !event.isFunctionalKeyEvent()
-                && !event.isSuggestionStripPress() && !event.isGesture();
-    }
-
-    private boolean shouldRawTextCommitForCurrentEditor(@Nullable final Event event) {
-        if (!mInputLogic.mConnection.shouldUseRawTextCommitForCurrentEditor()) {
-            return false;
-        }
-        return event != null && !event.isFunctionalKeyEvent()
-                && !event.isSuggestionStripPress() && !event.isGesture()
-                && event.getCodePoint() != Constants.CODE_ENTER;
-    }
-
-    private boolean shouldShadowTextCommitForCurrentEditor(@Nullable final Event event) {
-        if (!isShadowTextCommitExperimentForCurrentEditor()) {
-            return false;
-        }
-        if (event == null || event.isSuggestionStripPress() || event.isGesture()) {
-            return false;
-        }
-        if (event.getKeyCode() == KeyCode.DELETE) {
-            return true;
-        }
-        return !event.isFunctionalKeyEvent()
-                && event.getCodePoint() != Constants.CODE_ENTER;
-    }
-
-    private boolean shouldShadowSuggestionPickForCurrentEditor() {
-        return isShadowTextCommitExperimentForCurrentEditor();
-    }
-
-    private boolean isShadowTextCommitExperimentForCurrentEditor() {
-        final EditorInfo editorInfo = getCurrentInputEditorInfo();
-        if (editorInfo == null) {
-            return false;
-        }
-        final String mode = DebugFlags.TEXT_COMMIT_EXPERIMENT_MODE;
-        if (DebugSettings.TEXT_COMMIT_EXPERIMENT_MODE_COMPAT_SHADOW_SUGGESTIONS.equals(mode)) {
-            return RichInputConnection.isKnownRawCommitProblemPackage(editorInfo.packageName);
-        }
-        return DebugSettings.TEXT_COMMIT_EXPERIMENT_MODE_TELEGRAM_SHADOW_COMPOSE.equals(mode)
-                && RichInputConnection.isTelegramPackage(editorInfo.packageName);
-    }
-
-    private static boolean isTelegramTextCommitExperimentMode(final String mode) {
-        return DebugSettings.TEXT_COMMIT_EXPERIMENT_MODE_TELEGRAM_NO_BATCH.equals(mode)
-                || DebugSettings.TEXT_COMMIT_EXPERIMENT_MODE_TELEGRAM_NO_BATCH_COMBINED_SEPARATOR.equals(mode)
-                || DebugSettings.TEXT_COMMIT_EXPERIMENT_MODE_TELEGRAM_RAW_COMMIT.equals(mode)
-                || DebugSettings.TEXT_COMMIT_EXPERIMENT_MODE_TELEGRAM_INTERNAL_COMPOSE.equals(mode)
-                || DebugSettings.TEXT_COMMIT_EXPERIMENT_MODE_TELEGRAM_SHADOW_COMPOSE.equals(mode);
-    }
-
-    private static boolean shouldUseBatchlessTextCommitForCurrentEditor(final String mode,
-            @Nullable final EditorInfo editorInfo) {
-        if (editorInfo == null) {
-            return false;
-        }
-        return RichInputConnection.shouldUseKnownLagTextCommitCompatibility(mode, editorInfo);
-    }
-
-    private static boolean shouldUseRawTextCommitForCurrentEditor(final String mode,
-            @Nullable final EditorInfo editorInfo) {
-        if (editorInfo == null) {
-            return false;
-        }
-        if (DebugSettings.TEXT_COMMIT_EXPERIMENT_MODE_RAW_COMMIT_ALL.equals(mode)) {
-            return true;
-        }
-        if (DebugSettings.TEXT_COMMIT_EXPERIMENT_MODE_COMPAT_RAW_COMMIT.equals(mode)) {
-            return RichInputConnection.isKnownRawCommitProblemPackage(editorInfo.packageName);
-        }
-        return (DebugSettings.TEXT_COMMIT_EXPERIMENT_MODE_TELEGRAM_RAW_COMMIT.equals(mode)
-                || DebugSettings.TEXT_COMMIT_EXPERIMENT_MODE_TELEGRAM_SHADOW_COMPOSE.equals(mode))
-                && RichInputConnection.isTelegramPackage(editorInfo.packageName);
+        // TODO: have the keyboard pass the correct key code when we need it.
+        final Event event = Event.createSoftwareTextEvent(rawText, KeyCode.MULTIPLE_CODE_POINTS, null);
+        final InputTransaction completeInputTransaction = mInputLogic.onTextInput(mSettings.getCurrent(), event,
+                mKeyboardSwitcher.getKeyboardShiftMode(), mHandler);
+        updateStateAfterInputTransaction(completeInputTransaction);
+        mInputLogic.restartSuggestionsOnWordTouchedByCursor(mSettings.getCurrent(),
+                mKeyboardSwitcher.getCurrentKeyboardScript());
+        mKeyboardSwitcher.onEvent(event, getCurrentAutoCapsState(), getCurrentRecapitalizeState());
     }
 
     public void onStartBatchInput() {
@@ -2142,8 +1989,7 @@ public class LatinIME extends InputMethodService implements
                 mSettings.getCurrent(), suggestionInfo,
                 mKeyboardSwitcher.getKeyboardShiftMode(),
                 mKeyboardSwitcher.getCurrentKeyboardScript(),
-                mHandler,
-                shouldShadowSuggestionPickForCurrentEditor());
+                mHandler);
         updateStateAfterInputTransaction(completeInputTransaction);
     }
 
@@ -2233,10 +2079,8 @@ public class LatinIME extends InputMethodService implements
      * @param inputTransaction The transaction that has been executed.
      */
     private void updateStateAfterInputTransaction(final InputTransaction inputTransaction) {
-        final long diagnosticStart = TextCommitDiagnostics.startOperation();
         Trace.beginSection("LatinIME#updateStateAfterInput");
         try {
-            mInputLogic.mConnection.flush();
             switch (inputTransaction.getRequiredShiftUpdate()) {
                 case InputTransaction.SHIFT_UPDATE_LATER -> mHandler.postUpdateShiftState();
                 case InputTransaction.SHIFT_UPDATE_NOW -> mKeyboardSwitcher
@@ -2260,9 +2104,6 @@ public class LatinIME extends InputMethodService implements
                 mSubtypeState.setCurrentSubtypeHasBeenUsed();
             }
         } finally {
-            TextCommitDiagnostics.duration("LatinIME.updateStateAfterInput", diagnosticStart,
-                    "affectsContents=" + inputTransaction.didAffectContents()
-                            + " updateSuggestions=" + inputTransaction.requiresUpdateSuggestions());
             Trace.endSection();
         }
     }

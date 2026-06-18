@@ -12,21 +12,6 @@
     <string name="prefs_debug_mode" translatable="false">Debug Mode</string>
     <string name="prefs_show_suggestion_infos" translatable="false">Show suggestion infos</string>
     <string name="prefs_force_non_distinct_multitouch" translatable="false">Force non-distinct multitouch</string>
-    <string name="prefs_text_commit_diagnostics" translatable="false">Text commit latency diagnostics</string>
-    <string name="prefs_text_commit_diagnostics_summary" translatable="false">Log safe timing metadata for key dispatch, InputConnection writes, selection updates, and search focus routing</string>
-    <string name="prefs_text_commit_experiment_mode" translatable="false">Text commit experiment mode</string>
-    <string name="prefs_text_commit_experiment_mode_summary" translatable="false">Try safe app-specific text commit transport experiments while debugging lag</string>
-    <string name="text_commit_experiment_mode_normal_entry" translatable="false">Normal</string>
-    <string name="text_commit_experiment_mode_telegram_no_batch_entry" translatable="false">Telegram: no batch edit</string>
-    <string name="text_commit_experiment_mode_telegram_no_batch_combined_separator_entry" translatable="false">Telegram: no batch + combined space</string>
-    <string name="text_commit_experiment_mode_telegram_raw_commit_entry" translatable="false">Telegram: raw commit text</string>
-    <string name="text_commit_experiment_mode_compat_raw_commit_entry" translatable="false">Known lag apps: raw stable</string>
-    <string name="text_commit_experiment_mode_compat_shadow_suggestions_entry" translatable="false">Known lag apps: shadow suggestions</string>
-    <string name="text_commit_experiment_mode_raw_commit_all_entry" translatable="false">All apps: raw stable</string>
-    <string name="text_commit_experiment_mode_telegram_internal_compose_entry" translatable="false">Telegram: internal composing</string>
-    <string name="text_commit_experiment_mode_compat_internal_compose_entry" translatable="false">Known lag apps: internal composing</string>
-    <string name="text_commit_experiment_mode_internal_compose_all_entry" translatable="false">All apps: internal composing</string>
-    <string name="text_commit_experiment_mode_telegram_shadow_compose_entry" translatable="false">Telegram: shadow suggestions</string>
     <!-- Option to enable sliding key input indicator. The user can see a rubber band-like effect during sliding key input. [CHAR LIMIT=30]-->
     <string name="sliding_key_input_preview" translatable="false">Show slide indicator</string>
     <!-- Option summary to enable sliding key input indicator. The user can see a rubber band-like effect during sliding key input. [CHAR LIMIT=66]-->

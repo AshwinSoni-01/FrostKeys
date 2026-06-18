@@ -42,8 +42,6 @@ fun DebugScreen(
         DebugSettings.PREF_SHOW_SUGGESTION_INFOS,
         DebugSettings.PREF_FORCE_NON_DISTINCT_MULTITOUCH,
         DebugSettings.PREF_SLIDING_KEY_INPUT_PREVIEW,
-        DebugSettings.PREF_TEXT_COMMIT_DIAGNOSTICS,
-        DebugSettings.PREF_TEXT_COMMIT_EXPERIMENT_MODE,
         R.string.prefs_dump_dynamic_dicts
     ) + DictionaryFacilitator.DYNAMIC_DICTIONARY_TYPES.map { DebugSettings.PREF_KEY_DUMP_DICT_PREFIX + it }
     SearchSettingsScreen(
@@ -88,12 +86,7 @@ private fun createDebugSettings(context: Context) = listOf(
             if (!it) {
                 prefs.edit {
                     putBoolean(DebugSettings.PREF_SHOW_SUGGESTION_INFOS, false)
-                    putBoolean(DebugSettings.PREF_TEXT_COMMIT_DIAGNOSTICS, false)
-                    putString(DebugSettings.PREF_TEXT_COMMIT_EXPERIMENT_MODE,
-                        Defaults.PREF_TEXT_COMMIT_EXPERIMENT_MODE)
                 }
-                DebugFlags.setTextCommitDiagnosticsEnabled(false)
-                DebugFlags.setTextCommitExperimentMode(Defaults.PREF_TEXT_COMMIT_EXPERIMENT_MODE)
             }
             needsRestart = true
         }
@@ -106,29 +99,6 @@ private fun createDebugSettings(context: Context) = listOf(
     },
     Setting(context, DebugSettings.PREF_SLIDING_KEY_INPUT_PREVIEW, R.string.sliding_key_input_preview, R.string.sliding_key_input_preview_summary) { def ->
         SwitchPreference(def, Defaults.PREF_SLIDING_KEY_INPUT_PREVIEW)
-    },
-    Setting(context, DebugSettings.PREF_TEXT_COMMIT_DIAGNOSTICS, R.string.prefs_text_commit_diagnostics, R.string.prefs_text_commit_diagnostics_summary) {
-        SwitchPreference(it, Defaults.PREF_TEXT_COMMIT_DIAGNOSTICS) { enabled ->
-            DebugFlags.setTextCommitDiagnosticsEnabled(enabled)
-        }
-    },
-    Setting(context, DebugSettings.PREF_TEXT_COMMIT_EXPERIMENT_MODE, R.string.prefs_text_commit_experiment_mode, R.string.prefs_text_commit_experiment_mode_summary) {
-        val items = listOf(
-            stringResource(R.string.text_commit_experiment_mode_normal_entry) to DebugSettings.TEXT_COMMIT_EXPERIMENT_MODE_NORMAL,
-            stringResource(R.string.text_commit_experiment_mode_telegram_no_batch_entry) to DebugSettings.TEXT_COMMIT_EXPERIMENT_MODE_TELEGRAM_NO_BATCH,
-            stringResource(R.string.text_commit_experiment_mode_telegram_no_batch_combined_separator_entry) to DebugSettings.TEXT_COMMIT_EXPERIMENT_MODE_TELEGRAM_NO_BATCH_COMBINED_SEPARATOR,
-            stringResource(R.string.text_commit_experiment_mode_telegram_raw_commit_entry) to DebugSettings.TEXT_COMMIT_EXPERIMENT_MODE_TELEGRAM_RAW_COMMIT,
-            stringResource(R.string.text_commit_experiment_mode_compat_raw_commit_entry) to DebugSettings.TEXT_COMMIT_EXPERIMENT_MODE_COMPAT_RAW_COMMIT,
-            stringResource(R.string.text_commit_experiment_mode_compat_shadow_suggestions_entry) to DebugSettings.TEXT_COMMIT_EXPERIMENT_MODE_COMPAT_SHADOW_SUGGESTIONS,
-            stringResource(R.string.text_commit_experiment_mode_raw_commit_all_entry) to DebugSettings.TEXT_COMMIT_EXPERIMENT_MODE_RAW_COMMIT_ALL,
-            stringResource(R.string.text_commit_experiment_mode_telegram_internal_compose_entry) to DebugSettings.TEXT_COMMIT_EXPERIMENT_MODE_TELEGRAM_INTERNAL_COMPOSE,
-            stringResource(R.string.text_commit_experiment_mode_compat_internal_compose_entry) to DebugSettings.TEXT_COMMIT_EXPERIMENT_MODE_COMPAT_INTERNAL_COMPOSE,
-            stringResource(R.string.text_commit_experiment_mode_internal_compose_all_entry) to DebugSettings.TEXT_COMMIT_EXPERIMENT_MODE_INTERNAL_COMPOSE_ALL,
-            stringResource(R.string.text_commit_experiment_mode_telegram_shadow_compose_entry) to DebugSettings.TEXT_COMMIT_EXPERIMENT_MODE_TELEGRAM_SHADOW_COMPOSE
-        )
-        ListPreference(it, items, Defaults.PREF_TEXT_COMMIT_EXPERIMENT_MODE) { mode ->
-            DebugFlags.setTextCommitExperimentMode(mode)
-        }
     },
 ) + DictionaryFacilitator.DYNAMIC_DICTIONARY_TYPES.map { type ->
     Setting(context, DebugSettings.PREF_KEY_DUMP_DICT_PREFIX + type, R.string.button_default) {

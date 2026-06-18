@@ -59,7 +59,6 @@ import helium314.keyboard.latin.settings.Defaults
 import helium314.keyboard.latin.settings.Settings
 import helium314.keyboard.latin.stickers.AnimatedStickerProcessor
 import helium314.keyboard.latin.utils.Log
-import helium314.keyboard.latin.utils.TextCommitDiagnostics
 import helium314.keyboard.latin.utils.dpToPx
 import helium314.keyboard.latin.utils.prefs
 import kotlinx.coroutines.*
@@ -217,7 +216,6 @@ class KlipyPalettesView @JvmOverloads constructor(
         editorInfo: EditorInfo,
         keyboardActionListener: KeyboardActionListener
     ) {
-        TextCommitDiagnostics.stage("KlipySearch.startKlipyPalettes", "searchMode=$isSearchMode")
         ensureViewScopeActive()
         ensureStickerProcessorDispatcherActive()
         this.keyboardActionListener = keyboardActionListener
@@ -250,7 +248,6 @@ class KlipyPalettesView @JvmOverloads constructor(
     }
 
     fun stopKlipyPalettes() {
-        TextCommitDiagnostics.stage("KlipySearch.stopKlipyPalettes", "searchMode=$isSearchMode")
         searchJob?.cancel()
         searchJob = null
         inFlightStickerJobs.values.forEach { it.cancel() }
@@ -1716,7 +1713,6 @@ class KlipyPalettesView @JvmOverloads constructor(
     }
 
     private fun enterSearchMode(moveCursorToEnd: Boolean = true) {
-        TextCommitDiagnostics.stage("KlipySearch.enter", "moveCursorToEnd=$moveCursorToEnd wasSearchMode=$isSearchMode")
         isSearchMode = true
         dismissHistoryActionPopup()
         pinnedGifsAdapter.setAnimationsRunning(false)
@@ -1739,12 +1735,10 @@ class KlipyPalettesView @JvmOverloads constructor(
     }
 
     private fun exitSearchMode(triggerSearch: Boolean) {
-        TextCommitDiagnostics.stage("KlipySearch.exit", "triggerSearch=$triggerSearch wasSearchMode=$isSearchMode")
         syncSearchQueryFromField()
         isSearchMode = false
         if (::searchEditText.isInitialized) {
             searchEditText.isCursorVisible = false
-            TextCommitDiagnostics.stage("KlipySearch.clearFocus", "hadFocus=${searchEditText.hasFocus()}")
             searchEditText.clearFocus()
         }
         findViewById<View>(R.id.klipyHeader)?.visibility = View.VISIBLE
@@ -1772,7 +1766,6 @@ class KlipyPalettesView @JvmOverloads constructor(
     private fun updateSearchKeyboard() {
         val switcher = KeyboardSwitcher.getInstance()
         val keyboardView = switcher.mainKeyboardView ?: return
-        TextCommitDiagnostics.stage("KlipySearch.updateSearchKeyboard", "elementId=$currentSearchKeyboardElementId")
         keyboardView.setKeyboardActionListener(searchKeyboardListener)
         PointerTracker.switchTo(keyboardView)
         when (currentSearchKeyboardElementId) {
@@ -1828,7 +1821,6 @@ class KlipyPalettesView @JvmOverloads constructor(
 
     private fun focusSearchEditText(moveCursorToEnd: Boolean) {
         if (!::searchEditText.isInitialized) return
-        TextCommitDiagnostics.stage("KlipySearch.requestFocus", "moveCursorToEnd=$moveCursorToEnd hadFocus=${searchEditText.hasFocus()}")
         searchEditText.requestFocus()
         searchEditText.isCursorVisible = isSearchMode
         if (moveCursorToEnd) {
