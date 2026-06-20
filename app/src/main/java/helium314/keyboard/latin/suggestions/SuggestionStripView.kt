@@ -74,6 +74,7 @@ import helium314.keyboard.latin.utils.pinToolbarKeyAt
 import helium314.keyboard.latin.utils.prefs
 import helium314.keyboard.latin.utils.removeFirst
 import helium314.keyboard.latin.utils.setToolbarButtonsActivatedStateOnPrefChange
+import helium314.keyboard.latin.utils.startDragAndDropCompat
 import helium314.keyboard.latin.utils.updateToolbarButtonActivatedState
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.abs
@@ -609,8 +610,16 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
         val toolbarMode = Settings.getValues().mToolbarMode
         val allowPinnedKeys = toolbarMode == ToolbarMode.EXPANDABLE || toolbarMode == ToolbarMode.TOOLBAR_KEYS
         val allowSuggestions = toolbarMode == ToolbarMode.EXPANDABLE || toolbarMode == ToolbarMode.SUGGESTION_STRIP
+        val isFieldEmpty = isTextFieldEmpty()
+        // Keep empty-editor ownership stable when beginning-of-sentence predictions arrive asynchronously.
+        val showPinnedKeysForEmptyField = showSuggestions &&
+                allowPinnedKeys &&
+                !isExternalSuggestionVisible &&
+                isFieldEmpty &&
+                pinnedKeys.childCount > 0
         val showSuggestionContent = showSuggestions && allowSuggestions &&
-                (isExternalSuggestionVisible || shouldShowSuggestionContent())
+                !showPinnedKeysForEmptyField &&
+                (isExternalSuggestionVisible || !isFieldEmpty || shouldShowSuggestionContent())
         val showChips = showSuggestionContent && !isExternalSuggestionVisible && shouldUseChipSuggestions()
         suggestionsStrip.isVisible = showSuggestionContent && !showChips
         suggestionsChipScroll.isVisible = showChips
@@ -845,7 +854,11 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
     private fun startPinnedToolbarDrag(view: View, key: ToolbarKey) {
         val clipData = ClipData.newPlainText(TOOLBAR_DRAG_CLIP_LABEL, key.name)
         view.visibility = INVISIBLE
-        view.startDragAndDrop(clipData, DragShadowBuilder(view), ToolbarDragState(key, ToolbarDragSource.PINNED_ROW, view), 0)
+        view.startDragAndDropCompat(
+            clipData,
+            DragShadowBuilder(view),
+            ToolbarDragState(key, ToolbarDragSource.PINNED_ROW, view),
+        )
     }
 
     private fun applyToolbarPillBackground(view: ImageButton, colors: Colors) {
@@ -924,6 +937,23 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
         applyAlphabetIconTint(accessPointTriggerBtn, colors)
         applySuggestionStripButtonIconSizing(accessPointTriggerBtn)
         updateSuggestionContainersVisibility(true)
+    }
+
+    private fun isTextFieldEmpty(): Boolean {
+        val ime = getLatinIME() ?: return true
+        val connection = ime.currentInputConnection ?: return true
+        val before = connection.getTextBeforeCursor(1, 0)
+        val after = connection.getTextAfterCursor(1, 0)
+        return (before == null || before.isEmpty()) && (after == null || after.isEmpty())
+    }
+
+    private fun getLatinIME(): helium314.keyboard.latin.LatinIME? {
+        var ctx = context
+        while (ctx is android.content.ContextWrapper) {
+            if (ctx is helium314.keyboard.latin.LatinIME) return ctx
+            ctx = ctx.baseContext
+        }
+        return ctx as? helium314.keyboard.latin.LatinIME
     }
 
     companion object {

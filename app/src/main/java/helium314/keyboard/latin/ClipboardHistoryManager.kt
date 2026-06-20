@@ -113,6 +113,7 @@ class ClipboardHistoryManager(
                 onScreenshotMediaChanged()
             }
 
+            @androidx.annotation.RequiresApi(Build.VERSION_CODES.R)
             override fun onChange(selfChange: Boolean, uris: Collection<Uri>, flags: Int) {
                 super.onChange(selfChange, uris, flags)
                 onScreenshotMediaChanged()

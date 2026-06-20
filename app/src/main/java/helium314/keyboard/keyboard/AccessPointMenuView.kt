@@ -39,6 +39,7 @@ import helium314.keyboard.latin.utils.getPinnedToolbarKeys
 import helium314.keyboard.latin.utils.getStringResourceOrName
 import helium314.keyboard.latin.utils.getToolbarKeyFromDragData
 import helium314.keyboard.latin.utils.removePinnedKey
+import helium314.keyboard.latin.utils.startDragAndDropCompat
 
 class AccessPointMenuView @JvmOverloads constructor(
     context: Context,
@@ -162,7 +163,11 @@ class AccessPointMenuView @JvmOverloads constructor(
                 val clipData = ClipData.newPlainText(TOOLBAR_DRAG_CLIP_LABEL, key.name)
                 val shadow = DragShadowBuilder(v)
                 v.visibility = View.INVISIBLE
-                v.startDragAndDrop(clipData, shadow, ToolbarDragState(key, ToolbarDragSource.ACCESS_POINT_MENU, v), 0)
+                v.startDragAndDropCompat(
+                    clipData,
+                    shadow,
+                    ToolbarDragState(key, ToolbarDragSource.ACCESS_POINT_MENU, v),
+                )
                 true
             }
 

@@ -35,7 +35,7 @@ android {
 
     defaultConfig {
         applicationId = "com.orion.kboard"
-        minSdk = 31
+        minSdk = 23
         targetSdk = 36
         versionCode = providers.of(GitCommitCountValueSource::class.java) {}.get()
         versionName = "2.5.6"

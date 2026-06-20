@@ -312,7 +312,9 @@ object FrostedGlassHelper {
         Log.d(TAG, "Samsung SDK ${Build.VERSION.SDK_INT}: using SemBlurInfo path; enable=$enable")
 
         window.clearFlags(WindowManager.LayoutParams.FLAG_BLUR_BEHIND)
-        window.setBackgroundBlurRadius(0)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            window.setBackgroundBlurRadius(0)
+        }
         window.setBackgroundDrawable(roundedWindowBackground(context, Color.TRANSPARENT))
         val decorView = window.decorView
         decorView.outlineProvider = ViewOutlineProvider.BACKGROUND
@@ -442,8 +444,10 @@ object FrostedGlassHelper {
         decorView.clipToOutline = true
 
         window.clearFlags(WindowManager.LayoutParams.FLAG_BLUR_BEHIND)
-        window.setBackgroundBlurRadius(targetRadius)
-        Log.d(TAG, "window.setBackgroundBlurRadius successfully called without throwing an exception.")
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            window.setBackgroundBlurRadius(targetRadius)
+            Log.d(TAG, "window.setBackgroundBlurRadius successfully called without throwing an exception.")
+        }
 
         defaultBlurStates[window] = desiredState
         return true
@@ -518,6 +522,7 @@ object FrostedGlassHelper {
     }
 
     private fun isSystemBlurAvailable(context: Context): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return false
         if (isBatterySaverMode(context)) return false
         return try {
             val windowManager = context.getSystemService(Context.WINDOW_SERVICE) as? WindowManager
