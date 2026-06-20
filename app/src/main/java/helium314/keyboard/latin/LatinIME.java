@@ -2143,6 +2143,9 @@ public class LatinIME extends InputMethodService implements
     // Hooks for hardware keyboard
     @Override
     public boolean onKeyDown(final int keyCode, final KeyEvent keyEvent) {
+        if (keyCode == KeyEvent.KEYCODE_BACK && mKeyboardSwitcher.isResizeModeActive()) {
+            return true;
+        }
         if (keyCode == KeyEvent.KEYCODE_BACK
                 && (mKeyboardSwitcher.isShowingKlipyPalettes() || mKeyboardSwitcher.isShowingEmojiPalettes())) {
             return true;
@@ -2154,6 +2157,9 @@ public class LatinIME extends InputMethodService implements
 
     @Override
     public boolean onKeyUp(final int keyCode, final KeyEvent keyEvent) {
+        if (keyCode == KeyEvent.KEYCODE_BACK && mKeyboardSwitcher.handleResizeOverlayBack()) {
+            return true;
+        }
         if (keyCode == KeyEvent.KEYCODE_BACK && mKeyboardSwitcher.isShowingEmojiPalettes()) {
             final EmojiPalettesView emojiView = mKeyboardSwitcher.getEmojiPalettesView();
             if (emojiView != null && emojiView.handleBackPress()) {

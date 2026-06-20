@@ -12,11 +12,13 @@ import android.graphics.Rect;
 import android.util.AttributeSet;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.FrameLayout;
 
 import androidx.core.view.ViewKt;
 
 import helium314.keyboard.accessibility.AccessibilityUtils;
+import helium314.keyboard.keyboard.KeyboardSwitcher;
 import helium314.keyboard.keyboard.MainKeyboardView;
 import helium314.keyboard.latin.common.ColorType;
 import helium314.keyboard.latin.settings.Settings;
@@ -56,6 +58,31 @@ public final class InputView extends FrameLayout {
     }
 
     @Override
+    protected void onMeasure(final int widthMeasureSpec, final int heightMeasureSpec) {
+        final View resizeOverlay = findViewById(R.id.keyboard_resize_overlay);
+        final int overlayVisibility = resizeOverlay == null ? View.GONE : resizeOverlay.getVisibility();
+        if (resizeOverlay != null && overlayVisibility != View.GONE) {
+            resizeOverlay.setVisibility(View.GONE);
+        }
+        super.onMeasure(widthMeasureSpec, heightMeasureSpec);
+        if (resizeOverlay == null || overlayVisibility == View.GONE) {
+            return;
+        }
+        resizeOverlay.setVisibility(overlayVisibility);
+        final ViewGroup.LayoutParams params = resizeOverlay.getLayoutParams();
+        final int overlayHeight = params != null && params.height > 0
+                ? params.height
+                : getMeasuredHeight();
+        final int overlayWidthSpec = MeasureSpec.makeMeasureSpec(
+                Math.max(0, getMeasuredWidth() - getPaddingLeft() - getPaddingRight()),
+                MeasureSpec.EXACTLY);
+        final int overlayHeightSpec = MeasureSpec.makeMeasureSpec(
+                Math.max(1, overlayHeight),
+                MeasureSpec.EXACTLY);
+        resizeOverlay.measure(overlayWidthSpec, overlayHeightSpec);
+    }
+
+    @Override
     protected boolean dispatchHoverEvent(final MotionEvent event) {
         if (AccessibilityUtils.Companion.getInstance().isTouchExplorationEnabled()
                 && mMainKeyboardView.isShowingPopupKeysPanel()) {
@@ -68,6 +95,9 @@ public final class InputView extends FrameLayout {
 
     @Override
     public boolean onInterceptTouchEvent(final MotionEvent me) {
+        if (KeyboardSwitcher.getInstance().isResizeModeActive()) {
+            return false;
+        }
         final Rect rect = mInputViewRect;
         getGlobalVisibleRect(rect);
         final int index = me.getActionIndex();

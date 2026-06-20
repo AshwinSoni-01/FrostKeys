@@ -172,8 +172,11 @@ private fun upgradeToolbarPref(prefs: SharedPreferences, pref: String, default: 
     val splitDefault = defaultToolbarPref.split(Separators.ENTRY)
     splitDefault.forEach { entry ->
         val keyWithSeparator = entry.substringBefore(Separators.KV) + Separators.KV
-        if (list.none { it.startsWith(keyWithSeparator) })
-            list.add("${keyWithSeparator}false")
+        if (list.none { it.startsWith(keyWithSeparator) }) {
+            val enableResizeByDefault = pref == Settings.PREF_TOOLBAR_KEYS &&
+                entry.substringBefore(Separators.KV) == RESIZE.name
+            list.add("$keyWithSeparator$enableResizeByDefault")
+        }
     }
     // likely not needed, but better prepare for possibility of key removal
     list.removeAll {

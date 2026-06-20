@@ -2,7 +2,6 @@ package helium314.keyboard.keyboard.resize
 
 import android.annotation.SuppressLint
 import android.content.Context
-import android.content.res.Configuration
 import android.graphics.*
 import android.graphics.drawable.Drawable
 import android.os.Build
@@ -13,6 +12,8 @@ import androidx.core.content.ContextCompat
 import androidx.core.graphics.ColorUtils
 import helium314.keyboard.event.HapticEvent
 import helium314.keyboard.keyboard.KeyboardSwitcher
+import helium314.keyboard.keyboard.KeyboardTheme
+import helium314.keyboard.keyboard.MainKeyboardView
 import helium314.keyboard.keyboard.internal.keyboard_parser.floris.KeyCode
 import helium314.keyboard.latin.AudioAndHapticFeedbackManager
 import helium314.keyboard.latin.R
@@ -68,12 +69,20 @@ class KeyboardResizeOverlayView @JvmOverloads constructor(
     private val bottomHandleRect = RectF()
     private val resetBtnRect = RectF()
     private val doneBtnRect = RectF()
+    private val overlayRect = RectF()
 
     private var activeHandle: HandleType = HandleType.NONE
+    private var overlayTop = 0
+    private var overlayHeight = 1
     private var currentScale = 1.0f
+    private var currentBottomPaddingScale = 1.0f
     private var dragStartY = 0f
     private var dragStartScale = 1.0f
+    private var dragStartBottomPaddingScale = 1.0f
     private var dragDefaultHeight = 1.0f
+    private var dragStartFrameHeight = 0
+    private var dragStartBottomInsetPx = 0
+    private var dragStartBottomPaddingPx = 0f
     private var dragStartContentsHeight = 0
     private var isDragging = false
     // The target height during drag, used only to size the overlay itself.
@@ -98,10 +107,25 @@ class KeyboardResizeOverlayView @JvmOverloads constructor(
         doneIcon?.setTint(textPaint.color)
     }
 
+    fun setOverlayFrame(top: Int, height: Int) {
+        val newTop = top.coerceAtLeast(0)
+        val newHeight = height.coerceAtLeast(1)
+        if (overlayTop == newTop && overlayHeight == newHeight) return
+        overlayTop = newTop
+        overlayHeight = newHeight
+        invalidate()
+    }
+
+    fun getOverlayFrameTop(): Int = overlayTop
+
+    fun getOverlayFrameHeight(): Int = overlayHeight
+
     fun show() {
         visibility = VISIBLE
         currentScale = Settings.getInstance().current.mKeyboardHeightScale
+        currentBottomPaddingScale = Settings.getInstance().current.mBottomPaddingScale
         dragTargetHeight = -1
+        requestLayout()
         invalidate()
     }
 
@@ -111,17 +135,23 @@ class KeyboardResizeOverlayView @JvmOverloads constructor(
         dragTargetHeight = -1
     }
 
+    fun clearDragPreviewHeight() {
+        if (dragTargetHeight == -1) return
+        dragTargetHeight = -1
+        requestLayout()
+        invalidate()
+    }
+
     override fun onDraw(canvas: Canvas) {
         val left = 0f
-        val top = 0f
+        val top = overlayTop.toFloat()
         val right = width.toFloat()
-        val bottom = height.toFloat()
+        val bottom = (overlayTop + overlayHeight).toFloat().coerceAtMost(height.toFloat())
+        overlayRect.set(left, top, right, bottom)
         val cornerRadius = Settings.getInstance().current.mKeyboardCornerRadiusDp * resources.displayMetrics.density
 
-        // Draw background and outline clipped to rounded corners
-        // The view is positioned above the navigation bar by its parent RoundedKeyboardFrameView
-        canvas.drawRoundRect(left, top, right, bottom, cornerRadius, cornerRadius, scrimPaint)
-        canvas.drawRoundRect(left, top, right, bottom, cornerRadius, cornerRadius, outlinePaint)
+        canvas.drawRoundRect(overlayRect, cornerRadius, cornerRadius, scrimPaint)
+        canvas.drawRoundRect(overlayRect, cornerRadius, cornerRadius, outlinePaint)
 
         // Handles
         val centerX = (left + right) / 2f
@@ -172,14 +202,20 @@ class KeyboardResizeOverlayView @JvmOverloads constructor(
                 if (activeHandle != HandleType.NONE) {
                     dragStartY = rawY
                     dragStartScale = currentScale
+                    dragStartBottomPaddingScale = currentBottomPaddingScale
 
-                    // Capture actual pixel height of the frame at the start of the drag
-                    dragStartContentsHeight = mainKeyboardFrame?.height ?: 0
+                    // Capture the outer frame and the overlay/content height at the start of the drag.
+                    dragStartFrameHeight = mainKeyboardFrame?.height ?: height
+                    dragStartBottomInsetPx = keyboardSwitcher?.resizeOverlayBottomInset
+                        ?: keyboardWrapper?.paddingBottom
+                        ?: 0
+                    dragDefaultHeight = currentKeyboardHeightUnitPx(dragStartScale)
+                    dragStartBottomPaddingPx = bottomPaddingUnitPx(dragDefaultHeight * dragStartScale) *
+                        dragStartBottomPaddingScale
+                    dragStartContentsHeight = overlayHeight.takeIf { it > 0 }
+                        ?: (dragStartFrameHeight - dragStartBottomInsetPx -
+                            dragStartBottomPaddingPx.toInt()).coerceAtLeast(1)
 
-                    dragDefaultHeight = ResourceUtils.getDefaultKeyboardHeight(
-                        resources,
-                        Settings.getValues().mShowsNumberRow
-                    ).toFloat().coerceAtLeast(1.0f)
                     isDragging = (activeHandle == HandleType.TOP || activeHandle == HandleType.BOTTOM)
                     performFeedback(HapticEvent.KEY_PRESS)
                     return true
@@ -188,23 +224,50 @@ class KeyboardResizeOverlayView @JvmOverloads constructor(
             MotionEvent.ACTION_MOVE -> {
                 if (isDragging) {
                     val deltaPx = rawY - dragStartY
+                    val previousHeight = dragTargetHeight
+                    val previousScale = currentScale
+                    val previousBottomPaddingScale = currentBottomPaddingScale
 
-                    // The keyboard is anchored at the bottom.
-                    // Dragging the TOP handle UP (negative deltaPx) increases height.
-                    // Dragging the BOTTOM handle DOWN (positive deltaPx) increases height.
-                    val deltaHeight = if (activeHandle == HandleType.TOP) -deltaPx else deltaPx
-
-                    // Calculate what the new scale would be based on this pixel change
-                    val newScale = dragStartScale + (deltaHeight / dragDefaultHeight)
-                    val clampedScale = newScale.coerceIn(Settings.KEYBOARD_HEIGHT_SCALE_MIN, Settings.KEYBOARD_HEIGHT_SCALE_MAX)
-
-                    if (kotlin.math.abs(clampedScale - currentScale) > 0.0001f) {
+                    if (activeHandle == HandleType.TOP) {
+                        val heightDelta = -deltaPx
+                        val clampedScale = (dragStartScale + heightDelta / dragDefaultHeight)
+                            .coerceIn(Settings.KEYBOARD_HEIGHT_SCALE_MIN, Settings.KEYBOARD_HEIGHT_SCALE_MAX)
                         currentScale = clampedScale
-                        // Calculate visual height for the overlay based on the new scale.
-                        // This ensures it perfectly matches what the keyboard will be after reload.
-                        val visualHeightDelta = (currentScale - dragStartScale) * dragDefaultHeight
-                        dragTargetHeight = (dragStartContentsHeight + visualHeightDelta).toInt()
 
+                        // Floris-style: top resize changes keyboard height while keeping the
+                        // existing bottom padding visually stable.
+                        val bottomPaddingUnit = bottomPaddingUnitPx(dragDefaultHeight * currentScale)
+                        currentBottomPaddingScale = if (bottomPaddingUnit > 0f) {
+                            (dragStartBottomPaddingPx / bottomPaddingUnit)
+                                .coerceIn(Settings.BOTTOM_PADDING_SCALE_MIN, Settings.BOTTOM_PADDING_SCALE_MAX)
+                        } else {
+                            dragStartBottomPaddingScale
+                        }
+
+                        val visualHeightDelta = (currentScale - dragStartScale) * dragDefaultHeight
+                        dragTargetHeight = (dragStartContentsHeight + visualHeightDelta).toInt().coerceAtLeast(1)
+                        keyboardSwitcher?.onResizeOverlayPreviewHeightChanged(dragTargetHeight, true)
+                    } else {
+                        currentScale = dragStartScale
+                        val bottomPaddingUnit = bottomPaddingUnitPx(dragDefaultHeight * dragStartScale)
+                        currentBottomPaddingScale = if (bottomPaddingUnit > 0f) {
+                            (dragStartBottomPaddingScale - deltaPx / bottomPaddingUnit)
+                                .coerceIn(Settings.BOTTOM_PADDING_SCALE_MIN, Settings.BOTTOM_PADDING_SCALE_MAX)
+                        } else {
+                            dragStartBottomPaddingScale
+                        }
+                        val newBottomPaddingPx = bottomPaddingUnit * currentBottomPaddingScale
+
+                        // The bottom edge is the boundary above both system navigation and the
+                        // Appearance screen's Bottom padding scale.
+                        dragTargetHeight = (dragStartFrameHeight - dragStartBottomInsetPx -
+                            newBottomPaddingPx).toInt().coerceAtLeast(1)
+                        keyboardSwitcher?.onResizeOverlayPreviewHeightChanged(dragTargetHeight, false)
+                    }
+
+                    if (previousHeight != dragTargetHeight
+                        || kotlin.math.abs(previousScale - currentScale) > 0.0001f
+                        || kotlin.math.abs(previousBottomPaddingScale - currentBottomPaddingScale) > 0.0001f) {
                         requestLayout()
                         invalidate()
                     }
@@ -212,20 +275,35 @@ class KeyboardResizeOverlayView @JvmOverloads constructor(
             }
             MotionEvent.ACTION_UP -> {
                 if (activeHandle == HandleType.RESET) {
+                    keyboardSwitcher?.clearResizeOverlayPreviewPin()
+                    clearDragPreviewHeight()
                     Settings.getInstance().resetHeightScale()
+                    Settings.getInstance().resetBottomPaddingScale()
                     currentScale = Settings.getInstance().current.mKeyboardHeightScale
+                    currentBottomPaddingScale = Settings.getInstance().current.mBottomPaddingScale
                     keyboardSwitcher?.onKeyboardHeightScaleChanged()
                     invalidate()
                     performFeedback(HapticEvent.KEY_PRESS)
                 } else if (activeHandle == HandleType.DONE) {
-                    hide()
+                    keyboardSwitcher?.exitResizeMode()
                     performFeedback(HapticEvent.KEY_PRESS)
                 } else if (isDragging) {
                     // Write the new scale and rebuild the keyboard on release.
                     // The keyboard content was static during the drag; now it
                     // reloads to match the final size.
-                    dragTargetHeight = -1
-                    Settings.getInstance().writeHeightScale(currentScale)
+                    val committedPreviewHeight = dragTargetHeight.takeIf { it > 0 }
+                        ?: dragStartContentsHeight.coerceAtLeast(1)
+                    if (activeHandle == HandleType.BOTTOM) {
+                        currentBottomPaddingScale = bottomPaddingScaleForPreview(committedPreviewHeight)
+                    }
+                    keyboardSwitcher?.onResizeOverlayDragCommitted(
+                        committedPreviewHeight,
+                        activeHandle == HandleType.TOP
+                    )
+                    Settings.getInstance().writeKeyboardSizeScales(
+                        currentScale,
+                        currentBottomPaddingScale
+                    )
                     keyboardSwitcher?.onKeyboardHeightScaleChanged()
                     invalidate()
                 }
@@ -235,6 +313,14 @@ class KeyboardResizeOverlayView @JvmOverloads constructor(
             MotionEvent.ACTION_CANCEL -> {
                 if (isDragging) {
                     dragTargetHeight = -1
+                    keyboardSwitcher?.clearResizeOverlayPreviewPin()
+                    val restoreHeight = dragStartContentsHeight.takeIf { it > 0 }
+                        ?: mainKeyboardFrame?.height
+                        ?: height
+                    keyboardSwitcher?.onResizeOverlayPreviewHeightChanged(
+                        restoreHeight,
+                        activeHandle == HandleType.TOP
+                    )
                     requestLayout()
                     invalidate()
                 }
@@ -247,22 +333,7 @@ class KeyboardResizeOverlayView @JvmOverloads constructor(
 
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-        // During a drag, use the target height so the overlay tracks the finger.
-        // The keyboard content itself is not resized until finger release.
-        if (dragTargetHeight > 0) {
-            setMeasuredDimension(MeasureSpec.getSize(widthMeasureSpec), dragTargetHeight)
-            return
-        }
-        // Match the main keyboard frame's height to cover the entire keyboard area.
-        val frame = mainKeyboardFrame
-        if (frame != null && frame.visibility != GONE) {
-            val h = frame.measuredHeight
-            if (h > 0) {
-                setMeasuredDimension(MeasureSpec.getSize(widthMeasureSpec), h)
-                return
-            }
-        }
-        super.onMeasure(widthMeasureSpec, heightMeasureSpec)
+        setMeasuredDimension(MeasureSpec.getSize(widthMeasureSpec), MeasureSpec.getSize(heightMeasureSpec))
     }
 
     private fun drawButton(canvas: Canvas, rect: RectF, icon: Drawable?, text: String) {
@@ -282,12 +353,11 @@ class KeyboardResizeOverlayView @JvmOverloads constructor(
     }
 
     private fun resolveAccentColor(): Int {
+        val isDarkKeyboard = KeyboardTheme.isDarkThemeActive(context)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            val isNight = (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
-                    Configuration.UI_MODE_NIGHT_YES
             return ContextCompat.getColor(
                 context,
-                if (isNight) android.R.color.system_accent1_100 else android.R.color.system_accent1_200
+                if (isDarkKeyboard) android.R.color.system_accent1_100 else android.R.color.system_accent1_600
             )
         }
         val typedValue = android.util.TypedValue()
@@ -303,6 +373,38 @@ class KeyboardResizeOverlayView @JvmOverloads constructor(
             handleRect.centerY() + handleTouchHeight / 2f
         )
         return touchRect.contains(x, y)
+    }
+
+    private fun currentKeyboardHeightUnitPx(scale: Float): Float {
+        val keyboard = mainKeyboardFrame
+            ?.findViewById<MainKeyboardView>(R.id.keyboard_view)
+            ?.keyboard
+        val safeScale = scale.coerceAtLeast(0.0001f)
+        if (keyboard != null) {
+            return (keyboard.mOccupiedHeight / safeScale).coerceAtLeast(1.0f)
+        }
+        val settings = Settings.getValues()
+        val settingsScale = settings.mKeyboardHeightScale.coerceAtLeast(0.0001f)
+        return (ResourceUtils.getKeyboardHeight(resources, settings) / settingsScale)
+            .coerceAtLeast(1.0f)
+    }
+
+    private fun bottomPaddingUnitPx(keyboardHeightPx: Float): Float {
+        val height = keyboardHeightPx.toInt().coerceAtLeast(1)
+        return resources.getFraction(
+            R.fraction.config_keyboard_bottom_padding_holo,
+            height,
+            height
+        ).coerceAtLeast(0f)
+    }
+
+    private fun bottomPaddingScaleForPreview(previewHeight: Int): Float {
+        val bottomPaddingUnit = bottomPaddingUnitPx(dragDefaultHeight * dragStartScale)
+        if (bottomPaddingUnit <= 0f) return dragStartBottomPaddingScale
+        val bottomPaddingPx = (dragStartFrameHeight - dragStartBottomInsetPx - previewHeight)
+            .coerceAtLeast(0)
+        return (bottomPaddingPx / bottomPaddingUnit)
+            .coerceIn(Settings.BOTTOM_PADDING_SCALE_MIN, Settings.BOTTOM_PADDING_SCALE_MAX)
     }
 
     private fun performFeedback(event: HapticEvent) {

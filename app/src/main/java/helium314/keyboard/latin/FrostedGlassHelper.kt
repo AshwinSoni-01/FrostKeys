@@ -34,6 +34,8 @@ object FrostedGlassHelper {
     private val failedSamsungSemBlurModes = mutableSetOf<String>()
     private val windowsWithAppliedFrostedGlass: MutableSet<Window> =
         Collections.newSetFromMap(WeakHashMap<Window, Boolean>())
+    private val windowsWithResizeOverlayBlurSuppressed: MutableSet<Window> =
+        Collections.newSetFromMap(WeakHashMap<Window, Boolean>())
     private val defaultBlurStates: MutableMap<Window, DefaultBlurState> =
         Collections.synchronizedMap(WeakHashMap<Window, DefaultBlurState>())
 
@@ -178,9 +180,31 @@ object FrostedGlassHelper {
     }
 
     @JvmStatic
+    fun setResizeOverlayBlurSuppressed(
+        service: InputMethodService,
+        inputView: View?,
+        suppressed: Boolean,
+        restoreEnabled: Boolean
+    ) {
+        val window = service.window?.window ?: return
+        if (suppressed) {
+            windowsWithResizeOverlayBlurSuppressed.add(window)
+            configureFrostedGlass(service, inputView, false)
+        } else {
+            windowsWithResizeOverlayBlurSuppressed.remove(window)
+            configureFrostedGlass(service, inputView, restoreEnabled)
+        }
+    }
+
+    @JvmStatic
     fun configureFrostedGlass(service: InputMethodService, inputView: View?, enable: Boolean) {
         val window = service.window?.window ?: return
         val overrideMode = service.prefs().getString(Settings.PREF_BLUR_RENDER_OVERRIDE, "auto")
+
+        if (enable && windowsWithResizeOverlayBlurSuppressed.contains(window)) {
+            configureFrostedGlass(service, inputView, false)
+            return
+        }
 
         if (!enable) {
             val hadAppliedFrostedGlass = windowsWithAppliedFrostedGlass.remove(window)

@@ -113,6 +113,10 @@ public final class KeyboardLayoutSet {
         clearKeyboardCache();
     }
 
+    public static void onKeyboardGeometryChanged() {
+        clearKeyboardCache();
+    }
+
     private static void clearKeyboardCache() {
         sKeyboardCache.clear();
         sUniqueKeysCache.clear();

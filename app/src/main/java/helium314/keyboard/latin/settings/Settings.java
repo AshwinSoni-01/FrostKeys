@@ -132,6 +132,8 @@ public final class Settings implements SharedPreferences.OnSharedPreferenceChang
     public static final float KEYBOARD_HEIGHT_SCALE_MAX = 1.5f;
     public static final String PREF_BOTTOM_ROW_SCALE_PREFIX = "bottom_row_scale";
     public static final String PREF_BOTTOM_PADDING_SCALE_PREFIX = "bottom_padding_scale";
+    public static final float BOTTOM_PADDING_SCALE_MIN = 0.0f;
+    public static final float BOTTOM_PADDING_SCALE_MAX = 5.0f;
     public static final String PREF_SIDE_PADDING_SCALE_PREFIX = "side_padding_scale";
     public static final String PREF_FONT_SCALE = "font_scale";
     public static final String PREF_EMOJI_FONT_SCALE = "emoji_font_scale";
@@ -541,6 +543,58 @@ public final class Settings implements SharedPreferences.OnSharedPreferenceChang
         final boolean folded = FoldableUtils.INSTANCE.isFolded();
         int index = SettingsKt.findIndexOfDefaultSetting(landscape, folded);
         String key = SettingsKt.createPrefKeyForBooleanSettings(PREF_KEYBOARD_HEIGHT_SCALE_PREFIX, index, 2);
+        mPrefs.edit().remove(key).apply();
+    }
+
+    public void writeBottomPaddingScale(float scale) {
+        final boolean landscape = mSettingsValues.mDisplayOrientation == Configuration.ORIENTATION_LANDSCAPE;
+        final boolean folded = FoldableUtils.INSTANCE.isFolded();
+        int index = SettingsKt.findIndexOfDefaultSetting(landscape, folded);
+        String key = SettingsKt.createPrefKeyForBooleanSettings(PREF_BOTTOM_PADDING_SCALE_PREFIX, index, 2);
+        float clampedScale = Math.max(BOTTOM_PADDING_SCALE_MIN, Math.min(scale, BOTTOM_PADDING_SCALE_MAX));
+        if (clampedScale == Defaults.PREF_BOTTOM_PADDING_SCALE[index]) {
+            mPrefs.edit().remove(key).apply();
+        } else {
+            mPrefs.edit().putFloat(key, clampedScale).apply();
+        }
+    }
+
+    public void writeKeyboardSizeScales(float heightScale, float bottomPaddingScale) {
+        final boolean landscape = mSettingsValues.mDisplayOrientation == Configuration.ORIENTATION_LANDSCAPE;
+        final boolean folded = FoldableUtils.INSTANCE.isFolded();
+        final int index = SettingsKt.findIndexOfDefaultSetting(landscape, folded);
+        final String heightKey = SettingsKt.createPrefKeyForBooleanSettings(
+                PREF_KEYBOARD_HEIGHT_SCALE_PREFIX, index, 2);
+        final String bottomPaddingKey = SettingsKt.createPrefKeyForBooleanSettings(
+                PREF_BOTTOM_PADDING_SCALE_PREFIX, index, 2);
+        final float clampedHeightScale = Math.max(
+                KEYBOARD_HEIGHT_SCALE_MIN, Math.min(heightScale, KEYBOARD_HEIGHT_SCALE_MAX));
+        final float clampedBottomPaddingScale = Math.max(
+                BOTTOM_PADDING_SCALE_MIN, Math.min(bottomPaddingScale, BOTTOM_PADDING_SCALE_MAX));
+        final SharedPreferences.Editor editor = mPrefs.edit();
+        putFloatOrRemoveDefault(
+                editor, heightKey, clampedHeightScale, Defaults.PREF_KEYBOARD_HEIGHT_SCALE[index]);
+        putFloatOrRemoveDefault(
+                editor, bottomPaddingKey, clampedBottomPaddingScale, Defaults.PREF_BOTTOM_PADDING_SCALE[index]);
+        if (!editor.commit()) {
+            Log.w(TAG, "Failed to persist keyboard resize scales");
+        }
+    }
+
+    private static void putFloatOrRemoveDefault(final SharedPreferences.Editor editor,
+            final String key, final float value, final float defaultValue) {
+        if (value == defaultValue) {
+            editor.remove(key);
+        } else {
+            editor.putFloat(key, value);
+        }
+    }
+
+    public void resetBottomPaddingScale() {
+        final boolean landscape = mSettingsValues.mDisplayOrientation == Configuration.ORIENTATION_LANDSCAPE;
+        final boolean folded = FoldableUtils.INSTANCE.isFolded();
+        int index = SettingsKt.findIndexOfDefaultSetting(landscape, folded);
+        String key = SettingsKt.createPrefKeyForBooleanSettings(PREF_BOTTOM_PADDING_SCALE_PREFIX, index, 2);
         mPrefs.edit().remove(key).apply();
     }
 
