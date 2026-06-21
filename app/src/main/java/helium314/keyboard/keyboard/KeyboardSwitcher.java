@@ -1074,6 +1074,9 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
         if (mAccessPointMenuView != null) {
             mAccessPointMenuView.setVisibility(View.GONE);
         }
+        if (mSuggestionStripView != null) {
+            mSuggestionStripView.setAccessPointMenuOpen(false);
+        }
         setKeyboardPanelOffsets((mKlipyPalettesView != null && mKlipyPalettesView.isSearchMode())
                 || (mEmojiPalettesView != null && mEmojiPalettesView.isSearchMode()));
         updatePersistentEmojiRow();
@@ -1111,6 +1114,9 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
                 if (mAccessPointMenuView != null) {
                     mAccessPointMenuView.setVisibility(View.GONE);
                 }
+                if (mSuggestionStripView != null) {
+                    mSuggestionStripView.setAccessPointMenuOpen(false);
+                }
                 updatePersistentEmojiRow();
                 if (mCurrentInputView != null)
                     mCurrentInputView.requestLayout();
@@ -1136,11 +1142,9 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
                         mKeyboardView.getKeyVisualAttribute(),
                         mLatinIME.getCurrentInputEditorInfo(), mLatinIME.mKeyboardActionListener);
                 mClipboardHistoryView.setVisibility(View.VISIBLE);
-                mStripContainer.setVisibility(getSecondaryStripVisibility());
+                mStripContainer.setVisibility(View.GONE);
                 setKeyboardPanelOffsets(true);
-                mClipboardStripScrollView
-                        .post(() -> mClipboardStripScrollView.fullScroll(HorizontalScrollView.FOCUS_RIGHT));
-                mClipboardStripScrollView.setVisibility(View.VISIBLE);
+                mClipboardStripScrollView.setVisibility(View.GONE);
 
                 mEmojiTabStripView.setVisibility(View.GONE);
                 mSuggestionStripView.setVisibility(View.GONE);
@@ -1151,6 +1155,9 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
                 }
                 if (mAccessPointMenuView != null) {
                     mAccessPointMenuView.setVisibility(View.GONE);
+                }
+                if (mSuggestionStripView != null) {
+                    mSuggestionStripView.setAccessPointMenuOpen(false);
                 }
                 updatePersistentEmojiRow();
                 if (mCurrentInputView != null)
@@ -1191,6 +1198,9 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
                 if (mAccessPointMenuView != null) {
                     mAccessPointMenuView.setVisibility(View.GONE);
                 }
+                if (mSuggestionStripView != null) {
+                    mSuggestionStripView.setAccessPointMenuOpen(false);
+                }
                 updatePersistentEmojiRow();
                 if (mCurrentInputView != null)
                     mCurrentInputView.requestLayout();
@@ -1230,6 +1240,9 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
                 }
                 if (mAccessPointMenuView != null) {
                     mAccessPointMenuView.setVisibility(View.GONE);
+                }
+                if (mSuggestionStripView != null) {
+                    mSuggestionStripView.setAccessPointMenuOpen(false);
                 }
                 updatePersistentEmojiRow();
                 if (mCurrentInputView != null)

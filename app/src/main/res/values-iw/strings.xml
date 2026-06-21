@@ -219,7 +219,6 @@
     <string name="dictionary_settings_category">מילונים</string>
     <string name="theme_style">סגנון</string>
     <string name="close_history" tools:keep="@string/close_history">סגירת היסטוריית הלוח</string>
-    <string name="clipboard_toolbar_keys">בחירת כפתורי סרגל הכלים של הלוח</string>
     <string name="edit_layout">לחיצה לעריכת פריסת בסיס</string>
     <string name="theme_name_chocolate" tools:keep="@string/theme_name_chocolate">שוקולד</string>
     <string name="layout_symbols" tools:keep="@string/layout_symbols">סימנים</string>

@@ -44,7 +44,7 @@ fun ToolbarScreen(
     if ((b?.value ?: 0) < 0)
         Log.v("irrelevant", "stupid way to trigger recomposition on preference change")
     val toolbarMode = Settings.readToolbarMode(prefs)
-    val clipboardToolbarVisible = toolbarMode != ToolbarMode.HIDDEN
+    val customToolbarCodesVisible = toolbarMode != ToolbarMode.HIDDEN
         || !prefs.getBoolean(Settings.PREF_TOOLBAR_HIDING_GLOBAL, Defaults.PREF_TOOLBAR_HIDING_GLOBAL)
     val items = listOf(
         Settings.PREF_TOOLBAR_MODE,
@@ -56,8 +56,7 @@ fun ToolbarScreen(
             else -> null
         },
         if (toolbarMode != ToolbarMode.HIDDEN) Settings.PREF_PERSISTENT_TOOLBAR_KEY else null,
-        if (clipboardToolbarVisible) Settings.PREF_CLIPBOARD_TOOLBAR_KEYS else null,
-        if (clipboardToolbarVisible) Settings.PREF_TOOLBAR_CUSTOM_KEY_CODES else null,
+        if (customToolbarCodesVisible) Settings.PREF_TOOLBAR_CUSTOM_KEY_CODES else null,
         if (toolbarMode != ToolbarMode.HIDDEN) Settings.PREF_VARIABLE_TOOLBAR_DIRECTION else null,
     )
     SearchSettingsScreen(
@@ -103,9 +102,6 @@ fun createToolbarSettings(context: Context) = listOf(
                 .map { it.name.lowercase().getStringResourceOrName("", ctx) to it.name },
             Defaults.PREF_PERSISTENT_TOOLBAR_KEY
         )
-    },
-    Setting(context, Settings.PREF_CLIPBOARD_TOOLBAR_KEYS, R.string.clipboard_toolbar_keys) {
-        ReorderSwitchPreference(it, Defaults.PREF_CLIPBOARD_TOOLBAR_KEYS)
     },
     Setting(context, Settings.PREF_TOOLBAR_CUSTOM_KEY_CODES, R.string.customize_toolbar_key_codes) {
         var showDialog by rememberSaveable { mutableStateOf(false) }

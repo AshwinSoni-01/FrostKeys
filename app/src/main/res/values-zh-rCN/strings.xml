@@ -242,7 +242,6 @@
     <string name="word_right" tools:keep="@string/word_right">字词向右</string>
     <string name="page_up" tools:keep="@string/page_up">向上翻页</string>
     <string name="page_down" tools:keep="@string/page_down">向下翻页</string>
-    <string name="clipboard_toolbar_keys">选择剪贴板工具栏键</string>
     <string name="page_start" tools:keep="@string/page_start">页面开始</string>
     <string name="page_end" tools:keep="@string/page_end">页面结束</string>
     <string name="word_left" tools:keep="@string/word_left">字词向左</string>

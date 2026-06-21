@@ -214,7 +214,6 @@
     <string name="button_load_custom">Laadi fail</string>
     <string name="subtype_mns">Mansi</string>
     <string name="prefs_space_bar_text">Sinu tekst tühikuklahvil</string>
-    <string name="clipboard_toolbar_keys">Vali lõikelaua nupud tööriistariba jaoks</string>
     <string name="subtype_generic_extended">%s (laiendatud)</string>
     <string name="load">Laadi</string>
     <string name="button_title_add_custom_layout">Lisa kohandatud paigutus</string>

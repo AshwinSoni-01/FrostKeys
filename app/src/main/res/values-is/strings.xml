@@ -301,7 +301,6 @@
     <string name="custom_font">Velja sérsniðið letur úr skrá</string>
     <string name="hint_source">Veldu uppruna ábendinga</string>
     <string name="toolbar_keys">Veldu lykla á verkfærastiku</string>
-    <string name="clipboard_toolbar_keys">Veldu klippispjaldslykla á verkfærastiku</string>
     <string name="customize_currencies_detail">Stilltu aðal- og allt að 6 viðbótar gjaldmiðlatákn, aðskilin með bilum</string>
     <string name="disable_personalized_dicts_message">Aðvörun: Sé þessi stilling gerð óvirk verða öll lærð gögn hreinsuð</string>
     <string name="dictionary_file_error">Villa: Valin skrá er ekki gild orðasafnsskrá</string>

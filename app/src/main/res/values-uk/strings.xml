@@ -317,7 +317,6 @@
     <string name="word_right" tools:keep="@string/word_right">Слово правіше</string>
     <string name="page_up" tools:keep="@string/page_up">Сторінка вгору</string>
     <string name="page_down" tools:keep="@string/page_down">Сторінка вниз</string>
-    <string name="clipboard_toolbar_keys">Вибрати клавіші панелі інструментів буфера обміну</string>
     <string name="quick_pin_toolbar_keys">Закріплювати клавіші панелі інструментів при тривалому натисканні</string>
     <string name="quick_pin_toolbar_keys_summary">Це вимикає інші функції клавіш панелі інструментів при тривалому натисканні</string>
     <string name="page_start" tools:keep="@string/page_start">Початок сторінки</string>

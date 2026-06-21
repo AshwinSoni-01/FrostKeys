@@ -223,7 +223,6 @@
     <string name="popup_keys_layout" tools:keep="@string/popup_keys_layout">Layout</string>
     <string name="toolbar_keys">Välj verktygsfältstangenter</string>
     <string name="close_history" tools:keep="@string/close_history">Stäng urklippshistorik</string>
-    <string name="clipboard_toolbar_keys">Välj verktygsfältstangenter för urklipp</string>
     <string name="show_popup_hints_summary">Visa tips om långtryck på en tangent aktiverar ytterligare funktionalitet</string>
     <string name="show_popup_hints">Visa funktionalitetstips</string>
     <string name="clipboard" tools:keep="@string/clipboard">Urklipp</string>
