@@ -8,7 +8,6 @@ import android.os.Build
 import android.util.Log
 import android.view.Gravity
 import android.view.View
-import android.view.ViewOutlineProvider
 import android.view.Window
 import android.view.WindowManager
 import helium314.keyboard.latin.common.ColorType
@@ -31,6 +30,7 @@ object FrostedGlassHelper {
 
     private const val TAG = "KBoardBlur"
     private const val SAMSUNG_EXTENSION_FLAG_BLUR = 0x10
+    private const val NATIVE_BLUR_HIDE_CLEANUP_DELAY_MS = 250L
     private val failedSamsungSemBlurModes = mutableSetOf<String>()
     private val windowsWithAppliedFrostedGlass: MutableSet<Window> =
         Collections.newSetFromMap(WeakHashMap<Window, Boolean>())
@@ -38,6 +38,8 @@ object FrostedGlassHelper {
         Collections.newSetFromMap(WeakHashMap<Window, Boolean>())
     private val defaultBlurStates: MutableMap<Window, DefaultBlurState> =
         Collections.synchronizedMap(WeakHashMap<Window, DefaultBlurState>())
+    private val nativeBlurStates: MutableMap<Window, NativeBlurState> =
+        Collections.synchronizedMap(WeakHashMap<Window, NativeBlurState>())
 
     private data class DefaultBlurState(
         val enabled: Boolean,
@@ -46,6 +48,17 @@ object FrostedGlassHelper {
         val backgroundBlurOnly: Boolean,
         val cornerRadiusPx: Float
     )
+
+    private class NativeBlurState {
+        var generation = 0
+        var ready = false
+        var decorView: View? = null
+        var inputView: View? = null
+        var cornerRadiusPx = -1f
+        var blurRadius = -1
+        var pendingCleanup: Runnable? = null
+        var pendingCleanupDecorView: View? = null
+    }
 
     // =========================================================================
     // LAZY STATICS: Pre-resolve reflection references ONCE and cache them forever
@@ -189,30 +202,52 @@ object FrostedGlassHelper {
         val window = service.window?.window ?: return
         if (suppressed) {
             windowsWithResizeOverlayBlurSuppressed.add(window)
-            configureFrostedGlass(service, inputView, false)
+            configureFrostedGlassInternal(service, inputView, false, allowDelayedNativeCleanup = false)
         } else {
             windowsWithResizeOverlayBlurSuppressed.remove(window)
-            configureFrostedGlass(service, inputView, restoreEnabled)
+            configureFrostedGlassInternal(service, inputView, restoreEnabled, allowDelayedNativeCleanup = true)
         }
     }
 
     @JvmStatic
     fun configureFrostedGlass(service: InputMethodService, inputView: View?, enable: Boolean) {
+        configureFrostedGlassInternal(service, inputView, enable, allowDelayedNativeCleanup = true)
+    }
+
+    private fun configureFrostedGlassInternal(
+        service: InputMethodService,
+        inputView: View?,
+        enable: Boolean,
+        allowDelayedNativeCleanup: Boolean
+    ) {
         val window = service.window?.window ?: return
+        val nativeState = nativeBlurState(window)
+        val generation = ++nativeState.generation
         val overrideMode = service.prefs().getString(Settings.PREF_BLUR_RENDER_OVERRIDE, "auto")
 
         if (enable && windowsWithResizeOverlayBlurSuppressed.contains(window)) {
-            configureFrostedGlass(service, inputView, false)
+            configureFrostedGlassInternal(service, inputView, false, allowDelayedNativeCleanup = false)
             return
         }
 
         if (!enable) {
-            val hadAppliedFrostedGlass = windowsWithAppliedFrostedGlass.remove(window)
-            if (!hadAppliedFrostedGlass && !hasNativeBlurFlag(window)) {
+            val hadAppliedFrostedGlass = windowsWithAppliedFrostedGlass.contains(window)
+            val hadDefaultBlurEnabled = defaultBlurStates[window]?.enabled == true
+            if (!hadAppliedFrostedGlass && !hadDefaultBlurEnabled && !hasNativeBlurFlag(window)) {
+                cancelPendingNativeBlurCleanup(nativeState)
+                clearNativeBlurReady(nativeState)
                 return
             }
 
             constrainImeWindowToKeyboardBounds(service, window, inputView)
+            if (allowDelayedNativeCleanup && scheduleNativeBlurCleanupIfReady(service, window, inputView, nativeState, generation)) {
+                Log.i(TAG, "Frosted glass disabled. Scheduled native blur cleanup.")
+                return
+            }
+
+            cancelPendingNativeBlurCleanup(nativeState)
+            clearNativeBlurReady(nativeState)
+            windowsWithAppliedFrostedGlass.remove(window)
             val nativeBlurChanged = applyDefaultBlur(service, window, false)
             if (Build.MANUFACTURER.equals("samsung", ignoreCase = true) || overrideMode == "force_samsung") {
                 applySamsungSemBlur(window, inputView, false)
@@ -229,6 +264,8 @@ object FrostedGlassHelper {
         val shouldUseSolidFallback = overrideMode == "force_solid" || !blurAvailable
 
         if (shouldUseSolidFallback) {
+            cancelPendingNativeBlurCleanup(nativeState)
+            clearNativeBlurReady(nativeState)
             val nativeBlurChanged = applyDefaultBlur(service, window, false, solidFallbackColor(service))
             if (Build.MANUFACTURER.equals("samsung", ignoreCase = true) || overrideMode == "force_samsung") {
                 clearSamsungSemBlur(samsungBlurTarget(inputView))
@@ -245,11 +282,13 @@ object FrostedGlassHelper {
         when (overrideMode) {
             "force_native" -> {
                 restoreFrostedThemeBackground(service, inputView)
-                if (applyDefaultBlur(service, window, true)) {
-                    Log.i(TAG, "OVERRIDE: Force Native Android Blur applied successfully via window.setBackgroundBlurRadius.")
+                if (applyNativeBlur(service, window, inputView, nativeState, generation)) {
+                    Log.i(TAG, "OVERRIDE: Force Native Android Blur requested via window.setBackgroundBlurRadius.")
                 }
             }
             "force_samsung" -> {
+                cancelPendingNativeBlurCleanup(nativeState)
+                clearNativeBlurReady(nativeState)
                 applySamsungSemBlur(window, inputView, true)
                 Log.i(TAG, "OVERRIDE: Force Samsung Proprietary Blur applied successfully via SemBlurInfo.")
             }
@@ -257,9 +296,13 @@ object FrostedGlassHelper {
                 // "auto" mode - The existing logic
                 if (Build.MANUFACTURER.equals("samsung", ignoreCase = true)) {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        cancelPendingNativeBlurCleanup(nativeState)
+                        clearNativeBlurReady(nativeState)
                         applySamsungSemBlur(window, inputView, true)
                         Log.i(TAG, "AUTO: Samsung device detected (SDK >= S). Applied SemBlurInfo successfully.")
                     } else {
+                        cancelPendingNativeBlurCleanup(nativeState)
+                        clearNativeBlurReady(nativeState)
                         restoreFrostedThemeBackground(service, inputView)
                         val nativeBlurChanged = applyDefaultBlur(service, window, true)
                         applySamsungLegacyBlur(window, true)
@@ -269,8 +312,8 @@ object FrostedGlassHelper {
                     }
                 } else {
                     restoreFrostedThemeBackground(service, inputView)
-                    if (applyDefaultBlur(service, window, true)) {
-                        Log.i(TAG, "AUTO: Non-Samsung device detected. Applied Native Android window blur successfully.")
+                    if (applyNativeBlur(service, window, inputView, nativeState, generation)) {
+                        Log.i(TAG, "AUTO: Non-Samsung device detected. Requested Native Android window blur.")
                     }
                 }
             }
@@ -314,11 +357,13 @@ object FrostedGlassHelper {
         window.clearFlags(WindowManager.LayoutParams.FLAG_BLUR_BEHIND)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             window.setBackgroundBlurRadius(0)
+            val params = window.attributes
+            if (params.blurBehindRadius != 0) {
+                params.setBlurBehindRadius(0)
+                window.attributes = params
+            }
         }
         window.setBackgroundDrawable(roundedWindowBackground(context, Color.TRANSPARENT))
-        val decorView = window.decorView
-        decorView.outlineProvider = ViewOutlineProvider.BACKGROUND
-        decorView.clipToOutline = true
         defaultBlurStates.remove(window)
         inputView?.setBackgroundColor(Color.TRANSPARENT)
 
@@ -432,37 +477,200 @@ object FrostedGlassHelper {
             return false
         }
 
+        // AOSP background blur reads its corner radius from a uniform round-rect outline.
+        // Per-corner radii produce a path outline, which native background blur treats as radius 0.
         window.setBackgroundDrawable(
             roundedWindowBackground(
                 service,
-                backgroundColor
+                backgroundColor,
+                topOnlyCorners = !enable
             )
         )
 
-        val decorView = window.decorView
-        decorView.outlineProvider = ViewOutlineProvider.BACKGROUND
-        decorView.clipToOutline = true
-
-        window.clearFlags(WindowManager.LayoutParams.FLAG_BLUR_BEHIND)
+        var layoutParamsChanged = false
+        val params = window.attributes
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             window.setBackgroundBlurRadius(targetRadius)
             Log.d(TAG, "window.setBackgroundBlurRadius successfully called without throwing an exception.")
+
+            val blurFlag = WindowManager.LayoutParams.FLAG_BLUR_BEHIND
+            if ((params.flags and blurFlag) != 0) {
+                params.flags = params.flags and blurFlag.inv()
+                layoutParamsChanged = true
+            }
+            if (params.blurBehindRadius != 0) {
+                params.setBlurBehindRadius(0)
+                layoutParamsChanged = true
+            }
+        }
+        if (layoutParamsChanged) {
+            window.attributes = params
         }
 
         defaultBlurStates[window] = desiredState
         return true
     }
 
-    private fun roundedWindowBackground(context: Context, color: Int): GradientDrawable {
+    private fun applyNativeBlur(
+        service: InputMethodService,
+        window: Window,
+        inputView: View?,
+        nativeState: NativeBlurState,
+        generation: Int
+    ): Boolean {
+        val cornerRadiusPx = keyboardCornerRadiusPx(service)
+        val targetBlurRadius = blurRadius(service)
+        if (reuseReadyNativeBlurIfPossible(window, inputView, nativeState, cornerRadiusPx, targetBlurRadius)) {
+            Log.d(TAG, "Kept active native blur for the same window state.")
+            return false
+        }
+
+        cancelPendingNativeBlurCleanup(nativeState)
+        clearNativeBlurReady(nativeState)
+        applyDefaultBlur(service, window, false)
+        scheduleNativeBlurEnable(service, window, inputView, nativeState, generation, cornerRadiusPx, targetBlurRadius)
+        return true
+    }
+
+    private fun scheduleNativeBlurEnable(
+        service: InputMethodService,
+        window: Window,
+        inputView: View?,
+        nativeState: NativeBlurState,
+        generation: Int,
+        cornerRadiusPx: Float,
+        targetBlurRadius: Int
+    ) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
+        val decorView = window.decorView
+        // Post activation so AOSP samples the uniform background outline during the next predraw.
+        decorView.post {
+            if (generation != nativeState.generation || !isFrostedTheme(service)) return@post
+            applyDefaultBlur(service, window, true)
+            markNativeBlurReady(window, inputView, nativeState, cornerRadiusPx, targetBlurRadius)
+            Log.d(TAG, "Native Android window blur enabled via window.setBackgroundBlurRadius.")
+            samsungBlurTarget(inputView)?.invalidateOutline()
+            inputView?.invalidate()
+            decorView.invalidate()
+        }
+    }
+
+    private fun scheduleNativeBlurCleanupIfReady(
+        service: InputMethodService,
+        window: Window,
+        inputView: View?,
+        nativeState: NativeBlurState,
+        generation: Int
+    ): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return false
+        if (!canReuseNativeBlur(window, inputView, nativeState, keyboardCornerRadiusPx(service), blurRadius(service))) return false
+
+        cancelPendingNativeBlurCleanup(nativeState)
+        val decorView = window.decorView
+        val cleanup = Runnable {
+            nativeState.pendingCleanup = null
+            nativeState.pendingCleanupDecorView = null
+            if (generation != nativeState.generation) return@Runnable
+            applyDefaultBlur(service, window, false)
+            clearNativeBlurReady(nativeState)
+            windowsWithAppliedFrostedGlass.remove(window)
+            samsungBlurTarget(inputView)?.invalidateOutline()
+            inputView?.invalidate()
+            decorView.invalidate()
+            Log.d(TAG, "Delayed native blur cleanup completed.")
+        }
+        nativeState.pendingCleanup = cleanup
+        nativeState.pendingCleanupDecorView = decorView
+        decorView.postDelayed(cleanup, NATIVE_BLUR_HIDE_CLEANUP_DELAY_MS)
+        return true
+    }
+
+    private fun reuseReadyNativeBlurIfPossible(
+        window: Window,
+        inputView: View?,
+        nativeState: NativeBlurState,
+        cornerRadiusPx: Float,
+        targetBlurRadius: Int
+    ): Boolean {
+        if (!canReuseNativeBlur(window, inputView, nativeState, cornerRadiusPx, targetBlurRadius)) return false
+        cancelPendingNativeBlurCleanup(nativeState)
+        samsungBlurTarget(inputView)?.invalidateOutline()
+        inputView?.invalidate()
+        window.decorView.invalidate()
+        return true
+    }
+
+    private fun canReuseNativeBlur(
+        window: Window,
+        inputView: View?,
+        nativeState: NativeBlurState,
+        cornerRadiusPx: Float,
+        targetBlurRadius: Int
+    ): Boolean {
+        return nativeState.ready &&
+                nativeState.decorView === window.decorView &&
+                nativeState.inputView === inputView &&
+                nativeState.cornerRadiusPx == cornerRadiusPx &&
+                nativeState.blurRadius == targetBlurRadius
+    }
+
+    private fun markNativeBlurReady(
+        window: Window,
+        inputView: View?,
+        nativeState: NativeBlurState,
+        cornerRadiusPx: Float,
+        targetBlurRadius: Int
+    ) {
+        nativeState.ready = true
+        nativeState.decorView = window.decorView
+        nativeState.inputView = inputView
+        nativeState.cornerRadiusPx = cornerRadiusPx
+        nativeState.blurRadius = targetBlurRadius
+    }
+
+    private fun clearNativeBlurReady(nativeState: NativeBlurState) {
+        nativeState.ready = false
+        nativeState.decorView = null
+        nativeState.inputView = null
+        nativeState.cornerRadiusPx = -1f
+        nativeState.blurRadius = -1
+    }
+
+    private fun cancelPendingNativeBlurCleanup(nativeState: NativeBlurState) {
+        val cleanup = nativeState.pendingCleanup
+        val decorView = nativeState.pendingCleanupDecorView
+        if (cleanup != null && decorView != null) {
+            decorView.removeCallbacks(cleanup)
+        }
+        nativeState.pendingCleanup = null
+        nativeState.pendingCleanupDecorView = null
+    }
+
+    private fun nativeBlurState(window: Window): NativeBlurState {
+        return synchronized(nativeBlurStates) {
+            nativeBlurStates.getOrPut(window) { NativeBlurState() }
+        }
+    }
+
+    private fun roundedWindowBackground(
+        context: Context,
+        color: Int,
+        topOnlyCorners: Boolean = true
+    ): GradientDrawable {
         val radiusPx = keyboardCornerRadiusPx(context)
         return GradientDrawable().apply {
             setColor(color)
-            cornerRadii = floatArrayOf(
-                radiusPx, radiusPx,
-                radiusPx, radiusPx,
-                0f, 0f,
-                0f, 0f
-            )
+            if (topOnlyCorners) {
+                cornerRadii = floatArrayOf(
+                    radiusPx, radiusPx,
+                    radiusPx, radiusPx,
+                    0f, 0f,
+                    0f, 0f
+                )
+            } else {
+                // Uniform radius lets AOSP pass a non-zero corner radius to BackgroundBlurDrawable.
+                setCornerRadius(radiusPx)
+            }
         }
     }
 
@@ -498,9 +706,6 @@ object FrostedGlassHelper {
     private fun applySolidFallbackBackground(context: Context, window: Window, inputView: View?) {
         val color = solidFallbackColor(context)
         window.setBackgroundDrawable(roundedWindowBackground(context, color))
-        val decorView = window.decorView
-        decorView.outlineProvider = ViewOutlineProvider.BACKGROUND
-        decorView.clipToOutline = true
         inputView?.setBackgroundColor(Color.TRANSPARENT)
         samsungBlurTarget(inputView)?.let { target ->
             target.setBackgroundColor(color)
