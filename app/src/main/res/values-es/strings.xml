@@ -266,7 +266,6 @@
     <string name="var_toolbar_direction">Dirección variable de la barra de herramientas</string>
     <string name="subtype_xdq">Kaitag</string>
     <string name="close_history" tools:keep="@string/close_history">Cerrar historial del portapapeles</string>
-    <string name="clipboard_toolbar_keys">Seleccionar teclas de la barra de herramientas del portapapeles</string>
     <string name="show_popup_hints">Mostrar símbolos funcionales</string>
     <string name="show_popup_hints_summary">Muestra símbolos si al mantener pulsada una tecla se activan funciones adicionales</string>
     <string name="var_toolbar_direction_summary">Invertir dirección cuando un subtipo de teclado Derecha-a-Izquierda está seleccionado</string>

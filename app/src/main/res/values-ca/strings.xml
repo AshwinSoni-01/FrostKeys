@@ -189,7 +189,6 @@
     <string name="replace_dictionary_message">Realment substituir el diccionari afegit per l\'usuari «%1$s»?\n\nDiccionari actual:\n%2$s\n\nNou diccionari:\n%3$s</string>
     <string name="replace_dictionary">Substitueix diccionari</string>
     <string name="remove_dictionary_message">Eliminar realment el diccionari afegit per l\'usuari «%s»?</string>
-    <string name="clipboard_toolbar_keys">Selecciona les tecles de la barra d\'eines del porta-retalls</string>
     <string name="close_history" tools:keep="@string/close_history">Tanca l\'historial del porta-retalls</string>
     <string name="layout_symbols_arabic" tools:keep="@string/layout_symbols_arabic">Símbols (Àrab)</string>
     <string name="layout_symbols" tools:keep="@string/layout_symbols">Símbols</string>

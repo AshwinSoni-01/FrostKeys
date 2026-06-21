@@ -403,8 +403,6 @@
     <string name="redo" tools:keep="@string/redo">Redo</string>
     <string name="close_history" tools:keep="@string/close_history">Close clipboard history</string>
     <string name="emoji" tools:keep="@string/emoji">Emoji</string>
-    <!-- Title of the setting to set clipboard toolbar keys -->
-    <string name="clipboard_toolbar_keys">Select clipboard toolbar keys</string>
     <!-- Title of the setting to set pinned toolbar keys -->
     <string name="pinned_toolbar_keys">Select pinned toolbar buttons</string>
     <!-- Title of the setting to choose the fixed right-side toolbar button -->

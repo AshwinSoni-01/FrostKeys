@@ -304,7 +304,6 @@
     <string name="center_suggestion_text_to_enter">Erabili beti erdiko iradokizuna</string>
     <string name="center_suggestion_text_to_enter_summary">Zuriunea edo puntuazioa sakatzean, erdiko iradokizuna sartuko da</string>
     <string name="close_history" tools:keep="@string/close_history">Itxi arbelaren historia</string>
-    <string name="clipboard_toolbar_keys">Hautatu arbeleko tresna-barrako teklak</string>
     <string name="more_colors">Erakutsi kolore gehiago</string>
     <string name="all_colors_warning">Ezarpen honek barnean erabiltzen diren kolore guztiak agerian uzten ditu. Koloreen zerrenda edozein unetan alda daiteke. Kolore lehenetsia aleatorioa da, eta izenak ez dira itzuliko.</string>
     <string name="layout_functional_keys" tools:keep="@string/layout_functional_keys">Funtzio-teklak</string>

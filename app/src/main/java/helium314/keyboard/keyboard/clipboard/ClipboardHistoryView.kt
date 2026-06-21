@@ -5,40 +5,44 @@ package helium314.keyboard.keyboard.clipboard
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.SharedPreferences
+import android.content.res.ColorStateList
+import android.graphics.Color
+import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.InsetDrawable
+import android.graphics.drawable.RippleDrawable
 import android.util.AttributeSet
 import android.util.TypedValue
 import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.widget.ImageButton
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
+import androidx.core.graphics.ColorUtils
 import androidx.recyclerview.widget.StaggeredGridLayoutManager
 import helium314.keyboard.event.HapticEvent
 import helium314.keyboard.keyboard.KeyboardActionListener
 import helium314.keyboard.keyboard.KeyboardId
 import helium314.keyboard.keyboard.KeyboardLayoutSet
-import helium314.keyboard.keyboard.KeyboardSwitcher
 import helium314.keyboard.keyboard.KeyboardTypeface
 import helium314.keyboard.keyboard.MainKeyboardView
 import helium314.keyboard.keyboard.PointerTracker
 import helium314.keyboard.keyboard.internal.KeyDrawParams
 import helium314.keyboard.keyboard.internal.KeyVisualAttributes
+import helium314.keyboard.keyboard.internal.KeyboardIconsSet
 import helium314.keyboard.keyboard.internal.keyboard_parser.floris.KeyCode
 import helium314.keyboard.latin.AudioAndHapticFeedbackManager
 import helium314.keyboard.latin.ClipboardHistoryManager
 import helium314.keyboard.latin.R
+import helium314.keyboard.latin.common.Colors
 import helium314.keyboard.latin.common.ColorType
 import helium314.keyboard.latin.common.Constants
 import helium314.keyboard.latin.database.ClipboardDao
 import helium314.keyboard.latin.settings.Settings
 import helium314.keyboard.latin.utils.ResourceUtils
 import helium314.keyboard.latin.utils.ToolbarKey
-import helium314.keyboard.latin.utils.createToolbarKey
-import helium314.keyboard.latin.utils.getCodeForToolbarKey
-import helium314.keyboard.latin.utils.getCodeForToolbarKeyLongClick
-import helium314.keyboard.latin.utils.getEnabledClipboardToolbarKeys
+import helium314.keyboard.latin.utils.dpToPx
 import helium314.keyboard.latin.utils.prefs
-import helium314.keyboard.latin.utils.setToolbarButtonsActivatedStateOnPrefChange
 
 @SuppressLint("CustomViewStyleable")
 class ClipboardHistoryView @JvmOverloads constructor(
@@ -47,7 +51,7 @@ class ClipboardHistoryView @JvmOverloads constructor(
         defStyle: Int = R.attr.clipboardHistoryViewStyle
 ) : LinearLayout(context, attrs, defStyle), View.OnClickListener,
     ClipboardDao.Listener, OnKeyEventListener,
-    View.OnLongClickListener, SharedPreferences.OnSharedPreferenceChangeListener {
+    SharedPreferences.OnSharedPreferenceChangeListener {
 
     private val clipboardLayoutParams = ClipboardLayoutParams(context)
     private val pinIconId: Int
@@ -55,7 +59,9 @@ class ClipboardHistoryView @JvmOverloads constructor(
 
     private lateinit var clipboardRecyclerView: ClipboardHistoryRecyclerView
     private lateinit var placeholderView: TextView
-    private val toolbarKeys = mutableListOf<ImageButton>()
+    private lateinit var backButton: ImageButton
+    private lateinit var clearButton: ImageButton
+    private lateinit var titleView: TextView
     private lateinit var clipboardAdapter: ClipboardAdapter
 
     lateinit var keyboardActionListener: KeyboardActionListener
@@ -70,10 +76,6 @@ class ClipboardHistoryView @JvmOverloads constructor(
         val keyboardViewAttr = context.obtainStyledAttributes(attrs, R.styleable.KeyboardView, defStyle, R.style.KeyboardView)
         keyBackgroundId = keyboardViewAttr.getResourceId(R.styleable.KeyboardView_keyBackground, 0)
         keyboardViewAttr.recycle()
-        if (Settings.getValues().mSecondaryStripVisible) {
-            getEnabledClipboardToolbarKeys(context.prefs())
-                .forEach { toolbarKeys.add(createToolbarKey(context, it)) }
-        }
     }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
@@ -81,20 +83,22 @@ class ClipboardHistoryView @JvmOverloads constructor(
         val abcHeight = ResourceUtils.getKeyboardHeight(resources, settings)
         val persistentEmojiEnabled = context.prefs().getBoolean(Settings.PREF_PERSISTENT_EMOJI_ROW, helium314.keyboard.latin.settings.Defaults.PREF_PERSISTENT_EMOJI_ROW)
         val emojiRowHeight = if (persistentEmojiEnabled) (41 * resources.displayMetrics.density).toInt() else 0
-        val finalHeight = abcHeight + emojiRowHeight + paddingTop + paddingBottom - (6 * resources.displayMetrics.density).toInt() + 1
+        val toolbarHeight = resources.getDimensionPixelSize(R.dimen.config_suggestions_strip_height)
+        val finalHeight = abcHeight + emojiRowHeight + toolbarHeight + paddingTop + paddingBottom - (6 * resources.displayMetrics.density).toInt() + 1
         super.onMeasure(widthMeasureSpec, MeasureSpec.makeMeasureSpec(finalHeight, MeasureSpec.EXACTLY))
         setMeasuredDimension(MeasureSpec.getSize(widthMeasureSpec), finalHeight)
     }
 
-    @SuppressLint("ClickableViewAccessibility")
-    private fun initialize() { // needs to be delayed for access to ClipboardStrip, which is not a child of this view
+    private fun initialize() {
         if (this::clipboardAdapter.isInitialized) return
-        val colors = Settings.getValues().mColors
         clipboardAdapter = ClipboardAdapter(clipboardLayoutParams, this).apply {
             itemBackgroundId = keyBackgroundId
             pinnedIconResId = pinIconId
         }
         placeholderView = findViewById(R.id.clipboard_empty_view)
+        titleView = findViewById(R.id.clipboard_title)
+        backButton = findViewById(R.id.clipboard_back_button)
+        clearButton = findViewById(R.id.clipboard_clear_button)
         clipboardRecyclerView = findViewById<ClipboardHistoryRecyclerView>(R.id.clipboard_list).apply {
             val colCount = resources.getInteger(R.integer.config_clipboard_keyboard_col_count)
             layoutManager = StaggeredGridLayoutManager(colCount, StaggeredGridLayoutManager.VERTICAL)
@@ -102,14 +106,6 @@ class ClipboardHistoryView @JvmOverloads constructor(
             persistentDrawingCache = PERSISTENT_NO_CACHE
             clipboardLayoutParams.setListProperties(this)
             placeholderView = this@ClipboardHistoryView.placeholderView
-        }
-        val clipboardStrip = KeyboardSwitcher.getInstance().clipboardStrip
-        toolbarKeys.forEach {
-            clipboardStrip.addView(it)
-            it.setOnClickListener(this@ClipboardHistoryView)
-            it.setOnLongClickListener(this@ClipboardHistoryView)
-            colors.setColor(it, ColorType.TOOL_BAR_KEY)
-            colors.setBackground(it, ColorType.STRIP_BACKGROUND)
         }
     }
 
@@ -122,10 +118,42 @@ class ClipboardHistoryView @JvmOverloads constructor(
         }
     }
 
-    private fun setupToolbarKeys() {
-        // set layout params
-        val toolbarKeyLayoutParams = LayoutParams(resources.getDimensionPixelSize(R.dimen.config_suggestions_strip_edge_key_width), LayoutParams.MATCH_PARENT)
-        toolbarKeys.forEach { it.layoutParams = toolbarKeyLayoutParams }
+    private fun setupHeader() {
+        val colors = Settings.getValues().mColors
+        KeyboardTypeface.applyToTextView(
+            titleView,
+            titleView.text,
+            android.graphics.Typeface.defaultFromStyle(android.graphics.Typeface.BOLD)
+        )
+        titleView.setTextColor(colors.get(ColorType.KEY_TEXT))
+
+        setupHeaderButton(backButton, colors)
+        backButton.setOnClickListener(this)
+
+        setupHeaderButton(clearButton, colors)
+        clearButton.setImageDrawable(KeyboardIconsSet.instance.getNewDrawable(ToolbarKey.CLEAR_CLIPBOARD.name, context))
+        clearButton.setOnClickListener(this)
+    }
+
+    private fun setupHeaderButton(button: ImageButton, colors: Colors) {
+        button.imageTintList = ColorStateList.valueOf(colors.get(ColorType.KEY_TEXT))
+        button.background = createHeaderButtonBackground(colors)
+        button.setPadding(0, 0, 0, 0)
+        button.scaleType = ImageView.ScaleType.CENTER
+    }
+
+    private fun createHeaderButtonBackground(colors: Colors): RippleDrawable {
+        val shape = GradientDrawable().apply {
+            shape = GradientDrawable.OVAL
+            setColor(Color.WHITE)
+            colors.setColor(this, ColorType.SPECIAL_KEY_BACKGROUND)
+        }
+        val rippleColor = ColorStateList.valueOf(
+            ColorUtils.setAlphaComponent(colors.get(ColorType.FUNCTIONAL_KEY_TEXT), 0x33)
+        )
+        val inset = 3.dpToPx(resources)
+        val content = InsetDrawable(shape, inset, inset, inset, inset)
+        return RippleDrawable(rippleColor, content, content.constantState?.newDrawable()?.mutate())
     }
 
     private fun setupBottomRowKeyboard(editorInfo: EditorInfo, listener: KeyboardActionListener) {
@@ -151,7 +179,7 @@ class ClipboardHistoryView @JvmOverloads constructor(
     ) {
         clipboardHistoryManager = historyManager
         initialize()
-        setupToolbarKeys()
+        setupHeader()
         historyManager.prepareClipboardHistory()
         historyManager.setHistoryChangeListener(this)
         clipboardAdapter.clipboardHistoryManager = historyManager
@@ -185,9 +213,6 @@ class ClipboardHistoryView @JvmOverloads constructor(
             keyboardAttr.recycle()
             setPadding(leftPadding, paddingTop, rightPadding, paddingBottom)
         }
-
-        // absurd workaround so Android sets the correct color from stateList (depending on "activated")
-        toolbarKeys.forEach { it.isEnabled = false; it.isEnabled = true }
     }
 
     fun stopClipboardHistory() {
@@ -198,33 +223,15 @@ class ClipboardHistoryView @JvmOverloads constructor(
     }
 
     override fun onClick(view: View) {
-        val tag = view.tag
-        if (tag is ToolbarKey) {
-            AudioAndHapticFeedbackManager.getInstance().performHapticAndAudioFeedback(KeyCode.NOT_SPECIFIED, this, HapticEvent.KEY_PRESS)
-            val code = getCodeForToolbarKey(tag)
-            if (code != KeyCode.UNSPECIFIED) {
-                keyboardActionListener.onCodeInput(code, Constants.NOT_A_COORDINATE, Constants.NOT_A_COORDINATE, false)
-                return
-            }
+        AudioAndHapticFeedbackManager.getInstance().performHapticAndAudioFeedback(KeyCode.NOT_SPECIFIED, this, HapticEvent.KEY_PRESS)
+        val code = when (view.id) {
+            R.id.clipboard_back_button -> KeyCode.ALPHA
+            R.id.clipboard_clear_button -> KeyCode.CLIPBOARD_CLEAR_HISTORY
+            else -> KeyCode.UNSPECIFIED
         }
-    }
-
-    override fun onLongClick(view: View): Boolean {
-        val tag = view.tag
-        if (tag is ToolbarKey) {
-            AudioAndHapticFeedbackManager.getInstance().performHapticAndAudioFeedback(KeyCode.NOT_SPECIFIED, this, HapticEvent.KEY_LONG_PRESS)
-            val longClickCode = getCodeForToolbarKeyLongClick(tag)
-            if (longClickCode != KeyCode.UNSPECIFIED) {
-                keyboardActionListener.onCodeInput(
-                    longClickCode,
-                    Constants.NOT_A_COORDINATE,
-                    Constants.NOT_A_COORDINATE,
-                    false
-                )
-            }
-            return true
+        if (code != KeyCode.UNSPECIFIED) {
+            keyboardActionListener.onCodeInput(code, Constants.NOT_A_COORDINATE, Constants.NOT_A_COORDINATE, false)
         }
-        return false
     }
 
     override fun onKeyDown(clipId: Long) {
@@ -257,8 +264,6 @@ class ClipboardHistoryView @JvmOverloads constructor(
     }
 
     override fun onSharedPreferenceChanged(prefs: SharedPreferences?, key: String?) {
-        setToolbarButtonsActivatedStateOnPrefChange(KeyboardSwitcher.getInstance().clipboardStrip, key)
-
         // The setting can only be changed from a settings screen, but adding it to this listener seems necessary: https://github.com/HeliBorg/HeliBoard/pull/1903#issuecomment-3478424606
         if (::clipboardHistoryManager.isInitialized && key == Settings.PREF_CLIPBOARD_HISTORY_PINNED_FIRST) {
             // Ensure settings are reloaded first

@@ -297,7 +297,6 @@
     <string name="language_switch_key_behavior">Паводзіны клавішы змены мовы</string>
     <string name="center_suggestion_text_to_enter">Заўсёды выкарыстоўваць сярэднюю прапанову</string>
     <string name="gesture_fast_typing_cooldown">Час аднаўлення хуткага друку</string>
-    <string name="clipboard_toolbar_keys">Выбраць клавішы панэлі інструментаў буфера абмену</string>
     <string name="all_colors_warning">Гэтая настройка паказвае ўсе колеры, якія выкарыстоўваюцца ўнутры праграмы. Спіс колераў можа мяняцца. Колер па змаўчанні з\'яўляецца выпадковым, і імёны не будуць перакладзены.</string>
     <string name="auto_show_toolbar_summary">Паказваць панэль інструментаў пры ўводзе ці пры выбары тэксту</string>
     <string name="auto_hide_toolbar">Хаваць панэль інструментаў аўтаматычна</string>

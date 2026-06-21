@@ -312,7 +312,6 @@
     <string name="settings_screen_toolbar">Barra degli strumenti</string>
     <string name="center_suggestion_text_to_enter">Usa sempre la parola suggerita al centro</string>
     <string name="close_history" tools:keep="@string/close_history">Chiudi la cronologia appunti</string>
-    <string name="clipboard_toolbar_keys">Scegli i tasti mostrati insieme alla cronologia appunti (nella barra superiore)</string>
     <string name="language_switch_key_behavior">Comportamento del tasto \'Cambia lingua\'</string>
     <string name="center_suggestion_text_to_enter_summary">All\'aggiunta di uno spazio o di un segno di punteggiatura, il suggerimento centrale è inserito automaticamente</string>
     <string name="toast_msg_clipboard_copy">Testo copiato</string>

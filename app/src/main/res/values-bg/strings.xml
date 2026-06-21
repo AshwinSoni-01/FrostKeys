@@ -186,7 +186,6 @@
     <string name="full_left" tools:keep="@string/full_left">Напълно вляво</string>
     <string name="full_right" tools:keep="@string/full_right">Напълно вдясно</string>
     <string name="close_history" tools:keep="@string/close_history">Затваряне на хронологията на клипборда</string>
-    <string name="clipboard_toolbar_keys">Избиране на клавиши от лентата с инструменти за клипборд</string>
     <string name="quick_pin_toolbar_keys">Закачи клавиш от лентата с инструменти при дълго натискане</string>
     <string name="layout_numpad" tools:keep="@string/layout_numpad">Цифрова клавиатура</string>
     <string name="prefs_space_bar_text">Персонализиран текст в лентата за интервал</string>
