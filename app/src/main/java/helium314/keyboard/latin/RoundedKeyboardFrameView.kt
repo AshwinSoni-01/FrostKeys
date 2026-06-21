@@ -5,10 +5,13 @@ package helium314.keyboard.latin
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.Outline
 import android.graphics.Path
 import android.graphics.RectF
 import android.os.Build
 import android.util.AttributeSet
+import android.view.View
+import android.view.ViewOutlineProvider
 import android.widget.LinearLayout
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.ColorUtils
@@ -24,6 +27,7 @@ class RoundedKeyboardFrameView @JvmOverloads constructor(
 ) : LinearLayout(context, attrs, defStyleAttr) {
 
     private val clipPath = Path()
+    private val outlineClipPath = Path()
     private val clipRect = RectF()
     private var lastWidth = -1
     private var lastHeight = -1
@@ -34,7 +38,35 @@ class RoundedKeyboardFrameView @JvmOverloads constructor(
     private val prefListener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
         if (key == Settings.PREF_KEYBOARD_CORNER_RADIUS) {
             cachedRadiusPx = -1f
+            invalidateOutline()
             postInvalidate()
+        }
+    }
+
+    init {
+        // Also clip via HWUI so hardware-layered descendants respect the rounded keyboard shape.
+        // Android 13+ supports path outlines, which lets us keep only the top corners rounded.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            outlineProvider = object : ViewOutlineProvider() {
+                override fun getOutline(view: View, outline: Outline) {
+                    val radiusPx = if (cachedRadiusPx >= 0f) cachedRadiusPx else keyboardCornerRadiusPx()
+                    if (view.width <= 0 || view.height <= 0 || radiusPx <= 0f) {
+                        outline.setRect(0, 0, view.width, view.height)
+                        return
+                    }
+                    outlineClipPath.reset()
+                    outlineClipPath.addRoundRect(
+                        0f,
+                        0f,
+                        view.width.toFloat(),
+                        view.height.toFloat(),
+                        floatArrayOf(radiusPx, radiusPx, radiusPx, radiusPx, 0f, 0f, 0f, 0f),
+                        Path.Direction.CW
+                    )
+                    outline.setPath(outlineClipPath)
+                }
+            }
+            clipToOutline = true
         }
     }
 
@@ -42,12 +74,22 @@ class RoundedKeyboardFrameView @JvmOverloads constructor(
         super.onAttachedToWindow()
         context.prefs().registerOnSharedPreferenceChangeListener(prefListener)
         cachedRadiusPx = -1f
+        invalidateOutline()
     }
 
     override fun onDetachedFromWindow() {
         super.onDetachedFromWindow()
         context.prefs().unregisterOnSharedPreferenceChangeListener(prefListener)
         staticDustOverlay.clear()
+    }
+
+    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+        super.onSizeChanged(w, h, oldw, oldh)
+        // Rebuild outline as soon as the IME view gets its real size.
+        lastWidth = -1
+        lastHeight = -1
+        invalidateOutline()
+        postInvalidateOnAnimation()
     }
 
     override fun draw(canvas: Canvas) {
