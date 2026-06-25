@@ -4,6 +4,7 @@
 .kotlin
 local.properties
 .DS_Store
+*.apk
 Gemfile
 build
 app/build
