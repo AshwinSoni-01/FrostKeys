@@ -4,7 +4,9 @@ package helium314.keyboard.latin.utils
 import android.content.Context
 import android.content.ClipData
 import android.content.SharedPreferences
+import android.os.Build
 import android.view.View
+import android.view.View.DragShadowBuilder
 import android.view.ViewGroup
 import android.widget.ImageButton
 import android.widget.ImageView
@@ -36,6 +38,18 @@ data class ToolbarDragState(
     val source: ToolbarDragSource,
     val sourceView: View? = null,
 )
+
+@Suppress("DEPRECATION")
+fun View.startDragAndDropCompat(
+    clipData: ClipData,
+    shadowBuilder: DragShadowBuilder,
+    localState: Any?,
+    flags: Int = 0,
+): Boolean = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+    startDragAndDrop(clipData, shadowBuilder, localState, flags)
+} else {
+    startDrag(clipData, shadowBuilder, localState, flags)
+}
 
 fun createToolbarKey(context: Context, key: ToolbarKey): ImageButton {
     val button = ImageButton(context, null, R.attr.suggestionWordStyle)
