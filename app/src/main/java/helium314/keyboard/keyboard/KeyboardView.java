@@ -785,7 +785,8 @@ public class KeyboardView extends View {
             }
             final int iconX = (keyWidth - iconWidth) / 2; // Align horizontally center.
             setKeyIconColor(key, icon, keyboard);
-            drawIcon(canvas, icon, iconX, iconY, iconWidth, iconHeight);
+            drawIcon(canvas, icon, iconX, iconY, iconWidth, iconHeight,
+                    shouldMirrorIconForRtl(key, keyboard));
         }
 
         if (key.hasPopupHint() && key.getPopupKeys() != null) {
@@ -825,10 +826,27 @@ public class KeyboardView extends View {
 
     protected static void drawIcon(@NonNull final Canvas canvas, @NonNull final Drawable icon,
             final int x, final int y, final int width, final int height) {
+        drawIcon(canvas, icon, x, y, width, height, false);
+    }
+
+    protected static void drawIcon(@NonNull final Canvas canvas, @NonNull final Drawable icon,
+            final int x, final int y, final int width, final int height,
+            final boolean mirrorHorizontally) {
+        final int saveCount = canvas.save();
         canvas.translate(x, y);
+        if (mirrorHorizontally) {
+            canvas.translate(width, 0);
+            canvas.scale(-1.0f, 1.0f);
+        }
         icon.setBounds(0, 0, width, height);
         icon.draw(canvas);
-        canvas.translate(-x, -y);
+        canvas.restoreToCount(saveCount);
+    }
+
+    private boolean shouldMirrorIconForRtl(@NonNull final Key key, @Nullable final Keyboard keyboard) {
+        return keyboard != null
+                && keyboard.mId.mSubtype.isRtlSubtype()
+                && key.getCode() == KeyCode.DELETE;
     }
 
     public Paint newLabelPaint(@Nullable final Key key) {

@@ -21,6 +21,7 @@ import helium314.keyboard.latin.utils.LayoutUtils
 import helium314.keyboard.latin.utils.LayoutType
 import helium314.keyboard.latin.utils.POPUP_KEYS_LAYOUT
 import helium314.keyboard.latin.utils.POPUP_KEYS_NUMBER
+import helium314.keyboard.latin.utils.ScriptUtils
 import helium314.keyboard.latin.utils.replaceFirst
 import helium314.keyboard.latin.utils.splitAt
 import helium314.keyboard.latin.utils.sumOf
@@ -166,6 +167,7 @@ class KeyboardParser(private val params: KeyboardParams, private val context: Co
         // expand width = -1 keys and make sure rows fit on screen, insert spacers if necessary
         bassKeyParams.forEachIndexed { i, keys ->
             val (functionalKeysLeft, functionalKeysRight) = functionalKeys[i]
+            normalizeArabicScriptDeleteKeyWidth(keys, functionalKeysLeft, functionalKeysRight)
             // sum up width, excluding -1 elements (put those in a separate list)
             val varWidthKeys = mutableListOf<KeyParams>()
             var totalWidth = 0f
@@ -230,6 +232,39 @@ class KeyboardParser(private val params: KeyboardParams, private val context: Co
         lastNormalFullRow.add(lastNormalFullRow.indexOfLast { it == lastNormalRow.last() } + 1, KeyParams.newSpacer(params, spacerWidth))
 
         return keysInRows
+    }
+
+    private fun normalizeArabicScriptDeleteKeyWidth(
+        baseKeys: List<KeyParams>,
+        functionalKeysLeft: List<KeyParams>,
+        functionalKeysRight: List<KeyParams>
+    ) {
+        if (!params.mId.isAlphabetKeyboard || baseKeys.isEmpty()) return
+        val baseKeyWidth = baseKeys.first().mWidth
+        if (baseKeyWidth <= 0f
+                || baseKeys.any {
+                    it.isSpacer
+                            || it.mBackgroundType != Key.BACKGROUND_TYPE_NORMAL
+                            || it.mWidth != baseKeyWidth
+                            || !isArabicScriptKey(it)
+                }) {
+            return
+        }
+
+        val functionalKeys = functionalKeysLeft + functionalKeysRight
+        if (functionalKeys.any { it.mCode == KeyCode.SHIFT }) return
+        val deleteKey = functionalKeys.singleOrNull { it.mCode == KeyCode.DELETE } ?: return
+        val otherFunctionalKeysWidth = functionalKeys.sumOf { it.mWidth } - deleteKey.mWidth
+        val targetWidth = (1f - otherFunctionalKeysWidth) / (baseKeys.size + 1).toFloat()
+        if (targetWidth > 0f && deleteKey.mWidth > targetWidth)
+            deleteKey.mWidth = targetWidth
+    }
+
+    private fun isArabicScriptKey(key: KeyParams): Boolean {
+        val label = key.mLabel ?: return false
+        if (label.isEmpty()) return false
+        val codePoint = label.codePointAt(0)
+        return ScriptUtils.isLetterPartOfScript(codePoint, ScriptUtils.SCRIPT_ARABIC)
     }
 
     /**

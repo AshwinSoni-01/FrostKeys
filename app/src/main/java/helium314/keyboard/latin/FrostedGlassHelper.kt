@@ -30,8 +30,13 @@ object FrostedGlassHelper {
 
     private const val TAG = "KBoardBlur"
     private const val SAMSUNG_EXTENSION_FLAG_BLUR = 0x10
+    private const val ANDROID_15_API = 35
+    private const val SAMSUNG_BLUR_PRESET_DARK = 130
+    private const val SAMSUNG_BLUR_PRESET_LIGHT = 115
     private const val NATIVE_BLUR_HIDE_CLEANUP_DELAY_MS = 250L
     private val failedSamsungSemBlurModes = mutableSetOf<String>()
+    private var loggedSamsungLegacyApplyUnavailable = false
+    private var loggedSamsungLegacyClearUnavailable = false
     private val windowsWithAppliedFrostedGlass: MutableSet<Window> =
         Collections.newSetFromMap(WeakHashMap<Window, Boolean>())
     private val windowsWithResizeOverlayBlurSuppressed: MutableSet<Window> =
@@ -84,6 +89,7 @@ object FrostedGlassHelper {
         var setBackgroundColorMethod: Method? = null
         var setBackgroundCornerRadiusMethod: Method? = null
         var setBlurModeMethod: Method? = null
+        var setColorCurvePresetMethod: Method? = null
         var buildMethod: Method? = null
         var semSetBlurInfoMethod: Method? = null
 
@@ -106,18 +112,19 @@ object FrostedGlassHelper {
                 }.getOrNull()
 
                 // Cache builder methods
-                setRadiusMethod = findMethod(bc, listOf("setRadius", "hidden_setRadius"), Int::class.javaPrimitiveType!!)
-                setBackgroundColorMethod = findMethod(bc, listOf("setBackgroundColor", "hidden_setBackgroundColor"), Int::class.javaPrimitiveType!!)
-                setBackgroundCornerRadiusMethod = findMethod(bc, listOf("setBackgroundCornerRadius", "hidden_setBackgroundCornerRadius"), Float::class.javaPrimitiveType!!)
-                setBlurModeMethod = findMethod(bc, listOf("setBlurMode", "hidden_setBlurMode"), Int::class.javaPrimitiveType!!)
-                buildMethod = bc.getMethod("build").apply { isAccessible = true }
+                setRadiusMethod = findMethod(bc, listOf("hidden_setRadius", "setRadius"), Int::class.javaPrimitiveType!!)
+                setBackgroundColorMethod = findMethod(bc, listOf("hidden_setBackgroundColor", "setBackgroundColor"), Int::class.javaPrimitiveType!!)
+                setBackgroundCornerRadiusMethod = findMethod(bc, listOf("hidden_setBackgroundCornerRadius", "setBackgroundCornerRadius"), Float::class.javaPrimitiveType!!)
+                setBlurModeMethod = findMethod(bc, listOf("hidden_setBlurMode", "setBlurMode"), Int::class.javaPrimitiveType!!)
+                setColorCurvePresetMethod = findMethod(bc, listOf("setColorCurvePreset"), Int::class.javaPrimitiveType!!)
+                buildMethod = findNoArgMethod(bc, listOf("hidden_build", "build"))
 
                 // Cache View method
-                semSetBlurInfoMethod = runCatching {
-                    View::class.java.getMethod("semSetBlurInfo", sbi)
-                }.recoverCatching {
-                    View::class.java.getDeclaredMethod("semSetBlurInfo", sbi)
-                }.getOrNull()?.apply { isAccessible = true }
+                semSetBlurInfoMethod = findMethod(
+                    View::class.java,
+                    listOf("hidden_semSetBlurInfo", "semSetBlurInfo"),
+                    sbi
+                )
 
                 // Parse and pre-cache modes
                 val modes = mutableListOf<SemBlurMode>()
@@ -144,16 +151,38 @@ object FrostedGlassHelper {
                     cachedCandidates = listOf(SemBlurMode("BLUR_MODE_WINDOW", 0))
                 }
 
-                initialized = semSetBlurInfoMethod != null && (builderIntConstructor != null || builderNoArgConstructor != null)
+                initialized = buildMethod != null &&
+                        semSetBlurInfoMethod != null &&
+                        (builderIntConstructor != null || builderNoArgConstructor != null)
+                Log.d(
+                    TAG,
+                    "Samsung SemBlurInfo reflection initialized=$initialized " +
+                            "viewMethod=${semSetBlurInfoMethod?.name} " +
+                            "buildMethod=${buildMethod?.name} " +
+                            "presetMethod=${setColorCurvePresetMethod?.name}"
+                )
             } catch (e: Throwable) {
                 Log.e(TAG, "Failed to initialize Samsung SemBlurInfo reflection framework", e)
             }
         }
 
+        private fun findNoArgMethod(clazz: Class<*>, names: List<String>): Method? {
+            for (name in names) {
+                val method = runCatching { clazz.getDeclaredMethod(name) }
+                    .recoverCatching { clazz.getMethod(name) }
+                    .getOrNull()
+                if (method != null) {
+                    method.isAccessible = true
+                    return method
+                }
+            }
+            return null
+        }
+
         private fun findMethod(clazz: Class<*>, names: List<String>, paramType: Class<*>): Method? {
             for (name in names) {
-                val method = runCatching { clazz.getMethod(name, paramType) }
-                    .recoverCatching { clazz.getDeclaredMethod(name, paramType) }
+                val method = runCatching { clazz.getDeclaredMethod(name, paramType) }
+                    .recoverCatching { clazz.getMethod(name, paramType) }
                     .getOrNull()
                 if (method != null) {
                     method.isAccessible = true
@@ -224,6 +253,8 @@ object FrostedGlassHelper {
         val nativeState = nativeBlurState(window)
         val generation = ++nativeState.generation
         val overrideMode = service.prefs().getString(Settings.PREF_BLUR_RENDER_OVERRIDE, "auto")
+        val isSamsungDevice = Build.MANUFACTURER.equals("samsung", ignoreCase = true)
+        val shouldTrySamsungBlur = isSamsungDevice || overrideMode == "force_samsung"
 
         if (enable && windowsWithResizeOverlayBlurSuppressed.contains(window)) {
             configureFrostedGlassInternal(service, inputView, false, allowDelayedNativeCleanup = false)
@@ -240,7 +271,9 @@ object FrostedGlassHelper {
             }
 
             constrainImeWindowToKeyboardBounds(service, window, inputView)
-            if (allowDelayedNativeCleanup && scheduleNativeBlurCleanupIfReady(service, window, inputView, nativeState, generation)) {
+            if (allowDelayedNativeCleanup &&
+                    service.isInputViewShown &&
+                    scheduleNativeBlurCleanupIfReady(service, window, inputView, nativeState, generation)) {
                 Log.i(TAG, "Frosted glass disabled. Scheduled native blur cleanup.")
                 return
             }
@@ -249,25 +282,34 @@ object FrostedGlassHelper {
             clearNativeBlurReady(nativeState)
             windowsWithAppliedFrostedGlass.remove(window)
             val nativeBlurChanged = applyDefaultBlur(service, window, false)
-            if (Build.MANUFACTURER.equals("samsung", ignoreCase = true) || overrideMode == "force_samsung") {
+            if (shouldTrySamsungBlur) {
                 applySamsungSemBlur(window, inputView, false)
                 applySamsungLegacyBlur(window, false)
             }
-            if (nativeBlurChanged || Build.MANUFACTURER.equals("samsung", ignoreCase = true) || overrideMode == "force_samsung") {
+            if (nativeBlurChanged || shouldTrySamsungBlur) {
                 Log.i(TAG, "Frosted glass disabled. Cleared blur state.")
             }
             return
         }
 
+        if (!service.isInputViewShown) {
+            cancelPendingNativeBlurCleanup(nativeState)
+            clearNativeBlurReady(nativeState)
+            windowsWithAppliedFrostedGlass.remove(window)
+            applyDefaultBlur(service, window, false, force = true)
+            Log.d(TAG, "Skipped frosted blur enable while IME input view is hidden.")
+            return
+        }
+
         constrainImeWindowToKeyboardBounds(service, window, inputView)
         val blurAvailable = isSystemBlurAvailable(service)
-        val shouldUseSolidFallback = overrideMode == "force_solid" || !blurAvailable
+        val shouldUseSolidFallback = overrideMode == "force_solid" || (!blurAvailable && !shouldTrySamsungBlur)
 
         if (shouldUseSolidFallback) {
             cancelPendingNativeBlurCleanup(nativeState)
             clearNativeBlurReady(nativeState)
             val nativeBlurChanged = applyDefaultBlur(service, window, false, solidFallbackColor(service))
-            if (Build.MANUFACTURER.equals("samsung", ignoreCase = true) || overrideMode == "force_samsung") {
+            if (shouldTrySamsungBlur) {
                 clearSamsungSemBlur(samsungBlurTarget(inputView))
                 applySamsungLegacyBlur(window, false)
             }
@@ -289,24 +331,36 @@ object FrostedGlassHelper {
             "force_samsung" -> {
                 cancelPendingNativeBlurCleanup(nativeState)
                 clearNativeBlurReady(nativeState)
-                applySamsungSemBlur(window, inputView, true)
-                Log.i(TAG, "OVERRIDE: Force Samsung Proprietary Blur applied successfully via SemBlurInfo.")
+                if (applySamsungSemBlur(window, inputView, true, force = true)) {
+                    Log.i(TAG, "OVERRIDE: Force Samsung Proprietary Blur applied successfully via SemBlurInfo.")
+                } else if (applySamsungLegacyBlur(window, true)) {
+                    Log.i(TAG, "OVERRIDE: Force Samsung Proprietary Blur fell back to legacy semAddExtensionFlags.")
+                } else {
+                    applySolidFallbackBackground(service, window, inputView)
+                    Log.i(TAG, "OVERRIDE: Force Samsung Proprietary Blur failed; applied opaque frosted fallback.")
+                }
             }
             else -> {
                 // "auto" mode - The existing logic
-                if (Build.MANUFACTURER.equals("samsung", ignoreCase = true)) {
+                if (isSamsungDevice) {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                         cancelPendingNativeBlurCleanup(nativeState)
                         clearNativeBlurReady(nativeState)
-                        applySamsungSemBlur(window, inputView, true)
-                        Log.i(TAG, "AUTO: Samsung device detected (SDK >= S). Applied SemBlurInfo successfully.")
+                        if (applySamsungSemBlur(window, inputView, true)) {
+                            Log.i(TAG, "AUTO: Samsung device detected (SDK >= S). Applied SemBlurInfo successfully.")
+                        } else if (applySamsungLegacyBlur(window, true)) {
+                            Log.i(TAG, "AUTO: Samsung SemBlurInfo unavailable. Fell back to legacy semAddExtensionFlags.")
+                        } else {
+                            applySolidFallbackBackground(service, window, inputView)
+                            Log.i(TAG, "AUTO: Samsung proprietary blur unavailable. Applied opaque frosted fallback.")
+                        }
                     } else {
                         cancelPendingNativeBlurCleanup(nativeState)
                         clearNativeBlurReady(nativeState)
                         restoreFrostedThemeBackground(service, inputView)
                         val nativeBlurChanged = applyDefaultBlur(service, window, true)
-                        applySamsungLegacyBlur(window, true)
-                        if (nativeBlurChanged) {
+                        val legacyBlurChanged = applySamsungLegacyBlur(window, true)
+                        if (nativeBlurChanged || legacyBlurChanged) {
                             Log.i(TAG, "AUTO: Older Samsung device detected. Applied Legacy semAddExtensionFlags successfully.")
                         }
                     }
@@ -348,7 +402,7 @@ object FrostedGlassHelper {
         }
     }
 
-    private fun applySamsungSemBlur(window: Window, inputView: View?, enable: Boolean) {
+    private fun applySamsungSemBlur(window: Window, inputView: View?, enable: Boolean, force: Boolean = false): Boolean {
         val context = window.context
         val target = samsungBlurTarget(inputView)
 
@@ -360,94 +414,189 @@ object FrostedGlassHelper {
         inputView?.setBackgroundColor(Color.TRANSPARENT)
 
         if (!enable) {
-            clearSamsungSemBlur(target)
+            val cleared = clearSamsungSemBlur(target)
             restoreFrostedThemeBackground(context, inputView)
-            return
+            return cleared
         }
 
         if (target == null) {
-            Log.e(TAG, "SemBlurInfo target is null; falling back to opaque frosted background")
-            applySolidFallbackBackground(context, window, inputView)
-            return
+            Log.e(TAG, "SemBlurInfo target is null; trying next Samsung blur fallback")
+            return false
         }
 
-        if (isKnownFrostedGlassBlurUnsupportedDevice()) {
-            Log.d(TAG, "Known unsupported Samsung blur device (${Build.MODEL}); using opaque frosted fallback")
-            applySolidFallbackBackground(context, window, inputView)
-            return
+        if (!force && isKnownFrostedGlassBlurUnsupportedDevice()) {
+            Log.d(TAG, "Known unsupported Samsung blur device (${Build.MODEL}); trying next Samsung blur fallback")
+            return false
         }
 
-        if (!samsungSemBlurSupported) {
-            Log.e(TAG, "Samsung SemBlurInfo is unsupported on this device environment; falling back to opaque frosted background")
-            applySolidFallbackBackground(context, window, inputView)
-            return
+        if (!isSamsungSemBlurAvailable(force)) {
+            Log.e(TAG, "Samsung SemBlurInfo is unsupported on this device environment; trying next Samsung blur fallback")
+            return false
         }
 
         try {
-            val radius = blurRadius(context)
-            val tint = samsungBlurTint(context)
             val candidates = SemBlurInfoReflect.cachedCandidates
 
             for (mode in candidates) {
-                if (mode.name in failedSamsungSemBlurModes) continue
-                try {
-                    val builder = if (SemBlurInfoReflect.builderIntConstructor != null) {
-                        SemBlurInfoReflect.builderIntConstructor!!.newInstance(mode.value)
-                    } else {
-                        val b = SemBlurInfoReflect.builderNoArgConstructor!!.newInstance()
-                        SemBlurInfoReflect.setBlurModeMethod?.invoke(b, mode.value)
-                        b
-                    }
+                val standardKey = "standard:${mode.name}"
+                if (standardKey !in failedSamsungSemBlurModes &&
+                        tryApplySamsungSemBlurMode(context, target, mode, usePreset = false)) {
+                    return true
+                }
 
-                    SemBlurInfoReflect.setRadiusMethod?.invoke(builder, radius)
-                    SemBlurInfoReflect.setBackgroundColorMethod?.invoke(builder, tint)
-                    val cornerRadiusPx = Settings.readKeyboardCornerRadius(context.prefs()) * context.resources.displayMetrics.density
-                    SemBlurInfoReflect.setBackgroundCornerRadiusMethod?.invoke(builder, cornerRadiusPx)
-
-                    val blurInfo = SemBlurInfoReflect.buildMethod!!.invoke(builder)
-                    target.setBackgroundColor(Color.TRANSPARENT)
-                    SemBlurInfoReflect.semSetBlurInfoMethod!!.invoke(target, blurInfo)
-                    Log.d(TAG, "semSetBlurInfo successfully called without throwing an exception.")
-                    Log.d(TAG, "Applied SemBlurInfo mode=${mode.name}(${mode.value}) radius=$radius target=${target.javaClass.simpleName} size=${target.width}x${target.height}")
-                    return
-                } catch (modeError: Throwable) {
-                    failedSamsungSemBlurModes.add(mode.name)
-                    Log.e(TAG, "SemBlurInfo mode ${mode.name}(${mode.value}) failed; trying next candidate", modeError)
+                val presetKey = "preset:${mode.name}"
+                if (Build.VERSION.SDK_INT >= ANDROID_15_API &&
+                        SemBlurInfoReflect.setColorCurvePresetMethod != null &&
+                        presetKey !in failedSamsungSemBlurModes &&
+                        tryApplySamsungSemBlurMode(context, target, mode, usePreset = true)) {
+                    return true
                 }
             }
 
-            Log.e(TAG, "No Samsung SemBlurInfo mode applied; falling back to opaque frosted background")
-            applySolidFallbackBackground(context, window, inputView)
+            Log.e(TAG, "No Samsung SemBlurInfo mode applied; trying next Samsung blur fallback")
+            return false
         } catch (e: Throwable) {
-            Log.e(TAG, "Failed to apply Samsung SemBlurInfo blur; falling back to opaque frosted background", e)
-            applySolidFallbackBackground(context, window, inputView)
+            Log.e(TAG, "Failed to apply Samsung SemBlurInfo blur; trying next Samsung blur fallback", e)
+            return false
         }
     }
 
-    private fun applySamsungLegacyBlur(window: Window, enable: Boolean) {
+    private fun isSamsungSemBlurAvailable(force: Boolean): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return false
+        if (!force) return samsungSemBlurSupported
+        return SemBlurInfoReflect.initialized
+    }
+
+    private fun tryApplySamsungSemBlurMode(
+        context: Context,
+        target: View,
+        mode: SemBlurMode,
+        usePreset: Boolean
+    ): Boolean {
+        val attempt = if (usePreset) "preset" else "standard"
+        val failedKey = "$attempt:${mode.name}"
+        return try {
+            val builder = createSamsungSemBlurBuilder(mode)
+            val tint = samsungBlurTint(context)
+            val cornerRadiusPx = Settings.readKeyboardCornerRadius(context.prefs()) * context.resources.displayMetrics.density
+
+            if (usePreset) {
+                SemBlurInfoReflect.setColorCurvePresetMethod!!.invoke(builder, samsungBlurPreset(context))
+            } else {
+                SemBlurInfoReflect.setRadiusMethod?.invoke(builder, blurRadius(context))
+            }
+            SemBlurInfoReflect.setBackgroundColorMethod?.invoke(builder, tint)
+            SemBlurInfoReflect.setBackgroundCornerRadiusMethod?.invoke(builder, cornerRadiusPx)
+
+            val blurInfo = SemBlurInfoReflect.buildMethod!!.invoke(builder)
+            target.setBackgroundColor(Color.TRANSPARENT)
+            SemBlurInfoReflect.semSetBlurInfoMethod!!.invoke(target, blurInfo)
+            Log.d(
+                TAG,
+                "Applied Samsung SemBlurInfo $attempt mode=${mode.name}(${mode.value}) " +
+                        "viewMethod=${SemBlurInfoReflect.semSetBlurInfoMethod?.name} " +
+                        "buildMethod=${SemBlurInfoReflect.buildMethod?.name} " +
+                        "target=${target.javaClass.simpleName} size=${target.width}x${target.height}"
+            )
+            true
+        } catch (modeError: Throwable) {
+            failedSamsungSemBlurModes.add(failedKey)
+            Log.e(TAG, "SemBlurInfo $attempt mode ${mode.name}(${mode.value}) failed; trying next candidate", modeError)
+            false
+        }
+    }
+
+    private fun createSamsungSemBlurBuilder(mode: SemBlurMode): Any {
+        val intConstructor = SemBlurInfoReflect.builderIntConstructor
+        if (intConstructor != null) {
+            return intConstructor.newInstance(mode.value)
+        }
+        val builder = SemBlurInfoReflect.builderNoArgConstructor!!.newInstance()
+        SemBlurInfoReflect.setBlurModeMethod?.invoke(builder, mode.value)
+        return builder
+    }
+
+    private fun samsungBlurPreset(context: Context): Int {
+        return if (isNight(context)) SAMSUNG_BLUR_PRESET_DARK else SAMSUNG_BLUR_PRESET_LIGHT
+    }
+
+    private fun applySamsungLegacyBlur(window: Window, enable: Boolean): Boolean {
         val params = window.attributes
         try {
             if (enable) {
-                val semAddExtensionFlags = params.javaClass.getMethod("semAddExtensionFlags", Int::class.javaPrimitiveType)
-                semAddExtensionFlags.invoke(params, SAMSUNG_EXTENSION_FLAG_BLUR)
-                Log.d(TAG, "Applied Samsung legacy semAddExtensionFlags blur")
+                val semAddExtensionFlags = findReflectedMethod(
+                    params.javaClass,
+                    listOf("semAddExtensionFlags"),
+                    Int::class.javaPrimitiveType!!
+                )
+                if (semAddExtensionFlags != null) {
+                    semAddExtensionFlags.invoke(params, SAMSUNG_EXTENSION_FLAG_BLUR)
+                    window.attributes = params
+                    Log.d(TAG, "Applied Samsung legacy semAddExtensionFlags blur")
+                    return true
+                }
+                if (!loggedSamsungLegacyApplyUnavailable) {
+                    loggedSamsungLegacyApplyUnavailable = true
+                    Log.d(TAG, "Samsung legacy semAddExtensionFlags unavailable; skipping legacy blur apply.")
+                }
             } else {
-                val field = params.javaClass.getField("semExtensionFlags")
-                val currentFlags = field.getInt(params)
-                field.setInt(params, currentFlags and SAMSUNG_EXTENSION_FLAG_BLUR.inv())
-                Log.d(TAG, "Cleared Samsung legacy blur flag")
+                val semClearExtensionFlags = findReflectedMethod(
+                    params.javaClass,
+                    listOf("semClearExtensionFlags"),
+                    Int::class.javaPrimitiveType!!
+                )
+                if (semClearExtensionFlags != null) {
+                    semClearExtensionFlags.invoke(params, SAMSUNG_EXTENSION_FLAG_BLUR)
+                    window.attributes = params
+                    Log.d(TAG, "Cleared Samsung legacy blur flag via semClearExtensionFlags")
+                    return true
+                }
+
+                val field = findReflectedField(params.javaClass, "semExtensionFlags")
+                if (field != null) {
+                    val currentFlags = field.getInt(params)
+                    field.setInt(params, currentFlags and SAMSUNG_EXTENSION_FLAG_BLUR.inv())
+                    window.attributes = params
+                    Log.d(TAG, "Cleared Samsung legacy blur flag")
+                    return true
+                }
+                if (!loggedSamsungLegacyClearUnavailable) {
+                    loggedSamsungLegacyClearUnavailable = true
+                    Log.d(TAG, "Samsung legacy semExtensionFlags clear path unavailable; skipped legacy blur clear.")
+                }
             }
-            window.attributes = params
         } catch (e: Throwable) {
-            Log.e(TAG, "Failed to update Samsung legacy blur flag via reflection", e)
+            Log.w(TAG, "Failed to update Samsung legacy blur flag via reflection; trying remaining blur fallback", e)
         }
+        return false
+    }
+
+    private fun findReflectedMethod(clazz: Class<*>, names: List<String>, vararg paramTypes: Class<*>): Method? {
+        for (name in names) {
+            val method = runCatching { clazz.getDeclaredMethod(name, *paramTypes) }
+                .recoverCatching { clazz.getMethod(name, *paramTypes) }
+                .getOrNull()
+            if (method != null) {
+                method.isAccessible = true
+                return method
+            }
+        }
+        return null
+    }
+
+    private fun findReflectedField(clazz: Class<*>, name: String): java.lang.reflect.Field? {
+        return runCatching { clazz.getDeclaredField(name) }
+            .recoverCatching { clazz.getField(name) }
+            .getOrNull()
+            ?.apply { isAccessible = true }
     }
 
     private fun applyDefaultBlur(
         service: InputMethodService,
         window: Window,
         enable: Boolean,
-        backgroundColor: Int = Color.TRANSPARENT
+        backgroundColor: Int = Color.TRANSPARENT,
+        force: Boolean = false
     ): Boolean {
         val targetRadius = if (enable) {
             blurRadius(service)
@@ -465,7 +614,7 @@ object FrostedGlassHelper {
             backgroundBlurOnly = backgroundBlurOnly,
             cornerRadiusPx = keyboardCornerRadiusPx(service)
         )
-        if (defaultBlurStates[window] == desiredState) {
+        if (!force && defaultBlurStates[window] == desiredState) {
             return false
         }
 
@@ -530,14 +679,14 @@ object FrostedGlassHelper {
     ): Boolean {
         val cornerRadiusPx = keyboardCornerRadiusPx(service)
         val targetBlurRadius = blurRadius(service)
-        if (reuseReadyNativeBlurIfPossible(service, window, inputView, nativeState, generation, cornerRadiusPx, targetBlurRadius)) {
-            Log.d(TAG, "Kept or reasserted active native blur for the same window state.")
+        if (reuseReadyNativeBlurIfPossible(service, window, inputView, nativeState, cornerRadiusPx, targetBlurRadius)) {
+            Log.d(TAG, "Reasserted active native blur through rounded window background.")
             return false
         }
 
         cancelPendingNativeBlurCleanup(nativeState)
         clearNativeBlurReady(nativeState)
-        applyDefaultBlur(service, window, false)
+        applyDefaultBlur(service, window, false, force = true)
         scheduleNativeBlurEnable(service, window, inputView, nativeState, generation, cornerRadiusPx, targetBlurRadius)
         return true
     }
@@ -555,8 +704,12 @@ object FrostedGlassHelper {
         val decorView = window.decorView
         // Post activation so AOSP samples the uniform background outline during the next predraw.
         decorView.post {
-            if (generation != nativeState.generation || !isFrostedTheme(service)) return@post
-            applyDefaultBlur(service, window, true)
+            if (generation != nativeState.generation ||
+                    !isFrostedTheme(service) ||
+                    !service.isInputViewShown) {
+                return@post
+            }
+            applyDefaultBlur(service, window, true, force = true)
             markNativeBlurReady(window, inputView, nativeState, cornerRadiusPx, targetBlurRadius)
             Log.d(TAG, "Native Android window blur enabled via window.setBackgroundBlurRadius.")
             samsungBlurTarget(inputView)?.invalidateOutline()
@@ -581,7 +734,7 @@ object FrostedGlassHelper {
             nativeState.pendingCleanup = null
             nativeState.pendingCleanupDecorView = null
             if (generation != nativeState.generation) return@Runnable
-            applyDefaultBlur(service, window, false)
+            applyDefaultBlur(service, window, false, force = true)
             clearNativeBlurReady(nativeState)
             windowsWithAppliedFrostedGlass.remove(window)
             samsungBlurTarget(inputView)?.invalidateOutline()
@@ -600,19 +753,23 @@ object FrostedGlassHelper {
         window: Window,
         inputView: View?,
         nativeState: NativeBlurState,
-        generation: Int,
         cornerRadiusPx: Float,
         targetBlurRadius: Int
     ): Boolean {
         if (!canReuseNativeBlur(window, inputView, nativeState, cornerRadiusPx, targetBlurRadius)) return false
-        val hadPendingCleanup = nativeState.pendingCleanup != null
-        cancelPendingNativeBlurCleanup(nativeState)
-        if (hadPendingCleanup) {
+        if (nativeState.pendingCleanup != null) {
+            cancelPendingNativeBlurCleanup(nativeState)
             clearNativeBlurReady(nativeState)
-            applyDefaultBlur(service, window, false)
-            scheduleNativeBlurEnable(service, window, inputView, nativeState, generation, cornerRadiusPx, targetBlurRadius)
-            Log.d(TAG, "Rearmed native blur after cancelling pending hide cleanup.")
+            applyDefaultBlur(service, window, false, force = true)
+            samsungBlurTarget(inputView)?.invalidateOutline()
+            inputView?.invalidate()
+            window.decorView.invalidate()
+            Log.d(TAG, "Pending native blur cleanup found; cleared blur instead of re-enabling during hide.")
+            return true
         }
+        cancelPendingNativeBlurCleanup(nativeState)
+        applyDefaultBlur(service, window, true, force = true)
+        markNativeBlurReady(window, inputView, nativeState, cornerRadiusPx, targetBlurRadius)
         samsungBlurTarget(inputView)?.invalidateOutline()
         inputView?.invalidate()
         window.decorView.invalidate()
@@ -701,14 +858,16 @@ object FrostedGlassHelper {
         return inputView?.findViewById<View?>(R.id.main_keyboard_frame) ?: inputView
     }
 
-    private fun clearSamsungSemBlur(target: View?) {
-        if (target == null || !samsungSemBlurSupported) return
+    private fun clearSamsungSemBlur(target: View?): Boolean {
+        if (target == null || SemBlurInfoReflect.semSetBlurInfoMethod == null) return false
         try {
             SemBlurInfoReflect.semSetBlurInfoMethod!!.invoke(target, null)
             Log.d(TAG, "Cleared Samsung SemBlurInfo blur")
+            return true
         } catch (e: Throwable) {
             Log.e(TAG, "Failed to clear Samsung SemBlurInfo blur", e)
         }
+        return false
     }
 
     private fun restoreFrostedThemeBackground(context: Context, inputView: View?) {

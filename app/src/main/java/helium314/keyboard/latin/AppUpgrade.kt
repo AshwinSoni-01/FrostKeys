@@ -50,10 +50,12 @@ import kotlin.collections.set
 
 private var isRestoringDefaultBackup = false
 private const val PREF_DEFAULT_BACKUP_RESTORED = "default_backup_restored"
+private const val VERSION_FROSTED_DUST_DEFAULT_OFF = 2409
 
 fun checkVersionUpgrade(context: Context) {
     val prefs = context.prefs()
     var oldVersion = prefs.getInt(Settings.PREF_VERSION_CODE, 0)
+    var restoredDefaultBackupForFreshInstall = false
     val isFreshInstall = prefs.all.keys.none {
         it != PREF_DEFAULT_BACKUP_RESTORED && it != Settings.PREF_VERSION_CODE && it != Settings.PREF_EMOJI_MAX_SDK
     }
@@ -70,11 +72,12 @@ fun checkVersionUpgrade(context: Context) {
             isRestoringDefaultBackup = false
         }
         oldVersion = prefs.getInt(Settings.PREF_VERSION_CODE, 0)
+        restoredDefaultBackupForFreshInstall = true
     } else if (oldVersion == 0 && !isFreshInstall && !prefs.getBoolean(PREF_DEFAULT_BACKUP_RESTORED, false)) {
         prefs.edit { putBoolean(PREF_DEFAULT_BACKUP_RESTORED, true) }
     }
     if (oldVersion != BuildConfig.VERSION_CODE)
-        AppUpgrade.onUpgrade(context)
+        AppUpgrade.onUpgrade(context, restoredDefaultBackupForFreshInstall)
 }
 
 fun transferOldPinnedClips(context: Context) {
@@ -99,7 +102,7 @@ fun transferOldPinnedClips(context: Context) {
 }
 
 private object AppUpgrade {
-    fun onUpgrade(context: Context) {
+    fun onUpgrade(context: Context, restoredDefaultBackupForFreshInstall: Boolean) {
         val prefs = context.prefs()
         val oldVersion = prefs.getInt(Settings.PREF_VERSION_CODE, 0)
         // clear extracted dictionaries, in case updated version contains newer ones
@@ -692,6 +695,11 @@ private object AppUpgrade {
                 if (prefs.contains(Settings.PREF_SPACE_VERTICAL_SWIPE))
                     putString(Settings.PREF_SPACE_VERTICAL_SWIPE, prefs.getString(Settings.PREF_SPACE_VERTICAL_SWIPE, "")!!.uppercase())
             }
+        }
+        if (!restoredDefaultBackupForFreshInstall
+                && oldVersion < VERSION_FROSTED_DUST_DEFAULT_OFF
+                && !prefs.contains(Settings.PREF_FROSTED_DUST_ENABLED)) {
+            prefs.edit { putBoolean(Settings.PREF_FROSTED_DUST_ENABLED, true) }
         }
         upgradeToolbarPrefs(prefs)
         LayoutUtilsCustom.onLayoutFileChanged() // just to be sure

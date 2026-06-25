@@ -1243,7 +1243,9 @@ public final class EmojiPalettesView extends LinearLayout
         if (emojiStr != null) {
             AdaptiveEmojiEngine.recordEmojiUsage(getContext(), emojiStr);
         }
-        if (getVisibility() == VISIBLE && mEmojiCategory.isInRecentTab()) {
+        // Defer visible recents reordering until the panel is closed to avoid RecyclerView
+        // rebinds/layout shifts while the user is tapping emojis.
+        if (getVisibility() == VISIBLE) {
             getRecentsKeyboard().addPendingKey(key);
             return;
         }

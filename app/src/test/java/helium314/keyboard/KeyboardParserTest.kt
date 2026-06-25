@@ -23,7 +23,9 @@ import helium314.keyboard.latin.RichInputMethodSubtype
 import helium314.keyboard.latin.utils.LayoutUtils
 import helium314.keyboard.latin.utils.LayoutUtilsCustom
 import helium314.keyboard.latin.utils.POPUP_KEYS_LAYOUT
+import helium314.keyboard.latin.utils.SubtypeSettings
 import helium314.keyboard.latin.utils.SubtypeUtilsAdditional
+import helium314.keyboard.latin.utils.mainLayoutName
 import org.junit.runner.RunWith
 import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
@@ -33,6 +35,7 @@ import org.robolectric.annotation.Implements
 import org.robolectric.shadows.ShadowLog
 import java.io.File
 import java.util.Locale
+import kotlin.math.abs
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -587,6 +590,45 @@ f""", // no newline at the end
         assertTrue((shiftedRows.flatten().first { it.outputText == "\u100f\u1039\u100d" }.mLabelFlags and Key.LABEL_FLAGS_AUTO_SCALE) == Key.LABEL_FLAGS_AUTO_SCALE)
         assertTrue((shiftedRows.flatten().first { it.outputText == "\u104e\u1004\u103a\u1038" }.mLabelFlags and Key.LABEL_FLAGS_AUTO_SCALE) == Key.LABEL_FLAGS_AUTO_SCALE)
         assertTrue((shiftedRows.flatten().first { it.outputText == "\u100f\u1039\u100c" }.mLabelFlags and Key.LABEL_FLAGS_AUTO_SCALE) == Key.LABEL_FLAGS_AUTO_SCALE)
+    }
+
+    @Test fun arabicScriptDeleteKeyMatchesLetterWidth() {
+        val subtype = SubtypeSettings.getResourceSubtypesForLocale(Locale("fa")).first { it.mainLayoutName() == "farsi" }
+        val (_, rows) = buildKeyboard(EditorInfo(), subtype, KeyboardId.ELEMENT_ALPHABET)
+        val deleteRow = rows.first { row ->
+            row.any { it.mCode == KeyCode.DELETE } && row.any { it.mBackgroundType == Key.BACKGROUND_TYPE_NORMAL }
+        }
+        val deleteKey = deleteRow.single { it.mCode == KeyCode.DELETE }
+        val letterKeys = deleteRow.filter { it.mBackgroundType == Key.BACKGROUND_TYPE_NORMAL }
+
+        assertTrue(letterKeys.isNotEmpty())
+        letterKeys.forEach {
+            assertTrue(abs(it.mWidth - deleteKey.mWidth) < 0.0001f, "Expected ${it.mLabel} and delete to have matching widths")
+        }
+    }
+
+    @Test fun latinDeleteKeyKeepsFunctionalWidth() {
+        val subtype = SubtypeUtilsAdditional.createEmojiCapableAdditionalSubtype(Locale.US, "qwerty", true)
+        val (_, rows) = buildKeyboard(EditorInfo(), subtype, KeyboardId.ELEMENT_ALPHABET)
+        val deleteRow = rows.first { row ->
+            row.any { it.mCode == KeyCode.DELETE } && row.any { it.mBackgroundType == Key.BACKGROUND_TYPE_NORMAL }
+        }
+        val deleteKey = deleteRow.single { it.mCode == KeyCode.DELETE }
+        val letterKey = deleteRow.first { it.mBackgroundType == Key.BACKGROUND_TYPE_NORMAL }
+
+        assertTrue(deleteKey.mWidth > letterKey.mWidth * 1.2f)
+    }
+
+    @Test fun urduPakistanDeleteKeyKeepsFunctionalWidth() {
+        val subtype = SubtypeSettings.getResourceSubtypesForLocale(Locale("ur", "PK")).first { it.mainLayoutName() == "urdu" }
+        val (_, rows) = buildKeyboard(EditorInfo(), subtype, KeyboardId.ELEMENT_ALPHABET)
+        val deleteRow = rows.first { row ->
+            row.any { it.mCode == KeyCode.DELETE } && row.any { it.mBackgroundType == Key.BACKGROUND_TYPE_NORMAL }
+        }
+        val deleteKey = deleteRow.single { it.mCode == KeyCode.DELETE }
+        val letterKey = deleteRow.first { it.mBackgroundType == Key.BACKGROUND_TYPE_NORMAL }
+
+        assertTrue(deleteKey.mWidth > letterKey.mWidth * 1.2f)
     }
 
     @Test fun simpleWithLabelPopupHasCode() {
