@@ -1,12 +1,12 @@
-# KBoard
+# FrostKeys
 
-<img src="assets/icon/FrostKeys_Icon_with_bg.png" alt="KBoard Icon" width="200">
+<img src="assets/icon/FrostKeys_Icon_with_bg.png" alt="FrostKeys Icon" width="200">
 
 **A personalized fork of [HeliBoard](https://github.com/HeliBorg/HeliBoard) with custom themes, AI writing tools, and Klipy GIF & animated sticker support.**
 
-KBoard takes the privacy-focused foundation of HeliBoard and adds modern, high-performance features for users who want more from their keyboard without sacrificing their data.
+FrostKeys takes the privacy-focused foundation of HeliBoard and adds modern, high-performance features for users who want more from their keyboard without sacrificing their data.
 
-[<img src="https://user-images.githubusercontent.com/663460/26973090-f8fdc986-4d14-11e7-995a-e7c5e79ed925.png" alt="Get APK from GitHub" height="80">](https://github.com/AshwinSoni-01/KBoard/releases)
+[<img src="https://user-images.githubusercontent.com/663460/26973090-f8fdc986-4d14-11e7-995a-e7c5e79ed925.png" alt="Get APK from GitHub" height="80">](https://github.com/AshwinSoni-01/FrostKeys/releases)
 
 ---
 
@@ -35,7 +35,7 @@ KBoard takes the privacy-focused foundation of HeliBoard and adds modern, high-p
 ### 1. The All-New Klipy Media Panel (GIFs & Animated Stickers)
 The Emoji and Media panel has been completely rebuilt to integrate the Klipy API, bringing an endless library of media right to your keyboard.
 * **Beautiful Layouts:** Browse GIFs in a gorgeous, staggered "river view" and find stickers in a clean, easy-to-tap 4-column grid.
-* **Flawless WhatsApp Integration:** Say goodbye to the share sheet and flattened static images! KBoard uses a custom-built `libwebp` processing engine to format and drop animated stickers *directly* into your WhatsApp chat bubbles with full animation intact.
+* **Flawless WhatsApp Integration:** Say goodbye to the share sheet and flattened static images! FrostKeys uses a custom-built `libwebp` processing engine to format and drop animated stickers *directly* into your WhatsApp chat bubbles with full animation intact.
 * **Bring Your Own Key:** Just like our AI tools, you are in control. Simply input your own personal Klipy API key in the settings to unlock unlimited GIF and sticker searches.
 
 ### 2. Frosted Glass Design (Material You Evolution) (ALPHA)
@@ -55,7 +55,7 @@ While the core of the keyboard remains offline-first, we have added **optional**
 * **Safe Connectivity:** Built specifically to power AI and Klipy Media features while keeping your keystrokes private.
 
 ### 5. Gemini AI Integration
-KBoard brings modern AI writing tools directly into your text field.
+FrostKeys brings modern AI writing tools directly into your text field.
 * **AI Writing Assistant:** Proofread, rewrite, or change the tone of your text instantly.
 * **Bring Your Own Key:** Powered by Google Gemini. Simply input your own Gemini API key in settings to unlock local AI power without subscription fees.
 
@@ -71,7 +71,7 @@ KBoard brings modern AI writing tools directly into your text field.
 ---
 
 ## Contributing & Support ❤️
-KBoard is a personal project, but the heavy lifting was done by the HeliBoard team.
+FrostKeys is a personal project, but the heavy lifting was done by the HeliBoard team.
 
 ### Support HeliBoard
 **Please support the upstream HeliBoard project!** This fork would not be possible without their incredible work on open-source privacy. You can support them via their official channels:
@@ -83,15 +83,31 @@ KBoard is a personal project, but the heavy lifting was done by the HeliBoard te
 
 ## License & Legal
 
-**KBoard** is a fork of **HeliBoard** (which is based on **OpenBoard** and **AOSP LatinIME**). 
+**FrostKeys** is a fork of **HeliBoard** (which is based on **OpenBoard** and **AOSP LatinIME**). 
 
-As a derivative work, KBoard is licensed under the **GNU General Public License v3.0**. 
+As a derivative work, FrostKeys is licensed under the **GNU General Public License v3.0**. 
 
-* **Copyleft Requirement:** In accordance with the GPL v3.0, the complete source code for KBoard is made available in this repository. Any further modifications or forks of KBoard must also be released under the same GPL v3.0 license.
+* **Copyleft Requirement:** In accordance with the GPL v3.0, the complete source code for FrostKeys is made available in this repository. Any further modifications or forks of FrostKeys must also be released under the same GPL v3.0 license.
 * **Preservation:** All original copyright and license notices from the HeliBoard, OpenBoard, and AOSP projects have been preserved in the source headers.
 * **Apache 2.0:** Since the app is based on the Apache 2.0 licensed AOSP Keyboard, those original terms also apply.
-* **Brand Assets:** The **KBoard** icon (by Orion) is licensed under [Creative Commons BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/).
+* **Brand Assets:** The **FrostKeys** icon (by Orion) is licensed under [Creative Commons BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/).
 
+**Disclaimer:** *Google Gemini is a trademark of Google LLC. Klipy is a trademark of Klipy. FrostKeys is not affiliated with or endorsed by Google or Klipy. Use of Gemini and Klipy features requires personal API keys and is subject to their respective Terms of Service.*
+
+---
+
+## Credits
+- **Ashwin Soni (Orion):** Fork maintainer; creator of the Frosted Glass UI, Klipy media pipeline, and AI implementation. [@AshwinSoni1](https://t.me/AshwinSoni1)
+- **Syntrop (Telegram):** UI/UX design contributions and official app icon. [@Syntrop2k2](https://t.me/Syntrop2k2)
+- **HeliBoard Team:** For the industry-leading open-source foundation.
+- **NGI Mobifree Fund:** Funding provided to the original HeliBoard project through [NLnet](https://nlnet.nl).
+- **AOSP / OpenBoard:** The ancestors of this project.
+
+---
+
+<p align="center">
+  Made with ❤️ by <a href="https://github.com/AshwinSoni-01">Ashwin Soni (Orion)</a>
+</p>
 **Disclaimer:** *Google Gemini is a trademark of Google LLC. Klipy is a trademark of Klipy. KBoard is not affiliated with or endorsed by Google or Klipy. Use of Gemini and Klipy features requires personal API keys and is subject to their respective Terms of Service.*
 
 ---
