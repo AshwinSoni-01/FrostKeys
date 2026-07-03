@@ -108,19 +108,3 @@ As a derivative work, FrostKeys is licensed under the **GNU General Public Licen
 <p align="center">
   Made with ❤️ by <a href="https://github.com/AshwinSoni-01">Ashwin Soni (Orion)</a>
 </p>
-**Disclaimer:** *Google Gemini is a trademark of Google LLC. Klipy is a trademark of Klipy. KBoard is not affiliated with or endorsed by Google or Klipy. Use of Gemini and Klipy features requires personal API keys and is subject to their respective Terms of Service.*
-
----
-
-## Credits
-- **Ashwin Soni (Orion):** Fork maintainer; creator of the Frosted Glass UI, Klipy media pipeline, and AI implementation. [@AshwinSoni1](https://t.me/AshwinSoni1)
-- **Syntrop (Telegram):** UI/UX design contributions and official app icon. [@Syntrop2k2](https://t.me/Syntrop2k2)
-- **HeliBoard Team:** For the industry-leading open-source foundation.
-- **NGI Mobifree Fund:** Funding provided to the original HeliBoard project through [NLnet](https://nlnet.nl).
-- **AOSP / OpenBoard:** The ancestors of this project.
-
----
-
-<p align="center">
-  Made with ❤️ by <a href="https://github.com/AshwinSoni-01">Ashwin Soni (Orion)</a>
-</p>
