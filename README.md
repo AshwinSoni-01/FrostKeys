@@ -80,6 +80,12 @@ FrostKeys is a personal project, but the heavy lifting was done by the HeliBoard
 * **Issues:** [HeliBoard Issue Tracker](https://github.com/HeliBorg/HeliBoard/issues)
 
 ---
+## 📢 Join Our Community!
+
+If you enjoy using FrostKeys, please consider giving the repository a ⭐️! Have feedback or suggestions? Drop by the [Telegram Channel](https://t.me/FrostKeys) and let us know!
+
+---
+
 
 ## License & Legal
 
