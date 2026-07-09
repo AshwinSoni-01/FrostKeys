@@ -192,7 +192,6 @@
     <string name="theme_name_user" tools:keep="@string/theme_name_user">Aangepast</string>
     <string name="show_horizontal_space_swipe">Horizontaal veeggebaar over spatiebalk</string>
     <string name="close_history" tools:keep="@string/close_history">Klembordgeschiedenis sluiten</string>
-    <string name="clipboard_toolbar_keys">Klembord-werkbalktoetsen kiezen</string>
     <string name="prefs_long_press_symbol_for_numpad">Druk lang op de toets symbolen voor het numpad</string>
     <string name="button_load_custom">Bestand laden</string>
     <string name="file_read_error">Kan bestand niet lezen</string>

@@ -324,7 +324,6 @@
     <string name="vibrate_in_dnd_mode">Bergetar dalam mode jangan ganggu</string>
     <string name="page_end" tools:keep="@string/page_end">Akhir halaman</string>
     <string name="word_left" tools:keep="@string/word_left">Kata tersisa</string>
-    <string name="clipboard_toolbar_keys">Pilih tombol bilah alat papan klip</string>
     <string name="quick_pin_toolbar_keys">Sematkan tombol bilah alat saat ditekan lama</string>
     <string name="quick_pin_toolbar_keys_summary">Ini akan menonaktifkan tindakan tekan lama lainnya untuk tombol bilah alat yang tidak disematkan</string>
     <string name="prefs_long_press_symbol_for_numpad">Tekan lama tombol simbol untuk papan nomor</string>

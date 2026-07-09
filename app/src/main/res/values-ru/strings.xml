@@ -303,7 +303,6 @@
     <string name="center_suggestion_text_to_enter">Всегда использовать среднюю подсказку</string>
     <string name="center_suggestion_text_to_enter_summary">При нажатии пробела или знака препинания будет вставлена средняя подсказка</string>
     <string name="close_history" tools:keep="@string/close_history">Закрыть историю буфера обмена</string>
-    <string name="clipboard_toolbar_keys">Выбрать клавиши панели буфера обмена</string>
     <string name="subtype_generic_extended">%s (Расширенная)</string>
     <string name="auto_hide_toolbar_summary">Скрывать панель инструментов при появлении подсказок</string>
     <string name="settings_screen_toolbar">Панель инструментов</string>

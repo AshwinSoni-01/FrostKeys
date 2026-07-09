@@ -239,7 +239,6 @@
     <string name="page_down" tools:keep="@string/page_down">பக்கம் கீழே</string>
     <string name="close_history" tools:keep="@string/close_history">இடைநிலைப்பலகை வரலாற்றை மூடு</string>
     <string name="emoji" tools:keep="@string/emoji">ஈமோசி</string>
-    <string name="clipboard_toolbar_keys">இடைநிலைப்பலகை கருவிப்பட்டி விசைகளைத் தேர்ந்தெடுக்கவும்</string>
     <string name="pinned_toolbar_keys">பின் செய்யப்பட்ட கருவிப்பட்டி விசைகளைத் தேர்ந்தெடுக்கவும்</string>
     <string name="quick_pin_toolbar_keys">நீண்ட அழுத்தத்தில் கருவிப்பட்டி விசையை பின் செய்யவும்</string>
     <string name="quick_pin_toolbar_keys_summary">இது பின் செய்யப்படாத கருவிப்பட்டி விசைகளுக்கான பிற நீண்ட அழுத்த செயல்களை முடக்கும்</string>

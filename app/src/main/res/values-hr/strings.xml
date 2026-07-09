@@ -238,7 +238,6 @@
     <string name="down" tools:keep="@string/down">Dolje</string>
     <string name="close_history" tools:keep="@string/close_history">Zatvori povijest međuspremnika</string>
     <string name="emoji" tools:keep="@string/emoji">Emoji</string>
-    <string name="clipboard_toolbar_keys">Odaberi tipke alatne trake međuspremnika</string>
     <string name="pinned_toolbar_keys">Odaberi prikvačene tipke alatne trake</string>
     <string name="quick_pin_toolbar_keys">Prikvači tipke alatne trake pomoću dugog pritiska</string>
     <string name="quick_pin_toolbar_keys_summary">Ovo će onemogućiti druge radnje za dugi pritisak tipki alatne trake koje nisu prikvačene</string>

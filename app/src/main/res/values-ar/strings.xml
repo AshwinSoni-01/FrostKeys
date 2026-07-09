@@ -302,7 +302,6 @@
     <string name="center_suggestion_text_to_enter">استخدم دائمًا الاقتراح الأوسط</string>
     <string name="center_suggestion_text_to_enter_summary">عند الضغط على مسافة أو علامات الترقيم، سيتم إدخال الاقتراح الأوسط</string>
     <string name="close_history" tools:keep="@string/close_history">أغلِق تاريخ الحافظة</string>
-    <string name="clipboard_toolbar_keys">حدد مفاتيح شريط أدوات الحافظة</string>
     <string name="subtype_generic_extended">%s (ممتدة)</string>
     <string name="subtype_mns">مانسي</string>
     <string name="more_colors">أظهِر المزيد من الالوان</string>

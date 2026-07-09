@@ -193,7 +193,6 @@
     <string name="action_none">Žádné</string>
     <string name="subtype_xdq">Kaitag</string>
     <string name="close_history" tools:keep="@string/close_history">Zavřít historii schránky</string>
-    <string name="clipboard_toolbar_keys">Výběr kláves panelu nástrojů schránky</string>
     <string name="prefs_bottom_padding_scale">Měřítko dolního odsazení</string>
     <string name="message_add_custom_layout">Vybrat soubor v kompatibilním formátu. Informace o formátech jsou k dispozici %s.</string>
     <string name="layout_symbols" tools:keep="@string/layout_symbols">Symboly</string>

@@ -240,7 +240,6 @@
     <string name="page_down" tools:keep="@string/page_down">Puslapis žemyn</string>
     <string name="close_history" tools:keep="@string/close_history">Užverti iškarpinės istoriją</string>
     <string name="emoji" tools:keep="@string/emoji">Jaustukai</string>
-    <string name="clipboard_toolbar_keys">Pasirinkti iškarpinės įrankių juostos mygtukus</string>
     <string name="pinned_toolbar_keys">Pasirinkti prisegtus įrankių juostos mygtukus</string>
     <string name="quick_pin_toolbar_keys">Ilgai paspaudus prisegti įrankių juostos mygtuką</string>
     <string name="prefs_long_press_keyboard_to_change_lang">Pakeisti įvesties režimą su tarpo klavišu</string>

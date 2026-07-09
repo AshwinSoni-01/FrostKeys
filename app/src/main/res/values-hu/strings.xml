@@ -371,7 +371,6 @@
     <string name="word_left" tools:keep="@string/word_left">Balra lévő szó</string>
     <string name="word_right" tools:keep="@string/word_right">Jobbra lévő szó</string>
     <string name="close_history" tools:keep="@string/close_history">Vágólapelőzmények bezárása</string>
-    <string name="clipboard_toolbar_keys">Vágólapeszköztár billentyűinek kiválasztása</string>
     <string name="pinned_toolbar_keys">Kitűzött eszköztárbillentyűk kiválasztása</string>
     <string name="prefs_font_scale">Billentyűzet betűmérete</string>
     <string name="prefs_emoji_skin_tone_neutral">Semleges</string>
