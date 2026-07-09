@@ -120,15 +120,18 @@ public class KeyboardView extends View {
         if (this instanceof MoreSuggestionsView)
             mKeyBackground = mColors.selectAndColorDrawable(keyboardViewAttr,
                     ColorType.MORE_SUGGESTIONS_WORD_BACKGROUND);
-        else if (this instanceof PopupKeysKeyboardView)
-            mKeyBackground = mColors.selectAndColorDrawable(keyboardViewAttr, ColorType.POPUP_KEYS_BACKGROUND);
+        else if (isPopupKeysView())
+            mKeyBackground = mColors.selectAndColorDrawable(keyboardViewAttr, ColorType.KEY_PREVIEW_BACKGROUND);
         else
             mKeyBackground = mColors.selectAndColorDrawable(keyboardViewAttr, ColorType.KEY_BACKGROUND);
         mKeyBackground.getPadding(mKeyBackgroundPadding);
         mFunctionalKeyBackground = mColors.selectAndColorDrawable(keyboardViewAttr,
                 ColorType.FUNCTIONAL_KEY_BACKGROUND);
         mSpacebarBackground = mColors.selectAndColorDrawable(keyboardViewAttr, ColorType.SPACE_BAR_BACKGROUND);
-        if (this instanceof PopupKeysKeyboardView)
+        if (isPopupKeysView())
+            mActionKeyBackground = mColors.selectAndColorDrawable(keyboardViewAttr,
+                    ColorType.ACTION_KEY_BACKGROUND);
+        else if (this instanceof PopupKeysKeyboardView)
             mActionKeyBackground = mColors.selectAndColorDrawable(keyboardViewAttr,
                     ColorType.ACTION_KEY_POPUP_KEYS_BACKGROUND);
         else
@@ -201,7 +204,7 @@ public class KeyboardView extends View {
             if (keyboard instanceof MoreSuggestions) {
                 mColors.setBackground(this, ColorType.MORE_SUGGESTIONS_BACKGROUND);
             } else if (keyboard instanceof PopupKeysKeyboard) {
-                mColors.setBackground(this, ColorType.POPUP_KEYS_BACKGROUND);
+                mColors.setBackground(this, ColorType.KEY_PREVIEW_BACKGROUND);
             } else {
                 // actual background color/drawable is applied to main_keyboard_frame
                 setBackgroundColor(Color.TRANSPARENT);
@@ -209,7 +212,8 @@ public class KeyboardView extends View {
 
             mKeyboard = keyboard;
             mKeyScaleForText = (float) Math.sqrt(1 / Settings.getValues().mKeyboardHeightScale);
-            final int scaledKeyHeight = (int) ((keyboard.mMostCommonKeyHeight - keyboard.mVerticalGap) * mKeyScaleForText);
+            final int scaledKeyHeight = (int) ((keyboard.mMostCommonKeyHeight - keyboard.mVerticalGap)
+                    * mKeyScaleForText);
             mKeyDrawParams.updateParams(scaledKeyHeight, mKeyVisualAttributes);
             mKeyDrawParams.updateParams(scaledKeyHeight, keyboard.mKeyVisualAttributes);
             invalidateAllKeys();
@@ -323,7 +327,8 @@ public class KeyboardView extends View {
             // Calculate clip region and set.
             final boolean drawAllKeys = mInvalidateAllKeys || mInvalidatedKeys.isEmpty();
             final boolean isHardwareAccelerated = canvas.isHardwareAccelerated();
-            // With hardware acceleration, onDraw() records the View display list. If we only emit
+            // With hardware acceleration, onDraw() records the View display list. If we
+            // only emit
             // the dirty key's draw commands here, untouched keys can disappear until a full
             // invalidation rebuilds the list. Keep the old full-draw behavior for hardware
             // canvases, and reserve partial redraws for the software offscreen buffer path.
@@ -426,12 +431,18 @@ public class KeyboardView extends View {
         }
         final int bgX = -padding.left;
 
+        if (shouldDrawSelectionOnlyPopupKey(key)) {
+            drawPopupKeySelectionBackground(key, canvas);
+            return;
+        }
+
         if (themeStyle.equals(KeyboardTheme.STYLE_ROUNDED) || KeyboardTheme.STYLE_CIRCLE.equals(themeStyle)) {
             final boolean isSpaceBar = key.getCode() == Constants.CODE_SPACE;
             final boolean isCircleStyle = KeyboardTheme.STYLE_CIRCLE.equals(themeStyle);
             final boolean isRoundableKey = isCircleStyle
                     ? (!key.isSpacer() && !isSpaceBar)
-                    : (!key.isSpacer() && !key.hasFunctionalBackground() && (key.getCode() > 0 || key.getCode() == KeyCode.MULTIPLE_CODE_POINTS) && !isSpaceBar);
+                    : (!key.isSpacer() && !key.hasFunctionalBackground()
+                            && (key.getCode() > 0 || key.getCode() == KeyCode.MULTIPLE_CODE_POINTS) && !isSpaceBar);
 
             if (isSpaceBar || isRoundableKey) {
                 ColorType colorType;
@@ -447,7 +458,8 @@ public class KeyboardView extends View {
                     colorType = ColorType.KEY_BACKGROUND;
                 }
 
-                mBackgroundPaint.setColor(KeyBackgroundUtils.fillColorFor(mColors, colorType, key.isPressed() || key.isLocked()));
+                mBackgroundPaint.setColor(
+                        KeyBackgroundUtils.fillColorFor(mColors, colorType, key.isPressed() || key.isLocked()));
 
                 canvas.translate(bgX, bgY);
                 if (isCircleStyle) {
@@ -504,9 +516,12 @@ public class KeyboardView extends View {
     private Keyboard mLastTopRowKeyboard = null;
     private int mTopAlphabetRowY = -1;
 
-    /** Returns true if the label's first codepoint is in a Myanmar Unicode block. */
+    /**
+     * Returns true if the label's first codepoint is in a Myanmar Unicode block.
+     */
     private static boolean isMyanmarLabel(final String label) {
-        if (label == null || label.isEmpty()) return false;
+        if (label == null || label.isEmpty())
+            return false;
         final int cp = Character.codePointAt(label, 0);
         return (cp >= 0x1000 && cp <= 0x109F)
                 || (cp >= 0xAA60 && cp <= 0xAA7F)
@@ -577,7 +592,7 @@ public class KeyboardView extends View {
             int topRowY = getTopAlphabetRowY(keyboard);
             if (topRowY != -1 && key.getY() == topRowY
                     && ((label.length() == 1 && Character.isLetter(label.charAt(0)))
-                        || isMyanmarLabel(label))) {
+                            || isMyanmarLabel(label))) {
                 isTopRowNumberHintStacking = true;
             }
         }
@@ -619,16 +634,17 @@ public class KeyboardView extends View {
                 if (isMyanmarLabel(label)) {
                     // Push the number hint to the absolute top edge of the key
                     stackedHintBaseline = -hintAscent + mKeyHintLetterPadding;
-                    // Center the main label vertically, slightly shifted down to accommodate the top hint
+                    // Center the main label vertically, slightly shifted down to accommodate the
+                    // top hint
                     labelBaseline = centerY + labelCharHeight / 2.0f + (hintCharHeight / 2.0f);
                 } else {
                     boolean isLowercase = label.length() > 0 && Character.isLowerCase(label.charAt(0));
                     float effectiveLabelHeight = isLowercase ? labelCharHeight * 0.7f : labelCharHeight;
                     float gap = labelCharHeight * 0.42f; // Slightly increased gap to prevent overlap
-    
+
                     float totalVisualHeight = effectiveLabelHeight + gap + hintCharHeight;
                     float descenderCompensation = isLowercase ? labelCharHeight * 0.08f : 0f;
-    
+
                     labelBaseline = centerY + totalVisualHeight / 2.0f - descenderCompensation;
                     stackedHintBaseline = centerY - totalVisualHeight / 2.0f - hintAscent - descenderCompensation;
                 }
@@ -675,6 +691,10 @@ public class KeyboardView extends View {
                     paint.setColor(key.selectTextColor(params) | 0xFF000000); // ignore alpha for emojis (though
                                                                               // actually color isn't applied anyway and
                                                                               // we could just set white)
+                else if (shouldDrawSelectionOnlyPopupKey(key))
+                    paint.setColor(mColors.get(isPopupKeySelected(key)
+                            ? ColorType.ACTION_KEY_ICON
+                            : ColorType.KEY_PREVIEW_TEXT));
                 else if (mColors.isFrosted())
                     paint.setColor(mColors.get(ColorType.KEY_TEXT));
                 else if (key.hasActionKeyBackground())
@@ -707,7 +727,8 @@ public class KeyboardView extends View {
         if (hintLabel != null && mShowsHints) {
             paint.setTextSize(key.selectHintTextSize(params) * mFontSizeMultiplier); // maybe take sqrt to not have such
                                                                                      // extreme changes?
-            paint.setColor(mColors.isFrosted() ? mColors.get(ColorType.KEY_HINT_TEXT) : key.selectHintTextColor(params));
+            paint.setColor(
+                    mColors.isFrosted() ? mColors.get(ColorType.KEY_HINT_TEXT) : key.selectHintTextColor(params));
             // TODO: Should add a way to specify type face for hint letters
             paint.setTypeface(KeyboardTypeface.resolve(hintLabel, Typeface.DEFAULT_BOLD));
             blendAlpha(paint, params.mAnimAlpha);
@@ -877,7 +898,7 @@ public class KeyboardView extends View {
         if (mKeyBackground != null) {
             colors.setColor(mKeyBackground,
                     this instanceof MoreSuggestionsView ? ColorType.MORE_SUGGESTIONS_WORD_BACKGROUND
-                            : (this instanceof PopupKeysKeyboardView ? ColorType.POPUP_KEYS_BACKGROUND
+                            : (isPopupKeysView() ? ColorType.KEY_PREVIEW_BACKGROUND
                                     : ColorType.KEY_BACKGROUND));
         }
         if (mFunctionalKeyBackground != null) {
@@ -888,8 +909,15 @@ public class KeyboardView extends View {
         }
         if (mActionKeyBackground != null) {
             colors.setColor(mActionKeyBackground,
-                    this instanceof PopupKeysKeyboardView ? ColorType.ACTION_KEY_POPUP_KEYS_BACKGROUND
-                            : ColorType.ACTION_KEY_BACKGROUND);
+                    isPopupKeysView() ? ColorType.ACTION_KEY_BACKGROUND
+                            : this instanceof PopupKeysKeyboardView ? ColorType.ACTION_KEY_POPUP_KEYS_BACKGROUND
+                                    : ColorType.ACTION_KEY_BACKGROUND);
+        }
+        final Keyboard keyboard = getKeyboard();
+        if (keyboard instanceof MoreSuggestions) {
+            colors.setBackground(this, ColorType.MORE_SUGGESTIONS_BACKGROUND);
+        } else if (keyboard instanceof PopupKeysKeyboard) {
+            colors.setBackground(this, ColorType.KEY_PREVIEW_BACKGROUND);
         }
         invalidateAllKeys();
     }
@@ -931,7 +959,8 @@ public class KeyboardView extends View {
     }
 
     private boolean isSpecialKey(@NonNull final Key key) {
-        if (key.isShift()) return true;
+        if (key.isShift())
+            return true;
         final int code = key.getCode();
         return code == KeyCode.SYMBOL
                 || code == KeyCode.ALPHA
@@ -944,7 +973,11 @@ public class KeyboardView extends View {
     }
 
     private void setKeyIconColor(Key key, Drawable icon, Keyboard keyboard) {
-        if (mColors.isFrosted() && (key.hasActionKeyBackground() || isSpecialKey(key))) {
+        if (shouldDrawSelectionOnlyPopupKey(key)) {
+            mColors.setColor(icon, isPopupKeySelected(key)
+                    ? ColorType.ACTION_KEY_ICON
+                    : ColorType.KEY_PREVIEW_TEXT);
+        } else if (mColors.isFrosted() && (key.hasActionKeyBackground() || isSpecialKey(key))) {
             mColors.setColor(icon, ColorType.KEY_ICON);
         } else if (key.hasActionKeyBackground()) {
             mColors.setColor(icon, ColorType.ACTION_KEY_ICON);
@@ -967,6 +1000,64 @@ public class KeyboardView extends View {
         } else {
             mColors.setColor(icon, ColorType.KEY_TEXT);
         }
+    }
+
+    private boolean isPopupKeysView() {
+        return this instanceof PopupKeysKeyboardView && !(this instanceof MoreSuggestionsView);
+    }
+
+    private boolean shouldDrawSelectionOnlyPopupKey(@NonNull final Key key) {
+        return isPopupKeysView()
+                && !key.isSpacer()
+                && (key.getBackgroundType() == Key.BACKGROUND_TYPE_NORMAL
+                        || key.getBackgroundType() == Key.BACKGROUND_TYPE_ACTION);
+    }
+
+    private static boolean isPopupKeySelected(@NonNull final Key key) {
+        return key.isPressed() || key.isLocked();
+    }
+
+    private void drawPopupKeySelectionBackground(@NonNull final Key key, @NonNull final Canvas canvas) {
+        if (!isPopupKeySelected(key)) {
+            return;
+        }
+
+        final float keyWidth = key.getDrawWidth();
+        final float keyHeight = key.getHeight();
+        final float highlightInset = Math.max(1f, keyHeight * 0.01f);
+        final float highlightHeight = Math.max(1f, keyHeight - highlightInset * 2f);
+        final float centerX = keyWidth * 0.5f;
+        final float centerY = keyHeight * 0.5f;
+
+        mBackgroundPaint.setColor(getStrongPopupSelectionColor());
+
+        if (keyWidth <= keyHeight * 1.25f) {
+            final float radius = Math.max(1f,
+                    Math.min(keyWidth - highlightInset * 2f, highlightHeight) * 0.5f);
+            canvas.drawCircle(centerX, centerY, radius, mBackgroundPaint);
+            return;
+        }
+
+        final float highlightWidth = Math.max(highlightHeight, keyWidth - highlightInset * 2f);
+        final float left = centerX - highlightWidth * 0.5f;
+        final float top = centerY - highlightHeight * 0.5f;
+        final float radius = highlightHeight * 0.5f;
+        canvas.drawRoundRect(left, top, left + highlightWidth, top + highlightHeight,
+                radius, radius, mBackgroundPaint);
+    }
+
+    private int getStrongPopupSelectionColor() {
+        final int actionColor = mColors.get(ColorType.ACTION_KEY_BACKGROUND);
+        final float[] hsv = new float[3];
+        Color.colorToHSV(Color.rgb(Color.red(actionColor), Color.green(actionColor),
+                Color.blue(actionColor)), hsv);
+        hsv[1] = Math.max(hsv[1], 0.55f);
+        if (hsv[2] > 0.70f) {
+            hsv[2] = 0.70f;
+        } else if (hsv[2] < 0.35f) {
+            hsv[2] = 0.35f;
+        }
+        return Color.HSVToColor(Constants.Color.ALPHA_OPAQUE, hsv);
     }
 
 }

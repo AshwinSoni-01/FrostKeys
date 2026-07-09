@@ -90,7 +90,7 @@
         >
         <item name="android:background">@drawable/keyboard_popup_panel_background_lxx_base</item>
         <item name="keyBackground">@drawable/btn_keyboard_key_popup_lxx_base</item>
-        <item name="divider">@drawable/popup_keys_divider</item>
+        <item name="divider">@null</item>
         <item name="keyTypeface">normal</item>
         <item name="verticalCorrection">@dimen/config_popup_keys_keyboard_vertical_correction_holo</item>
     </style>
@@ -98,10 +98,6 @@
         name="PopupKeysKeyboardView.LXX_Base.Action"
         parent="PopupKeysKeyboardView.LXX_Base"
         >
-        <item name="android:background">@android:color/transparent</item>
-        <item name="keyBackground">@drawable/btn_keyboard_key_popup_action_lxx_base</item>
-        <item name="divider">@null</item>
-        <item name="keyLabelFlags">keepBackgroundAspectRatio</item>
     </style>
     <style
         name="SuggestionStripView.LXX_Base"

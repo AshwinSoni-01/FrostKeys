@@ -17,7 +17,11 @@ import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Paint.Align;
+import android.graphics.RenderEffect;
+import android.graphics.Shader;
 import android.graphics.Typeface;
+import android.graphics.drawable.ColorDrawable;
+import android.os.Build;
 import android.os.Trace;
 import android.util.AttributeSet;
 import android.view.ContextThemeWrapper;
@@ -32,6 +36,7 @@ import android.widget.RelativeLayout;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.core.graphics.ColorUtils;
 
 import helium314.keyboard.accessibility.AccessibilityUtils;
 import helium314.keyboard.accessibility.MainKeyboardAccessibilityDelegate;
@@ -653,6 +658,35 @@ public final class MainKeyboardView extends KeyboardView implements DrawingProxy
         mSlidingKeyInputDrawingPreview.dismissSlidingKeyInputPreview();
         showFloatingPopup(panel);
         mPopupKeysPanel = panel;
+        applyPopupKeysPanelBackdrop();
+    }
+
+    private void applyPopupKeysPanelBackdrop() {
+        clearPopupKeysPanelBackdrop();
+        if (isPopupKeysPanelBlurAvailable()) {
+            setRenderEffect(RenderEffect.createBlurEffect(
+                    8f * getResources().getDisplayMetrics().density,
+                    8f * getResources().getDisplayMetrics().density,
+                    Shader.TileMode.CLAMP
+            ));
+        } else {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                setForeground(new ColorDrawable(ColorUtils.setAlphaComponent(Color.BLACK, 42)));
+            }
+        }
+    }
+
+    private boolean isPopupKeysPanelBlurAvailable() {
+        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && isHardwareAccelerated();
+    }
+
+    private void clearPopupKeysPanelBackdrop() {
+        if (isPopupKeysPanelBlurAvailable()) {
+            setRenderEffect(null);
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            setForeground(null);
+        }
     }
 
     private void showFloatingPopup(final PopupKeysPanel panel) {
@@ -706,6 +740,7 @@ public final class MainKeyboardView extends KeyboardView implements DrawingProxy
             }
             mPopupKeysPanel.removeFromParent();
             mPopupKeysPanel = null;
+            clearPopupKeysPanelBackdrop();
         }
     }
 

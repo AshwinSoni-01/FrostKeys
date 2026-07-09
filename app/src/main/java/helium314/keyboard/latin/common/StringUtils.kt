@@ -256,7 +256,8 @@ private val LocalBreakIterator = ThreadLocal<BreakIterator>().apply {
     set(BreakIterator.getCharacterInstance(Locale.ROOT))
 }
 
-private val localBreakIterator: BreakIterator = LocalBreakIterator.get() ?: initBreakIterator()
+private val localBreakIterator: BreakIterator
+    get() = LocalBreakIterator.get() ?: initBreakIterator()
 
 private fun initBreakIterator() = BreakIterator.getCharacterInstance(Locale.ROOT).also {
     LocalBreakIterator.set(it)

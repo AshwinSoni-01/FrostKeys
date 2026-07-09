@@ -272,7 +272,6 @@ object FrostedGlassHelper {
 
             constrainImeWindowToKeyboardBounds(service, window, inputView)
             if (allowDelayedNativeCleanup &&
-                    service.isInputViewShown &&
                     scheduleNativeBlurCleanupIfReady(service, window, inputView, nativeState, generation)) {
                 Log.i(TAG, "Frosted glass disabled. Scheduled native blur cleanup.")
                 return
@@ -730,17 +729,25 @@ object FrostedGlassHelper {
 
         cancelPendingNativeBlurCleanup(nativeState)
         val decorView = window.decorView
+        val overrideMode = service.prefs().getString(Settings.PREF_BLUR_RENDER_OVERRIDE, "auto")
+        val isSamsungDevice = Build.MANUFACTURER.equals("samsung", ignoreCase = true)
+        val shouldTrySamsungBlur = isSamsungDevice || overrideMode == "force_samsung"
+
         val cleanup = Runnable {
             nativeState.pendingCleanup = null
             nativeState.pendingCleanupDecorView = null
             if (generation != nativeState.generation) return@Runnable
             applyDefaultBlur(service, window, false, force = true)
+            if (shouldTrySamsungBlur) {
+                applySamsungSemBlur(window, inputView, false)
+                applySamsungLegacyBlur(window, false)
+            }
             clearNativeBlurReady(nativeState)
             windowsWithAppliedFrostedGlass.remove(window)
             samsungBlurTarget(inputView)?.invalidateOutline()
             inputView?.invalidate()
             decorView.invalidate()
-            Log.d(TAG, "Delayed native blur cleanup completed.")
+            Log.d(TAG, "Delayed native/proprietary blur cleanup completed.")
         }
         nativeState.pendingCleanup = cleanup
         nativeState.pendingCleanupDecorView = decorView

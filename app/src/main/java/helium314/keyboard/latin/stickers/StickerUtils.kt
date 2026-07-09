@@ -76,7 +76,7 @@ object StickerUtils {
                 action = "com.whatsapp.intent.action.ENABLE_STICKER_PACK"
                 putExtra("sticker_pack_id", packId)
                 putExtra("sticker_pack_authority", authority)
-                putExtra("sticker_pack_name", "KBoard Dynamic Pack")
+                putExtra("sticker_pack_name", "FrostKeys Dynamic Pack")
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 if (context !is android.app.Activity) {
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)

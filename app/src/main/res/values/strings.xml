@@ -9,11 +9,11 @@
     xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2"
     tools:ignore="MissingTranslation">
     <!-- Name of Android spell checker service. The app name should not be translated. -->
-    <string name="spell_checker_service_name">KBoard Spell Checker</string>
+    <string name="spell_checker_service_name">FrostKeys Spell Checker</string>
     <!-- Title for IME settings screen. The app name should not be translated. -->
-    <string name="ime_settings">KBoard Settings</string>
+    <string name="ime_settings">FrostKeys Settings</string>
     <!-- Title for the spell checking service settings screen. The app name should not be translated. -->
-    <string name="android_spell_checker_settings">KBoard Spell Checker Settings</string>
+    <string name="android_spell_checker_settings">FrostKeys Spell Checker Settings</string>
     <!-- Option to provide vibrate/haptic feedback on keypress -->
     <string name="vibrate_on_keypress">Vibrate on keypress</string>
     <!-- Option to provide vibrate/haptic feedback on keypress even in do not disturb mode -->
@@ -265,12 +265,12 @@
     <!-- Button text for deleting gesture library -->
     <string name="load_gesture_library_button_delete">Delete library</string>
 
-    <!-- KBoard custom guides and progressive onboarding strings -->
+    <!-- FrostKeys custom guides and progressive onboarding strings -->
     <string name="gesture_not_loaded_summary">Proprietary library required. Tap to set up.</string>
     <string name="gesture_guide_title">Gesture Typing Setup</string>
-    <string name="gesture_guide_desc">KBoard remains 100% offline and respects your privacy. Because of licensing restrictions, the gesture (swipe) typing library cannot be bundled with the open-source app by default. You must manually download and import it.</string>
+    <string name="gesture_guide_desc">FrostKeys remains 100% offline and respects your privacy. Because of licensing restrictions, the gesture (swipe) typing library cannot be bundled with the open-source app by default. You must manually download and import it.</string>
     <string name="gesture_guide_step1">1. Click below to download the gesture library for your device architecture (%s) from the OpenBoard repository.</string>
-    <string name="gesture_guide_step2">2. Click the import button and select the downloaded file to enable swipe typing. KBoard will restart automatically.</string>
+    <string name="gesture_guide_step2">2. Click the import button and select the downloaded file to enable swipe typing. FrostKeys will restart automatically.</string>
     <string name="gesture_guide_download_btn">Download Gesture Library (GitHub)</string>
     <string name="gesture_guide_import_btn">Select &amp; Import Library File</string>
 
@@ -279,11 +279,11 @@
     <string name="klipy_get_key_btn">Get Klipy API Key 🔑</string>
 
     <string name="dict_guide_title">Offline Word Suggestions</string>
-    <string name="dict_guide_desc">KBoard uses offline dictionary files to suggest words as you type.\n\nTo download a dictionary (or emoji dictionary):\n1. Click the button below to open the dictionary page on Codeberg.\n2. Open the relevant folder: \'dictionaries\' for standard languages, or \'emoji_cldr_signal_dictionaries\' for emojis.\n3. Locate and select the dictionary file for your language.\n4. Click the tiny download button (small icon on the right) or click the \'View raw\' / \'Raw\' button to download the file.\n\n💡 Tip: Tap directly on any language in the list below to get a direct download link for that specific language\'s dictionary!</string>
+    <string name="dict_guide_desc">FrostKeys uses offline dictionary files to suggest words as you type.\n\nTo download a dictionary (or emoji dictionary):\n1. Click the button below to open the dictionary page on Codeberg.\n2. Open the relevant folder: \'dictionaries\' for standard languages, or \'emoji_cldr_signal_dictionaries\' for emojis.\n3. Locate and select the dictionary file for your language.\n4. Click the tiny download button (small icon on the right) or click the \'View raw\' / \'Raw\' button to download the file.\n\n💡 Tip: Tap directly on any language in the list below to get a direct download link for that specific language\'s dictionary!</string>
     <string name="dict_download_btn">Download Dictionaries (Codeberg)</string>
 
-    <string name="quick_setup_title">KBoard Quick Setup</string>
-    <string name="quick_setup_desc">Configure these essential settings to unlock the full power of KBoard:</string>
+    <string name="quick_setup_title">FrostKeys Quick Setup</string>
+    <string name="quick_setup_desc">Configure these essential settings to unlock the full power of FrostKeys:</string>
     <string name="quick_setup_gesture_title">1. Setup Swipe (Gesture) Typing</string>
     <string name="quick_setup_gesture_desc">Import the gesture library for your CPU architecture</string>
     <string name="quick_setup_dict_title">2. Add Offline Dictionaries</string>
@@ -1108,7 +1108,7 @@ New dictionary:
     <!-- Text requesting the user to gesture a word
      string will probably be removed once data gathering is finished (end of 2026 latest) -->
     <string name="gesture_data_please_type">Please gesture type:</string>
-    <!-- Text requesting the user to switch to KBoard, in case a different keyboard app is active
+    <!-- Text requesting the user to switch to FrostKeys, in case a different keyboard app is active
      string will probably be removed once data gathering is finished (end of 2026 latest) -->
     <string name="gesture_data_please_switch_keyboard">Please switch to %s</string>
     <!-- Button for saving data and go to next word (now only shows up when the word %s is not in suggestions)
@@ -1191,7 +1191,7 @@ New dictionary:
      string will probably be removed once data gathering is finished (end of 2026 latest) -->
     <string name="gesture_data_promotion_message">
         Hey there!\n
-        Since you installed the gesture typing library, you might be interested in KBoard\'s project for creating a fully open gesture typing library.
+        Since you installed the gesture typing library, you might be interested in the FrostKeys project for creating a fully open gesture typing library.
         You can help by contributing gesture data. For more information visit the gesture data gathering screen.
     </string>
     <!-- Message asking the user to contribute to gesture data gathering again (dialog in main settings)

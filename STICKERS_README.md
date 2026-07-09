@@ -1,6 +1,6 @@
 # Animated Stickers Implementation & Verification
 
-This document describes how animated WebP stickers are handled in KBoard and how to verify the implementation.
+This document describes how animated WebP stickers are handled in FrostKeys and how to verify the implementation.
 
 ## Architecture
 

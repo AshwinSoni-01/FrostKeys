@@ -592,12 +592,15 @@ class ClipboardHistoryManager(
         val clip = recentClip(editorInfo) ?: return null
         val inputType = editorInfo?.inputType ?: InputType.TYPE_NULL
 
+        // Check if the keyboard is initialized before trying to access its icons set
+        val keyboard = latinIME.mKeyboardSwitcher.keyboard ?: return null
+
         // create the view
         val binding = ClipboardSuggestionBinding.inflate(LayoutInflater.from(latinIME), parent, false)
         val textView = binding.clipboardSuggestionText
         val preview = binding.clipboardSuggestionPreview
         KeyboardTypeface.applyToTextView(textView)
-        val clipIcon = latinIME.mKeyboardSwitcher.keyboard.mIconsSet.getIconDrawable(ToolbarKey.PASTE.name.lowercase())
+        val clipIcon = keyboard.mIconsSet.getIconDrawable(ToolbarKey.PASTE.name.lowercase())
 
         when (clip) {
             is RecentClip.Text -> {
@@ -624,7 +627,7 @@ class ClipboardHistoryManager(
             }
         }
         val closeButton = binding.clipboardSuggestionClose
-        closeButton.setImageDrawable(latinIME.mKeyboardSwitcher.keyboard.mIconsSet.getIconDrawable(ToolbarKey.CLOSE_HISTORY.name.lowercase()))
+        closeButton.setImageDrawable(keyboard.mIconsSet.getIconDrawable(ToolbarKey.CLOSE_HISTORY.name.lowercase()))
         closeButton.setOnClickListener { removeClipboardSuggestion() }
 
         val colors = latinIME.mSettings.current.mColors

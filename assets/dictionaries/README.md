@@ -1,14 +1,14 @@
 # Importable Dictionaries
 
-This folder contains dictionary files intended for manual import through KBoard's
-dictionary picker.
+This folder contains dictionary files intended for manual import through the
+FrostKeys dictionary picker.
 
 ## Burmese_Myanmar.dict
 
 `Burmese_Myanmar.dict` is an AOSP/HeliBoard-compatible binary dictionary for
-locale `my`, dictionary type `main`. Users can import it from KBoard settings:
+locale `my`, dictionary type `main`. Users can import it from FrostKeys settings:
 
-1. Open KBoard settings.
+1. Open FrostKeys settings.
 2. Go to Dictionaries.
 3. Choose Burmese/Myanmar.
 4. Tap Add dictionary and select `Burmese_Myanmar.dict`.

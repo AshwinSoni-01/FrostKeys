@@ -1,6 +1,6 @@
 # Importable layouts
 
-These files are example custom layouts that can be imported from KBoard's layout
+These files are example custom layouts that can be imported from FrostKeys layout
 settings. The Burmese/Myanmar layouts are also mirrored into the app's built-in
 layout assets for the first-class Burmese language subtype.
 
@@ -32,6 +32,6 @@ repository:
 The upstream keyboard is licensed under the MIT license. See
 `keyman-basic-kbdmyan-LICENSE.md`.
 
-The generated main layout keeps Keyman's Myanmar digit/top row and uses KBoard's
-two-key final-row behavior for comma and period replacements. Shift selects the
+The generated main layout keeps Keyman's Myanmar digit/top row and uses the
+FrostKeys two-key final-row behavior for comma and period replacements. Shift selects the
 Keyman shift-layer output, including Myanmar comma and full stop.

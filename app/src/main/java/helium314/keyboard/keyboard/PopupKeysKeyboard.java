@@ -40,6 +40,7 @@ public final class PopupKeysKeyboard extends Keyboard {
         public int mRightKeys; // includes default key.
         public int mDividerWidth;
         public int mColumnWidth;
+        private static final float PANEL_PADDING_RATIO = 0.12f;
 
         public PopupKeysKeyboardParams() {
             super();
@@ -117,7 +118,23 @@ public final class PopupKeysKeyboard extends Keyboard {
                     : getAutoOrderTopRowAdjustment();
             mDividerWidth = dividerWidth;
             mColumnWidth = mDefaultAbsoluteKeyWidth + mDividerWidth;
-            mBaseWidth = mOccupiedWidth = mNumColumns * mColumnWidth - mDividerWidth;
+            final int panelPadding = numKeys == 1 ? 0
+                    : Math.round(mDefaultAbsoluteRowHeight * PANEL_PADDING_RATIO);
+            // The selection highlight is a circle whose radius is limited by the
+            // narrower key width (since keys are taller than wide).  This leaves
+            // (keyVisualHeight − keyWidth) / 2 of dead space above and below the
+            // circle inside each key.  Subtract that from the vertical padding so
+            // the circle in corner keys aligns flush with the panel background's
+            // rounded corners.
+            final int keyVisualHeight = mDefaultAbsoluteRowHeight - mVerticalGap;
+            final int verticalCircleInset = Math.max(0,
+                    (keyVisualHeight - mDefaultAbsoluteKeyWidth) / 2);
+            mLeftPadding = panelPadding;
+            mRightPadding = panelPadding;
+            mTopPadding = Math.max(0, panelPadding - verticalCircleInset);
+            mBottomPadding = Math.max(0, panelPadding - verticalCircleInset);
+            mBaseWidth = mOccupiedWidth = mNumColumns * mColumnWidth - mDividerWidth
+                    + mLeftPadding + mRightPadding;
             // Need to subtract the bottom row's gutter only.
             mBaseHeight = mOccupiedHeight = mNumRows * mDefaultAbsoluteRowHeight - mVerticalGap
                     + mTopPadding + mBottomPadding;
@@ -246,8 +263,6 @@ public final class PopupKeysKeyboard extends Keyboard {
         private final Key mParentKey;
 
         private static final float LABEL_PADDING_RATIO = 0.2f;
-        private static final float DIVIDER_RATIO = 0.2f;
-
         /**
          * The builder of PopupKeysKeyboard.
          * @param context the context of {@link PopupKeysKeyboardView}.
@@ -291,12 +306,7 @@ public final class PopupKeysKeyboard extends Keyboard {
                 keyWidth = getMaxKeyWidth(key, mParams.mAbsolutePopupKeyWidth, padding, paintToMeasure);
                 rowHeight = keyboard.mMostCommonKeyHeight;
             }
-            final int dividerWidth;
-            if (key.needsDividersInPopupKeys()) {
-                dividerWidth = (int)(keyWidth * DIVIDER_RATIO);
-            } else {
-                dividerWidth = 0;
-            }
+            final int dividerWidth = 0;
             final PopupKeySpec[] popupKeys = key.getPopupKeys();
             final int defaultColumns = key.getPopupKeysColumnNumber();
             final int spaceForKeys = keyboard.mId.mWidth / keyWidth;

@@ -26,7 +26,7 @@ import java.util.EnumMap
 import java.util.Locale
 
 const val MAX_PINNED_TOOLBAR_KEYS = 5
-const val TOOLBAR_DRAG_CLIP_LABEL = "KBoardToolbarKey"
+const val TOOLBAR_DRAG_CLIP_LABEL = "FrostKeysToolbarKey"
 
 enum class ToolbarDragSource {
     ACCESS_POINT_MENU,
