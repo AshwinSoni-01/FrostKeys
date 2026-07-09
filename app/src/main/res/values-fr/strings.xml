@@ -298,7 +298,6 @@ Nouveau dictionnaire:
     <string name="center_suggestion_text_to_enter">Toujours utiliser la suggestion du milieu</string>
     <string name="center_suggestion_text_to_enter_summary">En appuyant sur espace ou sur un signe de ponctuation, la suggestion du milieu sera saisie</string>
     <string name="close_history" tools:keep="@string/close_history">Fermer le presse-papiers</string>
-    <string name="clipboard_toolbar_keys">Sélectionner les touches de la barre d\'outils du presse-papiers</string>
     <string name="subtype_generic_extended">%s (Étendu)</string>
     <string name="subtype_mns">Mansi</string>
     <string name="more_colors">Afficher plus de couleurs</string>

@@ -181,7 +181,6 @@
     <string name="day_night_mode_summary">Ulkoasu seuraa järjestelmän asetuksia</string>
     <string name="select_color_background">Näppäimistön tausta</string>
     <string name="emoji" tools:keep="@string/emoji">Emoji</string>
-    <string name="clipboard_toolbar_keys">Valitse leikepöydän työkalupalkin näppäimet</string>
     <string name="setup_step3_action">Muokkaa näppäimistöä</string>
     <string name="text_tap_languages">Napauta kieltä avataksesi sen asetukset</string>
     <string name="save_log">Tallenna loki</string>

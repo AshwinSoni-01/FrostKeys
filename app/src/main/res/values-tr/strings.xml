@@ -231,7 +231,6 @@
     <string name="hidden_features_summary">Fark edilmeyebilecek özellikleri göster</string>
     <string name="hidden_features_text">cihaz korumalı depolama</string>
     <string name="close_history" tools:keep="@string/close_history">Pano geçmişini kapat</string>
-    <string name="clipboard_toolbar_keys">Pano araç çubuğu tuşlarını seç</string>
     <string name="show_popup_hints_summary">Bir tuşa uzun süre basmak ek işlevleri tetikliyorsa ipuçlarını göster</string>
     <string name="button_title_add_custom_layout">Özel düzen ekle</string>
     <string name="layout_symbols" tools:keep="@string/layout_symbols">Semboller</string>

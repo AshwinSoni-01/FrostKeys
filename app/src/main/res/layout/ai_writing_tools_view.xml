@@ -24,8 +24,6 @@
             android:layout_width="38dp"
             android:layout_height="38dp"
             android:src="@drawable/ic_arrow_back"
-            android:background="?android:attr/selectableItemBackgroundBorderless"
-            android:foreground="?android:attr/selectableItemBackground"
             android:contentDescription="Back"
             android:tint="?android:attr/textColorPrimary" />
         <TextView

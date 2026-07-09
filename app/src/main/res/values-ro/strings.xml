@@ -337,7 +337,6 @@
     <string name="page_down" tools:keep="@string/page_down">Pagină jos</string>
     <string name="quick_pin_toolbar_keys">Fixează tasta din bara de instrumente la apăsarea lungă</string>
     <string name="close_history" tools:keep="@string/close_history">Închide istoricul clipboardului</string>
-    <string name="clipboard_toolbar_keys">Selectează tastele barei de instrumente clipboard</string>
     <string name="switch_keyboard_after">Comutare la tastatura principală după…</string>
     <string name="after_emoji">Se selectează emoji în vizualizarea emoji</string>
     <string name="after_clip">Selectarea unei intrări din istoricul clipboardului</string>

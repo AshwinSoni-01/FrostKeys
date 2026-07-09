@@ -623,7 +623,7 @@ class AiWritingToolsView @JvmOverloads constructor(
 
     private fun createBackButtonBackground(colors: helium314.keyboard.latin.common.Colors): RippleDrawable {
         val circle = GradientDrawable().apply {
-            shape = GradientDrawable.OVAL
+            this.shape = GradientDrawable.OVAL
             setColor(Color.WHITE)
             colors.setColor(this, ColorType.SPECIAL_KEY_BACKGROUND)
         }
@@ -633,7 +633,14 @@ class AiWritingToolsView @JvmOverloads constructor(
         val horizontalInset = 3.dpToPx(resources)
         val verticalInset = 3.dpToPx(resources)
         val content = InsetDrawable(circle, horizontalInset, verticalInset, horizontalInset, verticalInset)
-        return RippleDrawable(rippleColor, content, content.constantState?.newDrawable()?.mutate())
+        
+        val maskCircle = GradientDrawable().apply {
+            this.shape = GradientDrawable.OVAL
+            setColor(Color.BLACK)
+        }
+        val mask = InsetDrawable(maskCircle, horizontalInset, verticalInset, horizontalInset, verticalInset)
+        
+        return RippleDrawable(rippleColor, content, mask)
     }
 
     override fun onDetachedFromWindow() {

@@ -272,7 +272,11 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
         suggestionsChipScroll.isVisible = false
         pinnedKeys.isVisible = pinnedKeys.childCount > 0
         // Swap access point icon to back arrow while menu is open
-        setAccessPointIcon(isMenuOpen = true)
+        setAccessPointMenuOpen(true)
+    }
+
+    fun setAccessPointMenuOpen(isOpen: Boolean) {
+        setAccessPointIcon(isMenuOpen = isOpen)
     }
 
     fun setSuggestions(suggestions: SuggestedWords, isRtlLanguage: Boolean) {

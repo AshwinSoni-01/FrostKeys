@@ -305,7 +305,6 @@
     <string name="no_dictionary_dont_show_again_button">Não mostrar novamente</string>
     <string name="available_dictionary_experimental">%s (experimental)</string>
     <string name="replace_dictionary_message">Substituir o dicionário \"%1$s\" adicionado pelo utilizador?\n\nDicionário atual:\n%2$s\n\nNovo dicionário:\n%3$s</string>
-    <string name="clipboard_toolbar_keys">Selecionar teclas da barra de ferramentas da área de transferência</string>
     <string name="remove_redundant_popups">Remover pop-ups redundantes</string>
     <string name="pinned_toolbar_keys">Selecionar teclas afixadas da barra de ferramentas</string>
     <string name="quick_pin_toolbar_keys">Fixar tecla da barra de ferramentas ao pressionar</string>
