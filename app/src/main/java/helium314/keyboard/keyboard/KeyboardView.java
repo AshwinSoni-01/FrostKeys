@@ -440,7 +440,7 @@ public class KeyboardView extends View {
             if (!key.isSpacer()) {
                 final boolean isSpaceBar = key.getCode() == Constants.CODE_SPACE;
                 final boolean isEnterKey = key.getCode() == Constants.CODE_ENTER || key.hasActionKeyBackground();
-                final boolean isSymbolsKey = key.getCode() == KeyCode.SYMBOL_ALPHA || key.getCode() == KeyCode.SYMBOL;
+                final boolean isSymbolsKey = key.getCode() == KeyCode.SYMBOL_ALPHA || key.getCode() == KeyCode.ALPHA;
                 final boolean isPillShaped = isEnterKey || isSymbolsKey;
 
                 ColorType colorType;
