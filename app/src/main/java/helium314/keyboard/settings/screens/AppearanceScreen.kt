@@ -63,10 +63,10 @@ fun AppearanceScreen(
         Settings.PREF_ICON_STYLE,
         Settings.PREF_CUSTOM_ICON_NAMES,
         Settings.PREF_THEME_COLORS,
+        if (dayNightMode) Settings.PREF_THEME_COLORS_NIGHT else null,
         Settings.PREF_THEME_KEY_BORDERS,
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P)
             Settings.PREF_THEME_DAY_NIGHT else null,
-        if (dayNightMode) Settings.PREF_THEME_COLORS_NIGHT else null,
         Settings.PREF_NAVBAR_COLOR,
         if (isFrostedActive) "adjust_frosted_glass_dialog" else null,
         SettingsWithoutKey.BACKGROUND_IMAGE,
@@ -111,10 +111,18 @@ fun createAppearanceSettings(context: Context) = listOf(
         val items = KeyboardTheme.STYLES.map {
             it.getStringResourceOrName("style_name_", ctx) to it
         }
+        val descriptions = mapOf(
+            KeyboardTheme.STYLE_DEFAULT to "Matches the modern look and feel of the default android keyboard. Adjusts the padding scales automatically to give a familiar look.",
+            KeyboardTheme.STYLE_MATERIAL to "The classic Android Lollipop (Material Design) look with standard rectangular keys.",
+            KeyboardTheme.STYLE_HOLO to "A retro, Android KitKat-era aesthetic featuring stark, flat keys.",
+            KeyboardTheme.STYLE_ROUNDED to "A soft, bubbly design with pill-shaped keys and matching circular popups.",
+            KeyboardTheme.STYLE_CIRCLE to "A unique, minimalist layout where every individual key is a perfect circle."
+        )
         ListPreference(
-            setting,
-            items,
-            Defaults.PREF_ICON_STYLE
+            setting = setting,
+            items = items,
+            default = Defaults.PREF_THEME_STYLE,
+            itemDescriptions = { descriptions[it] }
         ) {
             if (it != KeyboardTheme.STYLE_HOLO) {
                 if (prefs.getString(Settings.PREF_THEME_COLORS, Defaults.PREF_THEME_COLORS) == KeyboardTheme.THEME_HOLO_WHITE)
@@ -283,21 +291,33 @@ fun createAppearanceSettings(context: Context) = listOf(
         ) { KeyboardSwitcher.getInstance().setThemeNeedsReload() }
     },
     Setting(context, Settings.PREF_BOTTOM_PADDING_SCALE_PREFIX, R.string.prefs_bottom_padding_scale) { setting ->
+        val currentStyle = LocalContext.current.prefs().getString(Settings.PREF_THEME_STYLE, Defaults.PREF_THEME_STYLE)
+        val defaults = if (currentStyle == KeyboardTheme.STYLE_DEFAULT) {
+            Defaults.PREF_BOTTOM_PADDING_SCALE.clone().apply { this[0] = 1.18f }
+        } else {
+            Defaults.PREF_BOTTOM_PADDING_SCALE
+        }
         KeyboardScalePreference(
             name = setting.title,
             baseKey = setting.key,
             dimensions = listOf(stringResource(R.string.landscape), stringResource(R.string.folded)),
-            defaults = Defaults.PREF_BOTTOM_PADDING_SCALE,
+            defaults = defaults,
             range = 0f..5f,
             description = { "${(100 * it).toInt()}%" }
         ) { KeyboardSwitcher.getInstance().setThemeNeedsReload() }
     },
     Setting(context, Settings.PREF_SIDE_PADDING_SCALE_PREFIX, R.string.prefs_side_padding_scale) { setting ->
+        val currentStyle = LocalContext.current.prefs().getString(Settings.PREF_THEME_STYLE, Defaults.PREF_THEME_STYLE)
+        val defaults = if (currentStyle == KeyboardTheme.STYLE_DEFAULT) {
+            Defaults.PREF_SIDE_PADDING_SCALE.clone().apply { this[0] = 0.06f }
+        } else {
+            Defaults.PREF_SIDE_PADDING_SCALE
+        }
         KeyboardScalePreference(
             name = setting.title,
             baseKey = setting.key,
             dimensions = listOf(stringResource(R.string.landscape), stringResource(R.string.split), stringResource(R.string.folded)),
-            defaults = Defaults.PREF_SIDE_PADDING_SCALE,
+            defaults = defaults,
             range = 0f..3f,
             description = { "${(100 * it).toInt()}%" }
         ) { KeyboardSwitcher.getInstance().setThemeNeedsReload() }

@@ -3,6 +3,7 @@ package helium314.keyboard.settings.dialogs
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -38,6 +39,7 @@ fun <T: Any> ListPickerDialog(
     title: (@Composable () -> Unit)? = null,
     selectedItem: T? = null,
     getItemName: (@Composable (T) -> String) = { it.toString() },
+    getItemDescription: (@Composable (T) -> String?)? = null,
     confirmImmediately: Boolean = true,
     showRadioButtons: Boolean = true,
 ) {
@@ -72,8 +74,11 @@ fun <T: Any> ListPickerDialog(
                                     }
                                     selected = item
                                 }
-                                .padding(horizontal = if (showRadioButtons) 8.dp else 16.dp)
-                                .heightIn(min = 40.dp)
+                                .padding(
+                                    horizontal = if (showRadioButtons) 8.dp else 16.dp,
+                                    vertical = 8.dp
+                                )
+                                .heightIn(min = 56.dp)
                         ) {
                             if (showRadioButtons)
                                 RadioButton(
@@ -86,10 +91,16 @@ fun <T: Any> ListPickerDialog(
                                         selected = item
                                     }
                                 )
-                            Text(
-                                text = getItemName(item),
-                                modifier = Modifier.weight(1f),
-                            )
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(text = getItemName(item))
+                                getItemDescription?.invoke(item)?.let {
+                                    Text(
+                                        text = it,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
                         }
                     }
                 }

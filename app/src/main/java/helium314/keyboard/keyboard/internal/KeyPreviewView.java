@@ -255,7 +255,8 @@ public class KeyPreviewView extends TextView {
     private static boolean isCircularPreviewStyle() {
         final String themeStyle = Settings.getValues().mColors.getThemeStyle();
         return KeyboardTheme.STYLE_ROUNDED.equals(themeStyle)
-                || KeyboardTheme.STYLE_CIRCLE.equals(themeStyle);
+                || KeyboardTheme.STYLE_CIRCLE.equals(themeStyle)
+                || KeyboardTheme.STYLE_DEFAULT.equals(themeStyle);
     }
 
     private static boolean isLightColor(final int color) {

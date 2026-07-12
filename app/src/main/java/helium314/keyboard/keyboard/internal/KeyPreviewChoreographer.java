@@ -156,7 +156,8 @@ public final class KeyPreviewChoreographer {
     private static boolean isCircularPreviewStyle(final Colors colors) {
         final String themeStyle = colors.getThemeStyle();
         return KeyboardTheme.STYLE_ROUNDED.equals(themeStyle)
-                || KeyboardTheme.STYLE_CIRCLE.equals(themeStyle);
+                || KeyboardTheme.STYLE_CIRCLE.equals(themeStyle)
+                || KeyboardTheme.STYLE_DEFAULT.equals(themeStyle);
     }
 
     void showKeyPreview(final Key key, final KeyPreviewView keyPreviewView) {

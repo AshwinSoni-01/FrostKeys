@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Copyright (C) 2015 The Android Open Source Project
+    modified
+    SPDX-License-Identifier: Apache-2.0 AND GPL-3.0-only
+-->
+<resources xmlns:android="http://schemas.android.com/apk/res/android">
+    <style name="KeyboardTheme.Default_Base_Border"
+        parent="KeyboardTheme.Default_Base">
+        <item name="keyboardStyle">@style/Keyboard.Default_Base_Border</item>
+        <item name="keyboardViewStyle">@style/KeyboardView.Default_Base_Border</item>
+        <item name="mainKeyboardViewStyle">@style/MainKeyboardView.Default_Base_Border</item>
+        <item name="emojiPalettesViewStyle">@style/EmojiPalettesView.Default_Base_Border</item>
+        <item name="clipboardHistoryViewStyle">@style/ClipboardHistoryView.Default_Base_Border</item>
+        <item name="popupKeysKeyboardViewStyle">@style/PopupKeysKeyboardView.Default_Base_Border</item>
+        <item name="suggestionStripViewStyle">@style/SuggestionStripView.Default_Base_Border</item>
+    </style>
+    <style
+        name="Keyboard.Default_Base_Border"
+        parent="Keyboard.Default_Base"
+        >
+        <!-- This should be aligned with KeyboardTheme.THEME_ID_* -->
+        <item name="themeId">DefaultBaseBorder</item>
+    </style>
+    <style
+        name="KeyboardView.Default_Base_Border"
+        parent="KeyboardView.Default_Base">
+        <item name="android:background">@drawable/keyboard_background_lxx_base_border</item>
+        <item name="keyBackground">@drawable/btn_keyboard_key_rounded_base_border</item>
+        <item name="functionalKeyBackground">@drawable/btn_keyboard_key_functional_rounded_base_border</item>
+        <item name="spacebarBackground">@drawable/btn_keyboard_key_rounded_base_border</item>
+    </style>
+
+    <style
+        name="MainKeyboardView.Default_Base_Border"
+        parent="MainKeyboardView.Default_Base">
+        <item name="android:background">@drawable/keyboard_background_lxx_base_border</item>
+        <item name="keyBackground">@drawable/btn_keyboard_key_rounded_base_border</item>
+        <item name="functionalKeyBackground">@drawable/btn_keyboard_key_functional_rounded_base_border</item>
+        <item name="spacebarBackground">@drawable/btn_keyboard_key_rounded_base_border</item>
+    </style>
+
+    <style
+        name="EmojiPalettesView.Default_Base_Border"
+        parent="EmojiPalettesView.Default_Base">
+        <item name="categoryPageIndicatorBackground">@color/emoji_tab_page_indicator_background_lxx_base_border</item>
+        <item name="android:background">@drawable/keyboard_background_lxx_base_border</item>
+        <item name="keyBackground">@drawable/btn_keyboard_key_rounded_base_border</item>
+        <item name="functionalKeyBackground">@drawable/btn_keyboard_key_functional_rounded_base_border</item>
+        <item name="spacebarBackground">@drawable/btn_keyboard_key_rounded_base_border</item>
+    </style>
+
+    <style
+        name="ClipboardHistoryView.Default_Base_Border"
+        parent="ClipboardHistoryView.Default_Base">
+        <item name="android:background">@drawable/keyboard_background_lxx_base_border</item>
+        <item name="keyBackground">@drawable/btn_keyboard_key_rounded_base_border</item>
+        <item name="functionalKeyBackground">@drawable/btn_keyboard_key_functional_rounded_base_border</item>
+    </style>
+
+    <style
+        name="PopupKeysKeyboardView.Default_Base_Border"
+        parent="PopupKeysKeyboardView.Default_Base">
+        <item name="android:background">@drawable/keyboard_popup_panel_background_rounded_base</item>
+        <item name="keyBackground">@drawable/btn_keyboard_key_popup_rounded_base</item>
+    </style>
+
+    <style
+        name="SuggestionStripView.Default_Base_Border"
+        parent="SuggestionStripView.Default_Base">
+        <item name="android:background">@drawable/keyboard_suggest_strip_lxx_base_border</item>
+    </style>
+
+</resources>

@@ -72,7 +72,9 @@ private constructor(val themeId: Int, @JvmField val mStyleId: Int) {
             if (themeOverride == "light") return false
             
             // Fallback to standard preference/system checks ONLY if override is null
-            return helium314.keyboard.latin.utils.ResourceUtils.isNight(context.resources)
+            val prefs = context.prefs()
+            val autoDayNight = prefs.getBoolean(helium314.keyboard.latin.settings.Settings.PREF_THEME_DAY_NIGHT, helium314.keyboard.latin.settings.Defaults.PREF_THEME_DAY_NIGHT)
+            return autoDayNight && helium314.keyboard.latin.utils.ResourceUtils.isNight(context.resources)
         }
 
         // old themes, now called styles
@@ -80,6 +82,7 @@ private constructor(val themeId: Int, @JvmField val mStyleId: Int) {
         const val STYLE_HOLO = "Holo"
         const val STYLE_ROUNDED = "Rounded"
         const val STYLE_CIRCLE = "Circle"
+        const val STYLE_DEFAULT = "Default"
 
         // new themes that are just colors
         const val THEME_LIGHT = "light"
@@ -117,7 +120,7 @@ private constructor(val themeId: Int, @JvmField val mStyleId: Int) {
             if (!isNight) THEME_SAND else null,
             THEME_VIOLETTE
         )
-        val STYLES = arrayOf(STYLE_MATERIAL, STYLE_HOLO, STYLE_ROUNDED, STYLE_CIRCLE)
+        val STYLES = arrayOf(STYLE_DEFAULT, STYLE_MATERIAL, STYLE_HOLO, STYLE_ROUNDED, STYLE_CIRCLE)
 
         // These should be aligned with Keyboard.themeId and Keyboard.Case.keyboardTheme
         // attributes' values in attrs.xml.
@@ -126,6 +129,8 @@ private constructor(val themeId: Int, @JvmField val mStyleId: Int) {
         private const val THEME_ID_LXX_BASE_BORDER = 2
         private const val THEME_ID_ROUNDED_BASE = 3
         private const val THEME_ID_ROUNDED_BASE_BORDER = 4
+        private const val THEME_ID_DEFAULT_BASE = 5
+        private const val THEME_ID_DEFAULT_BASE_BORDER = 6
         private const val DEFAULT_THEME_ID = THEME_ID_LXX_BASE
 
         private val KEYBOARD_THEMES = arrayOf(
@@ -133,7 +138,9 @@ private constructor(val themeId: Int, @JvmField val mStyleId: Int) {
             KeyboardTheme(THEME_ID_LXX_BASE, R.style.KeyboardTheme_LXX_Base),
             KeyboardTheme(THEME_ID_LXX_BASE_BORDER, R.style.KeyboardTheme_LXX_Base_Border),
             KeyboardTheme(THEME_ID_ROUNDED_BASE, R.style.KeyboardTheme_Rounded_Base),
-            KeyboardTheme(THEME_ID_ROUNDED_BASE_BORDER, R.style.KeyboardTheme_Rounded_Base_Border)
+            KeyboardTheme(THEME_ID_ROUNDED_BASE_BORDER, R.style.KeyboardTheme_Rounded_Base_Border),
+            KeyboardTheme(THEME_ID_DEFAULT_BASE, R.style.KeyboardTheme_Default_Base),
+            KeyboardTheme(THEME_ID_DEFAULT_BASE_BORDER, R.style.KeyboardTheme_Default_Base_Border)
         )
 
         // named colors, with names from old settings
@@ -156,13 +163,14 @@ private constructor(val themeId: Int, @JvmField val mStyleId: Int) {
             val matchingId = when (style) {
                 STYLE_HOLO -> THEME_ID_HOLO_BASE
                 STYLE_ROUNDED, STYLE_CIRCLE -> if (borders) THEME_ID_ROUNDED_BASE_BORDER else THEME_ID_ROUNDED_BASE
+                STYLE_DEFAULT -> if (borders) THEME_ID_DEFAULT_BASE_BORDER else THEME_ID_DEFAULT_BASE
                 else -> if (borders) THEME_ID_LXX_BASE_BORDER else THEME_ID_LXX_BASE
             }
             return KEYBOARD_THEMES.firstOrNull { it.themeId == matchingId } ?: KEYBOARD_THEMES[DEFAULT_THEME_ID]
         }
 
         fun getThemeActionAndEmojiKeyLabelFlags(themeId: Int): Int {
-            return if (themeId == THEME_ID_LXX_BASE || themeId == THEME_ID_ROUNDED_BASE) Key.LABEL_FLAGS_KEEP_BACKGROUND_ASPECT_RATIO else 0
+            return if (themeId == THEME_ID_LXX_BASE || themeId == THEME_ID_ROUNDED_BASE || themeId == THEME_ID_DEFAULT_BASE) Key.LABEL_FLAGS_KEEP_BACKGROUND_ASPECT_RATIO else 0
         }
 
         @JvmStatic

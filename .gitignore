@@ -15,6 +15,14 @@ fastlane/Appfile
 tools/*.txt
 *.patch
 *.diff
+app/build
+app/release
+app/.cxx
+app/.attach_*
+fastlane/Appfile
+tools/*.txt
+*.patch
+*.diff
 *.sh
 
 # Ignore root-level screenshots, log files, logcat dumps, and workspace
@@ -22,3 +30,6 @@ tools/*.txt
 /*.log
 /*logcat*.txt
 /*.code-workspace
+
+remove_strings.py
+pr2_body.txt

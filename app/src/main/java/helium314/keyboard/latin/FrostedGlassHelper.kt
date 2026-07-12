@@ -976,10 +976,7 @@ object FrostedGlassHelper {
     }
 
     private fun isNight(context: Context): Boolean {
-        var isNight = ResourceUtils.isNight(context.resources)
-        if (helium314.keyboard.keyboard.KeyboardTheme.themeOverride == "light") isNight = false
-        else if (helium314.keyboard.keyboard.KeyboardTheme.themeOverride == "dark") isNight = true
-        return isNight
+        return helium314.keyboard.keyboard.KeyboardTheme.isDarkThemeActive(context)
     }
 
     fun shouldWarnAboutFrostedGlassBlurUnsupported(themeName: String?): Boolean {

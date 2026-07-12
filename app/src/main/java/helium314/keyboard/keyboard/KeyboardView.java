@@ -436,6 +436,43 @@ public class KeyboardView extends View {
             return;
         }
 
+        if (KeyboardTheme.STYLE_DEFAULT.equals(themeStyle)) {
+            if (!key.isSpacer()) {
+                final boolean isSpaceBar = key.getCode() == Constants.CODE_SPACE;
+                final boolean isEnterKey = key.getCode() == Constants.CODE_ENTER || key.hasActionKeyBackground();
+                final boolean isSymbolsKey = key.getCode() == KeyCode.SYMBOL_ALPHA || key.getCode() == KeyCode.SYMBOL;
+                final boolean isPillShaped = isEnterKey || isSymbolsKey;
+
+                ColorType colorType;
+                if (mColors.isFrosted()) {
+                    colorType = frostedColorType;
+                } else if (isSpaceBar) {
+                    colorType = ColorType.SPACE_BAR_BACKGROUND;
+                } else if (key.hasActionKeyBackground()) {
+                    colorType = ColorType.ACTION_KEY_BACKGROUND;
+                } else if (key.hasFunctionalBackground()) {
+                    colorType = ColorType.FUNCTIONAL_KEY_BACKGROUND;
+                } else {
+                    colorType = ColorType.KEY_BACKGROUND;
+                }
+
+                mBackgroundPaint.setColor(
+                        KeyBackgroundUtils.fillColorFor(mColors, colorType, key.isPressed() || key.isLocked()));
+
+                canvas.translate(bgX, bgY);
+                if (isPillShaped) {
+                    final float spaceRadius = bgHeight * 0.5f;
+                    canvas.drawRoundRect(0f, 0f, bgWidth, bgHeight, spaceRadius, spaceRadius, mBackgroundPaint);
+                } else {
+                    final float density = getResources().getDisplayMetrics().density;
+                    final float cornerRadius = 8f * density;
+                    canvas.drawRoundRect(0f, 0f, bgWidth, bgHeight, cornerRadius, cornerRadius, mBackgroundPaint);
+                }
+                canvas.translate(-bgX, -bgY);
+                return;
+            }
+        }
+
         if (themeStyle.equals(KeyboardTheme.STYLE_ROUNDED) || KeyboardTheme.STYLE_CIRCLE.equals(themeStyle)) {
             final boolean isSpaceBar = key.getCode() == Constants.CODE_SPACE;
             final boolean isCircleStyle = KeyboardTheme.STYLE_CIRCLE.equals(themeStyle);

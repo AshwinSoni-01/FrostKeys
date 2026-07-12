@@ -24,6 +24,7 @@ import androidx.annotation.StringRes;
 
 import helium314.keyboard.compat.ConfigurationCompatKt;
 import helium314.keyboard.keyboard.KeyboardActionListener;
+import helium314.keyboard.keyboard.KeyboardTheme;
 import helium314.keyboard.keyboard.internal.PopupKeySpec;
 import helium314.keyboard.latin.AudioAndHapticFeedbackManager;
 import helium314.keyboard.latin.InputAttributes;
@@ -506,14 +507,20 @@ public final class Settings implements SharedPreferences.OnSharedPreferenceChang
     public static float readBottomPaddingScale(SharedPreferences prefs, boolean landscape, boolean folded) {
         int index = SettingsKt.findIndexOfDefaultSetting(landscape, folded);
         final Float[] defaults = Defaults.PREF_BOTTOM_PADDING_SCALE;
-        final float defaultValue = defaults[index];
+        float defaultValue = defaults[index];
+        if (index == 0 && KeyboardTheme.STYLE_DEFAULT.equals(prefs.getString(PREF_THEME_STYLE, Defaults.PREF_THEME_STYLE))) {
+            defaultValue = 1.18f;
+        }
         return prefs.getFloat(SettingsKt.createPrefKeyForBooleanSettings(PREF_BOTTOM_PADDING_SCALE_PREFIX, index, 2), defaultValue);
     }
 
     public static float readSidePaddingScale(SharedPreferences prefs, boolean landscape, boolean split, boolean folded) {
         int index = SettingsKt.findIndexOfDefaultSetting(landscape, split, folded);
         final Float[] defaults = Defaults.PREF_SIDE_PADDING_SCALE;
-        final float defaultValue = defaults[index];
+        float defaultValue = defaults[index];
+        if (index == 0 && KeyboardTheme.STYLE_DEFAULT.equals(prefs.getString(PREF_THEME_STYLE, Defaults.PREF_THEME_STYLE))) {
+            defaultValue = 0.06f;
+        }
         return prefs.getFloat(SettingsKt.createPrefKeyForBooleanSettings(PREF_SIDE_PADDING_SCALE_PREFIX, index, 3), defaultValue);
     }
 
@@ -551,7 +558,11 @@ public final class Settings implements SharedPreferences.OnSharedPreferenceChang
         int index = SettingsKt.findIndexOfDefaultSetting(landscape, folded);
         String key = SettingsKt.createPrefKeyForBooleanSettings(PREF_BOTTOM_PADDING_SCALE_PREFIX, index, 2);
         float clampedScale = Math.max(BOTTOM_PADDING_SCALE_MIN, Math.min(scale, BOTTOM_PADDING_SCALE_MAX));
-        if (clampedScale == Defaults.PREF_BOTTOM_PADDING_SCALE[index]) {
+        float defaultValue = Defaults.PREF_BOTTOM_PADDING_SCALE[index];
+        if (index == 0 && KeyboardTheme.STYLE_DEFAULT.equals(mPrefs.getString(PREF_THEME_STYLE, Defaults.PREF_THEME_STYLE))) {
+            defaultValue = 1.18f;
+        }
+        if (clampedScale == defaultValue) {
             mPrefs.edit().remove(key).apply();
         } else {
             mPrefs.edit().putFloat(key, clampedScale).apply();
@@ -571,10 +582,16 @@ public final class Settings implements SharedPreferences.OnSharedPreferenceChang
         final float clampedBottomPaddingScale = Math.max(
                 BOTTOM_PADDING_SCALE_MIN, Math.min(bottomPaddingScale, BOTTOM_PADDING_SCALE_MAX));
         final SharedPreferences.Editor editor = mPrefs.edit();
+        
+        float bottomPaddingDefault = Defaults.PREF_BOTTOM_PADDING_SCALE[index];
+        if (index == 0 && KeyboardTheme.STYLE_DEFAULT.equals(mPrefs.getString(PREF_THEME_STYLE, Defaults.PREF_THEME_STYLE))) {
+            bottomPaddingDefault = 1.18f;
+        }
+
         putFloatOrRemoveDefault(
                 editor, heightKey, clampedHeightScale, Defaults.PREF_KEYBOARD_HEIGHT_SCALE[index]);
         putFloatOrRemoveDefault(
-                editor, bottomPaddingKey, clampedBottomPaddingScale, Defaults.PREF_BOTTOM_PADDING_SCALE[index]);
+                editor, bottomPaddingKey, clampedBottomPaddingScale, bottomPaddingDefault);
         if (!editor.commit()) {
             Log.w(TAG, "Failed to persist keyboard resize scales");
         }
