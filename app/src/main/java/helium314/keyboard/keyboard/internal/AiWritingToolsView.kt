@@ -42,6 +42,41 @@ import androidx.core.content.ContextCompat
 import androidx.core.graphics.ColorUtils
 import androidx.viewpager2.widget.ViewPager2
 import androidx.recyclerview.widget.RecyclerView
+import androidx.compose.ui.platform.ComposeView
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.ButtonGroup
+import androidx.compose.material3.ButtonGroupDefaults
+import androidx.compose.material3.ToggleButton
+import androidx.compose.material3.ToggleButtonDefaults
+import helium314.keyboard.latin.common.Colors
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CornerSize
+import androidx.compose.material3.Text
+import androidx.compose.runtime.remember
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.material3.LocalTextStyle
+import androidx.compose.ui.platform.ViewCompositionStrategy
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.LifecycleRegistry
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.ViewModelStoreOwner
+import androidx.lifecycle.ViewModelStore
+import androidx.lifecycle.setViewTreeLifecycleOwner
+import androidx.lifecycle.setViewTreeViewModelStoreOwner
+import androidx.savedstate.SavedStateRegistryOwner
+import androidx.savedstate.SavedStateRegistry
+import androidx.savedstate.SavedStateRegistryController
+import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import helium314.keyboard.keyboard.KeyboardActionListener
 import helium314.keyboard.keyboard.KeyboardTheme
 import helium314.keyboard.keyboard.KeyboardTypeface
@@ -74,6 +109,15 @@ class AiWritingToolsView @JvmOverloads constructor(
     private var aiVariations: List<String> = emptyList()
     private var isReplacingSelection = false
     private var isExecutingReplacement = false
+    private val selectedToolState = androidx.compose.runtime.mutableStateOf<String?>(null)
+    private val canUseToolsState = androidx.compose.runtime.mutableStateOf(false)
+    private var composeLifecycleOwner: ComposeLifecycleOwner? = null
+
+    private var currentThemeColors: Colors? = null
+    private val colors: Colors
+        get() = currentThemeColors ?: Settings.getValues().mColors
+
+    private val colorsState = androidx.compose.runtime.mutableStateOf<Colors?>(null)
 
     private lateinit var viewPager: ViewPager2
     private lateinit var indicatorContainer: LinearLayout
@@ -474,55 +518,15 @@ class AiWritingToolsView @JvmOverloads constructor(
         val hasText = !extractedText.isNullOrBlank()
         val canUseTools = hasText && !isGenerating
 
+        selectedToolState.value = selectedTool
+        canUseToolsState.value = canUseTools
+
         val isNight = ResourceUtils.isNight(context.resources)
         val disabledAlpha = if (isNight) 0.8f else 0.5f
 
-        val toolButtons = listOf(
-            R.id.btn_tool_proofread to "Proofread",
-            R.id.btn_tool_fix_grammar to "Fix Grammar",
-            R.id.btn_tool_rewrite to "Rewrite",
-            R.id.btn_tone_professional to "Professional",
-            R.id.btn_tone_friendly to "Friendly",
-            R.id.btn_tool_old_english to "Old English"
-        )
-
-        val colors = Settings.getValues().mColors
-        val keyText = colors.get(ColorType.KEY_TEXT)
-        val accentColor = colors.get(ColorType.ACTION_KEY_ICON)
+        val colors = this.colors
 
         val keyboardViewAttr = context.obtainStyledAttributes(null, R.styleable.KeyboardView, R.attr.keyboardViewStyle, R.style.KeyboardView)
-
-        for ((id, toolName) in toolButtons) {
-            findViewById<Button>(id)?.apply {
-                isEnabled = canUseTools
-                alpha = if (canUseTools) 1.0f else disabledAlpha
-                isClickable = canUseTools
-                isFocusable = canUseTools
-
-                val isSelected = selectedTool == toolName
-                val colorType = if (isSelected) ColorType.SPECIAL_KEY_BACKGROUND else ColorType.KEY_BACKGROUND
-
-                val isRoundedStyle = colors.themeStyle == KeyboardTheme.STYLE_ROUNDED || colors.themeStyle == KeyboardTheme.STYLE_CIRCLE
-                if (isRoundedStyle) {
-                    val shape = android.graphics.drawable.GradientDrawable()
-                    if (colors.themeStyle == KeyboardTheme.STYLE_CIRCLE) {
-                        shape.shape = android.graphics.drawable.GradientDrawable.OVAL
-                    } else {
-                        shape.shape = android.graphics.drawable.GradientDrawable.RECTANGLE
-                        shape.cornerRadius = 1000f
-                    }
-                    shape.setColor(android.graphics.Color.WHITE)
-                    colors.setColor(shape, colorType)
-                    background = shape
-                } else {
-                    background = colors.selectAndColorDrawable(keyboardViewAttr, colorType)
-                }
-
-                setTextColor(if (isSelected) accentColor else keyText)
-                val style = if (isSelected) android.graphics.Typeface.BOLD else android.graphics.Typeface.NORMAL
-                KeyboardTypeface.applyToTextView(this, text, android.graphics.Typeface.defaultFromStyle(style))
-            }
-        }
 
         findViewById<View>(R.id.btn_delete_ai)?.apply {
             isEnabled = hasText
@@ -576,15 +580,35 @@ class AiWritingToolsView @JvmOverloads constructor(
         return ctx as? helium314.keyboard.latin.LatinIME
     }
 
+    fun updateThemeColors(colors: Colors) {
+        currentThemeColors = colors
+        colorsState.value = colors
+        applyThemeFixes()
+        updateButtonStates()
+    }
+
     override fun onAttachedToWindow() {
+        val latinIME = getLatinIME()
+        if (latinIME != null) {
+            val root = rootView
+            if (root != null) {
+                root.setViewTreeLifecycleOwner(latinIME)
+                root.setViewTreeSavedStateRegistryOwner(latinIME)
+                root.setViewTreeViewModelStoreOwner(latinIME)
+            }
+            setViewTreeLifecycleOwner(latinIME)
+            setViewTreeSavedStateRegistryOwner(latinIME)
+            setViewTreeViewModelStoreOwner(latinIME)
+        }
         super.onAttachedToWindow()
+        composeLifecycleOwner?.start()
         applyThemeFixes()
         updateButtonStates()
         viewPager.adapter?.notifyDataSetChanged()
     }
 
     private fun applyThemeFixes() {
-        val colors = Settings.getValues().mColors
+        val colors = this.colors
 
         // Apply custom font to all persistent UI elements
         findViewById<TextView>(R.id.tv_ai_title)?.let {
@@ -600,12 +624,6 @@ class AiWritingToolsView @JvmOverloads constructor(
         }
 
         val buttonsToFix = listOf(
-            R.id.btn_tool_fix_grammar,
-            R.id.btn_tool_proofread,
-            R.id.btn_tool_rewrite,
-            R.id.btn_tone_professional,
-            R.id.btn_tone_friendly,
-            R.id.btn_tool_old_english,
             R.id.btn_copy_text
         )
         for (id in buttonsToFix) {
@@ -645,6 +663,7 @@ class AiWritingToolsView @JvmOverloads constructor(
 
     override fun onDetachedFromWindow() {
         super.onDetachedFromWindow()
+        composeLifecycleOwner?.stop()
         stopGlowAnimation(immediate = true)
     }
 
@@ -676,31 +695,8 @@ class AiWritingToolsView @JvmOverloads constructor(
             }
         })
 
-        // Bind Tool Buttons
-        findViewById<Button>(R.id.btn_tool_fix_grammar).setOnClickListener { view ->
-            AudioAndHapticFeedbackManager.getInstance().performHapticAndAudioFeedback(KeyCode.NOT_SPECIFIED, view, HapticEvent.KEY_PRESS)
-            onToolClicked("Fix Grammar", AI_PROMPTS["Fix Grammar"] ?: "")
-        }
-        findViewById<Button>(R.id.btn_tool_proofread).setOnClickListener { view ->
-            AudioAndHapticFeedbackManager.getInstance().performHapticAndAudioFeedback(KeyCode.NOT_SPECIFIED, view, HapticEvent.KEY_PRESS)
-            onToolClicked("Proofread", AI_PROMPTS["Proofread"] ?: "")
-        }
-        findViewById<Button>(R.id.btn_tool_rewrite).setOnClickListener { view ->
-            AudioAndHapticFeedbackManager.getInstance().performHapticAndAudioFeedback(KeyCode.NOT_SPECIFIED, view, HapticEvent.KEY_PRESS)
-            onToolClicked("Rewrite", AI_PROMPTS["Rewrite"] ?: "")
-        }
-        findViewById<Button>(R.id.btn_tone_professional).setOnClickListener { view ->
-            AudioAndHapticFeedbackManager.getInstance().performHapticAndAudioFeedback(KeyCode.NOT_SPECIFIED, view, HapticEvent.KEY_PRESS)
-            onToolClicked("Professional", AI_PROMPTS["Professional"] ?: "")
-        }
-        findViewById<Button>(R.id.btn_tone_friendly).setOnClickListener { view ->
-            AudioAndHapticFeedbackManager.getInstance().performHapticAndAudioFeedback(KeyCode.NOT_SPECIFIED, view, HapticEvent.KEY_PRESS)
-            onToolClicked("Friendly", AI_PROMPTS["Friendly"] ?: "")
-        }
-        findViewById<Button>(R.id.btn_tool_old_english).setOnClickListener { view ->
-            AudioAndHapticFeedbackManager.getInstance().performHapticAndAudioFeedback(KeyCode.NOT_SPECIFIED, view, HapticEvent.KEY_PRESS)
-            onToolClicked("Old English", AI_PROMPTS["Old English"] ?: "")
-        }
+        setupComposeButtonGroup()
+
         findViewById<ImageButton>(R.id.btn_back_ai).setOnClickListener { view ->
             AudioAndHapticFeedbackManager.getInstance().performHapticAndAudioFeedback(KeyCode.NOT_SPECIFIED, view, HapticEvent.KEY_PRESS)
             onCloseClicked()
@@ -714,6 +710,186 @@ class AiWritingToolsView @JvmOverloads constructor(
             AudioAndHapticFeedbackManager.getInstance().performHapticAndAudioFeedback(KeyCode.NOT_SPECIFIED, view, HapticEvent.KEY_PRESS)
             onCopyClicked()
         }
+    }
+
+    @OptIn(ExperimentalMaterial3ExpressiveApi::class)
+    private fun setupComposeButtonGroup() {
+        val composeView = findViewById<ComposeView>(R.id.compose_button_group) ?: return
+        val owner = ComposeLifecycleOwner()
+        composeLifecycleOwner = owner
+        composeView.setViewTreeLifecycleOwner(owner)
+        composeView.setViewTreeSavedStateRegistryOwner(owner)
+        composeView.setViewTreeViewModelStoreOwner(owner)
+        composeView.setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
+        composeView.setContent {
+            val selectedTool by selectedToolState
+            val canUseTools by canUseToolsState
+            val keyboardColors = colorsState.value ?: Settings.getValues().mColors
+            val isNight = ResourceUtils.isNight(context.resources)
+
+            val primaryVal = androidx.compose.ui.graphics.Color(keyboardColors.get(ColorType.SPECIAL_KEY_BACKGROUND))
+            val onPrimaryVal = androidx.compose.ui.graphics.Color(keyboardColors.get(ColorType.ACTION_KEY_ICON))
+            val surfaceVal = androidx.compose.ui.graphics.Color(keyboardColors.get(ColorType.KEY_BACKGROUND))
+            val onSurfaceVal = androidx.compose.ui.graphics.Color(keyboardColors.get(ColorType.KEY_TEXT))
+
+            val themeStyle = keyboardColors.themeStyle
+            val isSquareStyle = themeStyle == KeyboardTheme.STYLE_MATERIAL || themeStyle == KeyboardTheme.STYLE_HOLO
+
+            val leadingShape = if (isSquareStyle) {
+                RoundedCornerShape(8.dp)
+            } else {
+                RoundedCornerShape(topStart = CornerSize(50), bottomStart = CornerSize(50), topEnd = CornerSize(8.dp), bottomEnd = CornerSize(8.dp))
+            }
+
+            val middleShape = RoundedCornerShape(8.dp)
+
+            val trailingShape = if (isSquareStyle) {
+                RoundedCornerShape(8.dp)
+            } else {
+                RoundedCornerShape(topStart = CornerSize(8.dp), bottomStart = CornerSize(8.dp), topEnd = CornerSize(50), bottomEnd = CornerSize(50))
+            }
+
+            val colorScheme = if (isNight) {
+                androidx.compose.material3.darkColorScheme(
+                    primary = primaryVal,
+                    onPrimary = onPrimaryVal,
+                    surface = surfaceVal,
+                    onSurface = onSurfaceVal,
+                    secondaryContainer = surfaceVal,
+                    onSecondaryContainer = onSurfaceVal,
+                    surfaceVariant = surfaceVal,
+                    onSurfaceVariant = onSurfaceVal,
+                    outline = androidx.compose.ui.graphics.Color.Transparent,
+                    outlineVariant = androidx.compose.ui.graphics.Color.Transparent
+                )
+            } else {
+                androidx.compose.material3.lightColorScheme(
+                    primary = primaryVal,
+                    onPrimary = onPrimaryVal,
+                    surface = surfaceVal,
+                    onSurface = onSurfaceVal,
+                    secondaryContainer = surfaceVal,
+                    onSecondaryContainer = onSurfaceVal,
+                    surfaceVariant = surfaceVal,
+                    onSurfaceVariant = onSurfaceVal,
+                    outline = androidx.compose.ui.graphics.Color.Transparent,
+                    outlineVariant = androidx.compose.ui.graphics.Color.Transparent
+                )
+            }
+
+            val customFontFamily = KeyboardTypeface.customFontFamily()
+
+            MaterialTheme(colorScheme = colorScheme) {
+                CompositionLocalProvider(
+                    LocalTextStyle provides LocalTextStyle.current.copy(
+                        fontFamily = customFontFamily,
+                        fontSize = 14.sp
+                    )
+                ) {
+                    val scrollState = rememberScrollState()
+                    ButtonGroup(
+                        overflowIndicator = {},
+                        expandedRatio = 0f,
+                        modifier = Modifier
+                            .horizontalScroll(scrollState)
+                            .padding(horizontal = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(2.dp)
+                    ) {
+                        val toolButtons = listOf(
+                            "Proofread" to "Proofread",
+                            "Fix Grammar" to "Fix Grammar",
+                            "Rewrite" to "Rewrite",
+                            "Professional" to "Professional",
+                            "Friendly" to "Friendly",
+                            "Old English" to "Old English"
+                        )
+                        toolButtons.forEachIndexed { index, (toolName, displayText) ->
+                            val isSelected = selectedTool == toolName
+                            customItem(
+                                buttonGroupContent = {
+                                    val buttonShapes = when (index) {
+                                        0 -> ButtonGroupDefaults.connectedLeadingButtonShapes(
+                                            shape = leadingShape,
+                                            pressedShape = RoundedCornerShape(4.dp),
+                                            checkedShape = RoundedCornerShape(percent = 50)
+                                        )
+                                        toolButtons.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes(
+                                            shape = trailingShape,
+                                            pressedShape = RoundedCornerShape(4.dp),
+                                            checkedShape = RoundedCornerShape(percent = 50)
+                                        )
+                                        else -> ButtonGroupDefaults.connectedMiddleButtonShapes(
+                                            shape = middleShape,
+                                            pressedShape = RoundedCornerShape(4.dp),
+                                            checkedShape = RoundedCornerShape(percent = 50)
+                                        )
+                                    }
+                                    ToggleButton(
+                                        checked = isSelected,
+                                        onCheckedChange = { checked ->
+                                            if (checked && canUseTools) {
+                                                AudioAndHapticFeedbackManager.getInstance().performHapticAndAudioFeedback(
+                                                    KeyCode.NOT_SPECIFIED,
+                                                    composeView,
+                                                    HapticEvent.KEY_PRESS
+                                                )
+                                                onToolClicked(toolName, AI_PROMPTS[toolName] ?: "")
+                                            }
+                                        },
+                                        enabled = canUseTools,
+                                        shapes = buttonShapes,
+                                        colors = ToggleButtonDefaults.toggleButtonColors(
+                                            containerColor = surfaceVal,
+                                            contentColor = onSurfaceVal,
+                                            checkedContainerColor = primaryVal,
+                                            checkedContentColor = onPrimaryVal
+                                        )
+                                    ) {
+                                        Text(displayText)
+                                    }
+                                },
+                                menuContent = { _ -> }
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private class ComposeLifecycleOwner : LifecycleOwner, SavedStateRegistryOwner, ViewModelStoreOwner {
+        private val lifecycleRegistry = LifecycleRegistry(this)
+        private val savedStateRegistryController = SavedStateRegistryController.create(this)
+        private val store = ViewModelStore()
+
+        init {
+            savedStateRegistryController.performRestore(null)
+            lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_CREATE)
+        }
+
+        fun start() {
+            lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_START)
+            lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_RESUME)
+        }
+
+        fun stop() {
+            lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_PAUSE)
+            lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_STOP)
+        }
+
+        fun destroy() {
+            lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_DESTROY)
+            store.clear()
+        }
+
+        override val lifecycle: Lifecycle
+            get() = lifecycleRegistry
+
+        override val savedStateRegistry: SavedStateRegistry
+            get() = savedStateRegistryController.savedStateRegistry
+
+        override val viewModelStore: ViewModelStore
+            get() = store
     }
 
     private fun updateIndicators(position: Int) {

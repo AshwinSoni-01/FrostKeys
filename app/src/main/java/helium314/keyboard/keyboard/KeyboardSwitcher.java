@@ -2080,6 +2080,16 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
             mAccessPointMenuView.updateThemeColors(colors);
         }
 
+        // Update AiWritingToolsView keys
+        if (mAiWritingToolsView != null) {
+            mAiWritingToolsView.updateThemeColors(colors);
+        }
+
+        // Update KlipyPalettesView keys
+        if (mKlipyPalettesView != null) {
+            mKlipyPalettesView.updateThemeColors(colors);
+        }
+
         // 4. Update the soft window background blur radius
         if (mLatinIME != null) {
             helium314.keyboard.latin.FrostedGlassHelper.configureFrostedGlass(mLatinIME, mCurrentInputView,

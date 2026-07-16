@@ -114,17 +114,51 @@ import androidx.core.content.ContextCompat;
 import androidx.core.view.inputmethod.EditorInfoCompat;
 import androidx.core.view.inputmethod.InputConnectionCompat;
 import androidx.core.view.inputmethod.InputContentInfoCompat;
+import androidx.lifecycle.Lifecycle;
+import androidx.lifecycle.LifecycleOwner;
+import androidx.lifecycle.LifecycleRegistry;
+import androidx.lifecycle.ViewModelStore;
+import androidx.lifecycle.ViewModelStoreOwner;
+import androidx.lifecycle.ViewTreeLifecycleOwner;
+import androidx.lifecycle.ViewTreeViewModelStoreOwner;
+import androidx.savedstate.SavedStateRegistry;
+import androidx.savedstate.SavedStateRegistryController;
+import androidx.savedstate.SavedStateRegistryOwner;
+import androidx.savedstate.ViewTreeSavedStateRegistryOwner;
 
 /**
  * Input method implementation for Qwerty'ish keyboard.
  */
 public class LatinIME extends InputMethodService implements
         SuggestionStripView.Listener, SuggestionStripViewAccessor,
-        DictionaryFacilitator.DictionaryInitializationListener {
+        DictionaryFacilitator.DictionaryInitializationListener,
+        LifecycleOwner, SavedStateRegistryOwner, ViewModelStoreOwner {
     static final String TAG = LatinIME.class.getSimpleName();
     private static final boolean TRACE = false;
 
     private static LatinIME sInstance;
+
+    private final LifecycleRegistry mLifecycleRegistry = new LifecycleRegistry(this);
+    private final SavedStateRegistryController mSavedStateRegistryController = SavedStateRegistryController.create(this);
+    private final ViewModelStore mViewModelStore = new ViewModelStore();
+
+    @NonNull
+    @Override
+    public Lifecycle getLifecycle() {
+        return mLifecycleRegistry;
+    }
+
+    @NonNull
+    @Override
+    public SavedStateRegistry getSavedStateRegistry() {
+        return mSavedStateRegistryController.getSavedStateRegistry();
+    }
+
+    @NonNull
+    @Override
+    public ViewModelStore getViewModelStore() {
+        return mViewModelStore;
+    }
 
     @Nullable
     public static LatinIME getInstance() {
@@ -736,6 +770,9 @@ public class LatinIME extends InputMethodService implements
         mDisplayContext = KtxKt.getDisplayContext(this);
         KeyboardSwitcher.init(this);
         super.onCreate();
+        mSavedStateRegistryController.performRestore(null);
+        mLifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_CREATE);
+        mLifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_START);
 
         loadSettings();
         mClipboardHistoryManager.onCreate();
@@ -1022,6 +1059,8 @@ public class LatinIME extends InputMethodService implements
         }
 
         // Wrap super execution to catch unhandled framework lifecycle exceptions on Android 17
+        mLifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_DESTROY);
+        mViewModelStore.clear();
         try {
             super.onDestroy();
         } catch (NullPointerException npe) {
@@ -1088,6 +1127,30 @@ public class LatinIME extends InputMethodService implements
 
     @Override
     public void setInputView(final View view) {
+        ViewTreeLifecycleOwner.set(view, this);
+        ViewTreeSavedStateRegistryOwner.set(view, this);
+        ViewTreeViewModelStoreOwner.set(view, this);
+        try {
+            if (getWindow() != null && getWindow().getWindow() != null) {
+                final View decorView = getWindow().getWindow().getDecorView();
+                if (decorView != null) {
+                    ViewTreeLifecycleOwner.set(decorView, this);
+                    ViewTreeSavedStateRegistryOwner.set(decorView, this);
+                    ViewTreeViewModelStoreOwner.set(decorView, this);
+                    final int parentPanelId = getResources().getIdentifier("parentPanel", "id", "android");
+                    if (parentPanelId != 0) {
+                        final View parentPanel = decorView.findViewById(parentPanelId);
+                        if (parentPanel != null) {
+                            ViewTreeLifecycleOwner.set(parentPanel, this);
+                            ViewTreeSavedStateRegistryOwner.set(parentPanel, this);
+                            ViewTreeViewModelStoreOwner.set(parentPanel, this);
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Failed to set view tree owners on decorView or parentPanel", e);
+        }
         super.setInputView(view);
         mInputView = view;
         mInsetsUpdater = ViewOutlineProviderUtilsKt.setInsetsOutlineProvider(view);
@@ -1386,6 +1449,7 @@ public class LatinIME extends InputMethodService implements
     @Override
     public void onWindowShown() {
         super.onWindowShown();
+        mLifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_RESUME);
         if (isInputViewShown()) {
             setNavigationBarColor();
             workaroundForHuaweiStatusBarIssue();
@@ -1396,6 +1460,7 @@ public class LatinIME extends InputMethodService implements
     @Override
     public void onWindowHidden() {
         super.onWindowHidden();
+        mLifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_PAUSE);
         Log.i(TAG, "onWindowHidden");
 
         mKeyboardSwitcher.clearCachedPersistentEmojis();

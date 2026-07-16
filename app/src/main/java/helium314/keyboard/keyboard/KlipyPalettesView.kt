@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class)
 package helium314.keyboard.keyboard
 
 import android.annotation.SuppressLint
@@ -73,12 +74,57 @@ import java.util.concurrent.Executors
 import java.util.UUID
 import androidx.core.graphics.ColorUtils
 
+import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.platform.ViewCompositionStrategy
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ButtonGroup
+import androidx.compose.material3.ButtonGroupDefaults
+import androidx.compose.material3.ToggleButton
+import androidx.compose.material3.ToggleButtonDefaults
+import androidx.compose.material3.Text
+import androidx.compose.material3.Icon
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.material3.LocalTextStyle
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.LifecycleRegistry
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.ViewModelStoreOwner
+import androidx.lifecycle.ViewModelStore
+import androidx.lifecycle.setViewTreeLifecycleOwner
+import androidx.lifecycle.setViewTreeViewModelStoreOwner
+import androidx.savedstate.SavedStateRegistryOwner
+import androidx.savedstate.SavedStateRegistry
+import androidx.savedstate.setViewTreeSavedStateRegistryOwner
+import androidx.savedstate.SavedStateRegistryController
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CornerSize
+import helium314.keyboard.latin.utils.ResourceUtils
+import helium314.keyboard.keyboard.KeyboardTheme
+
 @SuppressLint("CustomViewStyleable")
 class KlipyPalettesView @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet?,
     defStyle: Int = R.attr.emojiPalettesViewStyle
 ) : LinearLayout(context, attrs, defStyle) {
+
+    private val selectedTabState = androidx.compose.runtime.mutableStateOf(KlipyHistoryDao.TYPE_GIF)
+    private var composeLifecycleOwner: ComposeLifecycleOwner? = null
+
+    private var currentThemeColors: Colors? = null
+    private val colors: Colors
+        get() = currentThemeColors ?: Settings.getValues().mColors
+
+    private val colorsState = androidx.compose.runtime.mutableStateOf<Colors?>(null)
 
     private lateinit var gifsRecyclerView: RecyclerView
     private lateinit var stickersRecyclerView: RecyclerView
@@ -197,13 +243,39 @@ class KlipyPalettesView @JvmOverloads constructor(
         setMeasuredDimension(MeasureSpec.getSize(widthMeasureSpec), finalHeight)
     }
 
+    override fun onAttachedToWindow() {
+        val latinIME = getLatinIME()
+        if (latinIME != null) {
+            val root = rootView
+            if (root != null) {
+                root.setViewTreeLifecycleOwner(latinIME)
+                root.setViewTreeSavedStateRegistryOwner(latinIME)
+                root.setViewTreeViewModelStoreOwner(latinIME)
+            }
+            setViewTreeLifecycleOwner(latinIME)
+            setViewTreeSavedStateRegistryOwner(latinIME)
+            setViewTreeViewModelStoreOwner(latinIME)
+        }
+        super.onAttachedToWindow()
+        composeLifecycleOwner?.start()
+    }
+
     override fun onDetachedFromWindow() {
+        composeLifecycleOwner?.stop()
+        composeLifecycleOwner?.destroy()
+        composeLifecycleOwner = null
         super.onDetachedFromWindow()
         stopKlipyPalettes()
         viewScope.cancel()
         viewScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
         stickerProcessorDispatcher.close()
         isStickerProcessorDispatcherClosed = true
+    }
+
+    fun updateThemeColors(colors: Colors) {
+        currentThemeColors = colors
+        colorsState.value = colors
+        applyTheme()
     }
 
     fun setHardwareAcceleratedDrawingEnabled(enabled: Boolean) {
@@ -361,6 +433,7 @@ class KlipyPalettesView @JvmOverloads constructor(
             }
         })
 
+        setupComposeButtonGroup()
         setupRecyclerViews()
         setupSearchEditText()
         setupClickListeners()
@@ -1064,8 +1137,7 @@ class KlipyPalettesView @JvmOverloads constructor(
     }
 
     private fun updateTabSelection(tab: String) {
-        findViewById<TextView>(R.id.tabGifs)?.isSelected = (tab == KlipyHistoryDao.TYPE_GIF)
-        findViewById<TextView>(R.id.tabStickers)?.isSelected = (tab == KlipyHistoryDao.TYPE_STICKER)
+        selectedTabState.value = tab
     }
 
     private fun onTabSelected(tab: String) {
@@ -1324,12 +1396,6 @@ class KlipyPalettesView @JvmOverloads constructor(
     }
 
     private fun setupClickListeners() {
-        setFeedbackClickListener(findViewById(R.id.tabGifs)) {
-            selectGifsTab()
-        }
-        setFeedbackClickListener(findViewById(R.id.tabStickers)) {
-            selectStickersTab()
-        }
         installSearchTapTarget(findViewById(R.id.dummySearchBox), moveCursorToEnd = true)
         setFeedbackClickListener(findViewById(R.id.clearSearchButton)) {
             setSearchText("", 0)
@@ -1477,22 +1543,7 @@ class KlipyPalettesView @JvmOverloads constructor(
                 searchBackButton.setPadding(0, 0, 0, 0)
                 searchBackButton.scaleType = ImageView.ScaleType.CENTER
             }
-            val tabGifs = findViewById<TextView>(R.id.tabGifs)
-            if (tabGifs != null) {
-                val toolBarColor = colors.get(ColorType.TOOL_BAR_KEY)
-                tabGifs.setTextColor(toolBarColor)
-                val drawables = tabGifs.compoundDrawablesRelative
-                drawables[0]?.let { androidx.core.graphics.drawable.DrawableCompat.setTint(it.mutate(), toolBarColor) }
-                KeyboardTypeface.applyToTextView(tabGifs)
-            }
-            val tabStickers = findViewById<TextView>(R.id.tabStickers)
-            if (tabStickers != null) {
-                val toolBarColor = colors.get(ColorType.TOOL_BAR_KEY)
-                tabStickers.setTextColor(toolBarColor)
-                val drawables = tabStickers.compoundDrawablesRelative
-                drawables[0]?.let { androidx.core.graphics.drawable.DrawableCompat.setTint(it.mutate(), toolBarColor) }
-                KeyboardTypeface.applyToTextView(tabStickers)
-            }
+
 
             // Theme search bar elements
             val searchBarContainer = findViewById<View>(R.id.searchBarContainer)
@@ -2214,4 +2265,191 @@ class KlipyPalettesView @JvmOverloads constructor(
         val width: Int? = null,
         val height: Int? = null
     )
+
+    private fun setupComposeButtonGroup() {
+        val composeView = findViewById<ComposeView>(R.id.compose_klipy_tabs) ?: return
+        val owner = ComposeLifecycleOwner()
+        composeLifecycleOwner = owner
+        composeView.setViewTreeLifecycleOwner(owner)
+        composeView.setViewTreeSavedStateRegistryOwner(owner)
+        composeView.setViewTreeViewModelStoreOwner(owner)
+        composeView.setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
+        composeView.setContent {
+            val selectedTab by selectedTabState
+            val keyboardColors = colorsState.value ?: Settings.getValues().mColors
+            val isNight = ResourceUtils.isNight(context.resources)
+
+            val primaryVal = androidx.compose.ui.graphics.Color(keyboardColors.get(ColorType.SPECIAL_KEY_BACKGROUND))
+            val onPrimaryVal = androidx.compose.ui.graphics.Color(keyboardColors.get(ColorType.ACTION_KEY_ICON))
+            val surfaceVal = androidx.compose.ui.graphics.Color(keyboardColors.get(ColorType.KEY_BACKGROUND))
+            val onSurfaceVal = androidx.compose.ui.graphics.Color(keyboardColors.get(ColorType.KEY_TEXT))
+
+            val themeStyle = keyboardColors.themeStyle
+            val isSquareStyle = themeStyle == KeyboardTheme.STYLE_MATERIAL || themeStyle == KeyboardTheme.STYLE_HOLO
+
+            val leadingShape = if (isSquareStyle) {
+                RoundedCornerShape(8.dp)
+            } else {
+                RoundedCornerShape(topStart = CornerSize(50), bottomStart = CornerSize(50), topEnd = CornerSize(8.dp), bottomEnd = CornerSize(8.dp))
+            }
+
+            val middleShape = RoundedCornerShape(8.dp)
+
+            val trailingShape = if (isSquareStyle) {
+                RoundedCornerShape(8.dp)
+            } else {
+                RoundedCornerShape(topStart = CornerSize(8.dp), bottomStart = CornerSize(8.dp), topEnd = CornerSize(50), bottomEnd = CornerSize(50))
+            }
+
+            val colorScheme = if (isNight) {
+                androidx.compose.material3.darkColorScheme(
+                    primary = primaryVal,
+                    onPrimary = onPrimaryVal,
+                    surface = surfaceVal,
+                    onSurface = onSurfaceVal,
+                    secondaryContainer = surfaceVal,
+                    onSecondaryContainer = onSurfaceVal,
+                    surfaceVariant = surfaceVal,
+                    onSurfaceVariant = onSurfaceVal,
+                    outline = androidx.compose.ui.graphics.Color.Transparent,
+                    outlineVariant = androidx.compose.ui.graphics.Color.Transparent
+                )
+            } else {
+                androidx.compose.material3.lightColorScheme(
+                    primary = primaryVal,
+                    onPrimary = onPrimaryVal,
+                    surface = surfaceVal,
+                    onSurface = onSurfaceVal,
+                    secondaryContainer = surfaceVal,
+                    onSecondaryContainer = onSurfaceVal,
+                    surfaceVariant = surfaceVal,
+                    onSurfaceVariant = onSurfaceVal,
+                    outline = androidx.compose.ui.graphics.Color.Transparent,
+                    outlineVariant = androidx.compose.ui.graphics.Color.Transparent
+                )
+            }
+
+            val customFontFamily = KeyboardTypeface.customFontFamily()
+
+            MaterialTheme(colorScheme = colorScheme) {
+                CompositionLocalProvider(
+                    LocalTextStyle provides LocalTextStyle.current.copy(
+                        fontFamily = customFontFamily,
+                        fontSize = 14.sp
+                    )
+                ) {
+                    ButtonGroup(
+                        overflowIndicator = {},
+                        expandedRatio = 0f,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(2.dp)
+                    ) {
+                        val tabs = listOf(
+                            Triple(KlipyHistoryDao.TYPE_GIF, context.getString(R.string.tab_gifs), R.drawable.ic_tab_gif),
+                            Triple(KlipyHistoryDao.TYPE_STICKER, context.getString(R.string.tab_stickers), R.drawable.ic_tab_stickers)
+                        )
+                        tabs.forEachIndexed { index, (tabType, displayText, iconRes) ->
+                            val isSelected = selectedTab == tabType
+                            customItem(
+                                buttonGroupContent = {
+                                    val buttonShapes = when (index) {
+                                        0 -> ButtonGroupDefaults.connectedLeadingButtonShapes(
+                                            shape = leadingShape,
+                                            pressedShape = RoundedCornerShape(4.dp),
+                                            checkedShape = RoundedCornerShape(percent = 50)
+                                        )
+                                        tabs.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes(
+                                            shape = trailingShape,
+                                            pressedShape = RoundedCornerShape(4.dp),
+                                            checkedShape = RoundedCornerShape(percent = 50)
+                                        )
+                                        else -> ButtonGroupDefaults.connectedMiddleButtonShapes(
+                                            shape = middleShape,
+                                            pressedShape = RoundedCornerShape(4.dp),
+                                            checkedShape = RoundedCornerShape(percent = 50)
+                                        )
+                                    }
+                                    ToggleButton(
+                                        checked = isSelected,
+                                        onCheckedChange = { checked ->
+                                            if (checked) {
+                                                AudioAndHapticFeedbackManager.getInstance().performHapticAndAudioFeedback(
+                                                    KeyCode.NOT_SPECIFIED,
+                                                    composeView,
+                                                    HapticEvent.KEY_PRESS
+                                                )
+                                                if (tabType == KlipyHistoryDao.TYPE_GIF) {
+                                                    selectGifsTab()
+                                                } else {
+                                                    selectStickersTab()
+                                                }
+                                            }
+                                        },
+                                        shapes = buttonShapes,
+                                        colors = ToggleButtonDefaults.toggleButtonColors(
+                                            containerColor = surfaceVal,
+                                            contentColor = onSurfaceVal,
+                                            checkedContainerColor = primaryVal,
+                                            checkedContentColor = onPrimaryVal
+                                        ),
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Row(
+                                            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                        ) {
+                                            androidx.compose.material3.Icon(
+                                                painter = androidx.compose.ui.res.painterResource(iconRes),
+                                                contentDescription = null,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                            Text(displayText)
+                                        }
+                                    }
+                                },
+                                menuContent = { _ -> }
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private class ComposeLifecycleOwner : LifecycleOwner, SavedStateRegistryOwner, ViewModelStoreOwner {
+        private val lifecycleRegistry = LifecycleRegistry(this)
+        private val savedStateRegistryController = SavedStateRegistryController.create(this)
+        private val store = ViewModelStore()
+
+        init {
+            savedStateRegistryController.performRestore(null)
+            lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_CREATE)
+        }
+
+        fun start() {
+            lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_START)
+            lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_RESUME)
+        }
+
+        fun stop() {
+            lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_PAUSE)
+            lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_STOP)
+        }
+
+        fun destroy() {
+            lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_DESTROY)
+            store.clear()
+        }
+
+        override val lifecycle: Lifecycle
+            get() = lifecycleRegistry
+
+        override val savedStateRegistry: SavedStateRegistry
+            get() = savedStateRegistryController.savedStateRegistry
+
+        override val viewModelStore: ViewModelStore
+            get() = store
+    }
 }

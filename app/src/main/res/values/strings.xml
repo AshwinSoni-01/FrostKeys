@@ -1029,7 +1029,7 @@ New dictionary:
     <!-- Description for toggling suggestions when using the spell checker -->
     <string name="spell_check_suggestions_summary">Show suggestions when selecting a word with red underline. Requires setting app as default spell checker.</string>
 
-    <string name="klipy_search_hint">Search GIFs &amp; Stickers</string>
+    <string name="klipy_search_hint">Search Klipy</string>
     <string name="tab_gifs">GIFs</string>
     <string name="tab_stickers">Stickers</string>
     <string name="gifs">GIFs</string>

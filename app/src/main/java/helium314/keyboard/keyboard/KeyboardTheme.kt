@@ -210,8 +210,6 @@ private constructor(val themeId: Int, @JvmField val mStyleId: Int) {
                         val bgTransparency = livePreviewValues?.bgTransparency
                             ?: (if (isNight) prefs.getInt(Settings.PREF_FROSTED_BG_TRANSPARENCY_NIGHT, Defaults.PREF_FROSTED_BG_TRANSPARENCY_NIGHT)
                                 else prefs.getInt(Settings.PREF_FROSTED_BG_TRANSPARENCY, Defaults.PREF_FROSTED_BG_TRANSPARENCY))
-                        val edgeContrastVal = if (isNight) prefs.getInt(Settings.PREF_FROSTED_EDGE_CONTRAST_NIGHT, Defaults.PREF_FROSTED_EDGE_CONTRAST_NIGHT)
-                            else prefs.getInt(Settings.PREF_FROSTED_EDGE_CONTRAST, Defaults.PREF_FROSTED_EDGE_CONTRAST)
                         val specialVibrancyPref = livePreviewValues?.specialVibrancy
                             ?: (if (isNight) prefs.getInt(Settings.PREF_FROSTED_SPECIAL_VIBRANCY_NIGHT, Defaults.PREF_FROSTED_SPECIAL_VIBRANCY_NIGHT)
                                 else prefs.getInt(Settings.PREF_FROSTED_SPECIAL_VIBRANCY, Defaults.PREF_FROSTED_SPECIAL_VIBRANCY))
@@ -302,13 +300,6 @@ private constructor(val themeId: Int, @JvmField val mStyleId: Int) {
                         val keyHintText = if (isNight) keyText
                             else ContextCompat.getColor(context, android.R.color.system_accent3_700)
                         
-                        // Calculate border color based on Edge Contrast
-                        val borderColor = if (isNight) {
-                            ColorUtils.setAlphaComponent(Color.WHITE, (edgeContrastVal * 0.5f).toInt())
-                        } else {
-                            ColorUtils.setAlphaComponent(Color.BLACK, (edgeContrastVal * 0.7f).toInt())
-                        }
-
                         DefaultColors(
                             themeStyle,
                             hasBorders,
@@ -321,7 +312,7 @@ private constructor(val themeId: Int, @JvmField val mStyleId: Int) {
                             keyHintText,
                             keyboardBackground = backgroundImage,
                             isFrosted = true,
-                            keyBorderColor = borderColor,
+                            keyBorderColor = null,
                             specialKeyBackground = specialKeyBackground,
                             enterKeyBackground = enterKeyBackground,
                             systemAccent = systemAccentColor,

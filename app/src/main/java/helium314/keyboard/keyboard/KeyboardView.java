@@ -650,7 +650,14 @@ public class KeyboardView extends View {
                 labelCharHeight = mFontMetrics.descent - mFontMetrics.ascent;
                 labelCharWidth = Math.max(paint.measureText(drawingLabel), 1f);
             } else {
-                labelCharHeight = TypefaceUtils.getReferenceCharHeight(paint);
+                boolean isLowercase = label.length() > 0 && Character.isLowerCase(label.charAt(0));
+                if (isLowercase) {
+                    final Rect r = new Rect();
+                    paint.getTextBounds("x", 0, 1, r);
+                    labelCharHeight = r.height();
+                } else {
+                    labelCharHeight = TypefaceUtils.getReferenceCharHeight(paint);
+                }
                 labelCharWidth = TypefaceUtils.getReferenceCharWidth(paint);
             }
 
@@ -663,7 +670,7 @@ public class KeyboardView extends View {
                 final float originalTextSize = paint.getTextSize();
                 final Typeface originalTypeface = paint.getTypeface();
 
-                paint.setTextSize(key.selectHintTextSize(params) * mFontSizeMultiplier);
+                paint.setTextSize(key.selectHintTextSize(params) * mFontSizeMultiplier * 0.8f);
                 paint.setTypeface(KeyboardTypeface.resolve(hintLabel, Typeface.DEFAULT_BOLD));
                 float hintCharHeight = TypefaceUtils.getReferenceCharHeight(paint);
                 float hintAscent = paint.ascent();
@@ -675,15 +682,10 @@ public class KeyboardView extends View {
                     // top hint
                     labelBaseline = centerY + labelCharHeight / 2.0f + (hintCharHeight / 2.0f);
                 } else {
-                    boolean isLowercase = label.length() > 0 && Character.isLowerCase(label.charAt(0));
-                    float effectiveLabelHeight = isLowercase ? labelCharHeight * 0.7f : labelCharHeight;
-                    float gap = labelCharHeight * 0.42f; // Slightly increased gap to prevent overlap
-
-                    float totalVisualHeight = effectiveLabelHeight + gap + hintCharHeight;
-                    float descenderCompensation = isLowercase ? labelCharHeight * 0.08f : 0f;
-
-                    labelBaseline = centerY + totalVisualHeight / 2.0f - descenderCompensation;
-                    stackedHintBaseline = centerY - totalVisualHeight / 2.0f - hintAscent - descenderCompensation;
+                    // Push the number hint to the absolute top edge of the key
+                    stackedHintBaseline = -hintAscent + mKeyHintLetterPadding;
+                    // Center the main label vertically, perfectly centered on the key
+                    labelBaseline = centerY + labelCharHeight / 2.0f;
                 }
 
                 paint.setTextSize(originalTextSize);
@@ -762,17 +764,28 @@ public class KeyboardView extends View {
 
         // Draw hint label.
         if (hintLabel != null && mShowsHints) {
-            paint.setTextSize(key.selectHintTextSize(params) * mFontSizeMultiplier); // maybe take sqrt to not have such
-                                                                                     // extreme changes?
-            paint.setColor(
-                    mColors.isFrosted() ? mColors.get(ColorType.KEY_HINT_TEXT) : key.selectHintTextColor(params));
+            paint.setTextSize(key.selectHintTextSize(params) * mFontSizeMultiplier * 0.8f); // maybe take sqrt to not
+                                                                                            // have such
+            // extreme changes?
+            paint.setColor(mColors.get(ColorType.KEY_HINT_TEXT));
             // TODO: Should add a way to specify type face for hint letters
             paint.setTypeface(KeyboardTypeface.resolve(hintLabel, Typeface.DEFAULT_BOLD));
-            blendAlpha(paint, params.mAnimAlpha);
-            final float labelCharHeight = TypefaceUtils.getReferenceCharHeight(paint);
-            final float labelCharWidth = TypefaceUtils.getReferenceCharWidth(paint);
+            blendAlpha(paint, (int) (params.mAnimAlpha * 0.8f));
+            final float labelCharHeight;
+            final float labelCharWidth;
+            boolean isLowercase = label != null && label.length() > 0 && Character.isLowerCase(label.charAt(0));
+            if (isLowercase) {
+                final Rect r = new Rect();
+                paint.getTextBounds("x", 0, 1, r);
+                labelCharHeight = r.height();
+            } else {
+                labelCharHeight = TypefaceUtils.getReferenceCharHeight(paint);
+            }
+            labelCharWidth = TypefaceUtils.getReferenceCharWidth(paint);
             final boolean isFunctionalKeyAndRoundedStyle = (mColors.getThemeStyle().equals(STYLE_ROUNDED)
                     || isCircleStyle) && key.hasFunctionalBackground();
+            final String themeStyle = mColors.getThemeStyle();
+            final boolean alignToTopRight = !themeStyle.equals(STYLE_ROUNDED) && !isCircleStyle;
             if (isEmojiLabel) {
                 paint.setTextSize(paint.getTextSize() * 0.55f);
                 blendAlpha(paint, 110);
@@ -780,8 +793,13 @@ public class KeyboardView extends View {
             final float hintX, hintBaseline;
             if (isTopRowNumberHintStacking) {
                 hintBaseline = stackedHintBaseline;
-                hintX = centerX;
-                paint.setTextAlign(Align.CENTER);
+                if (alignToTopRight) {
+                    hintX = keyWidth - mKeyHintLetterPadding;
+                    paint.setTextAlign(Align.RIGHT);
+                } else {
+                    hintX = centerX;
+                    paint.setTextAlign(Align.CENTER);
+                }
             } else if (isEmojiLabel) {
                 paint.setTextAlign(Align.RIGHT);
                 hintX = keyWidth;
@@ -811,12 +829,18 @@ public class KeyboardView extends View {
                 paint.setTextAlign(Align.CENTER);
             } else { // key.hasHintLetter()
                 // The hint letter is placed at top-center of the key. Used mainly on phone.
-                hintBaseline = -paint.ascent();
-                hintX = centerX;
-                paint.setTextAlign(Align.CENTER);
+                if (alignToTopRight) {
+                    hintBaseline = -paint.ascent() + mKeyHintLetterPadding;
+                    hintX = keyWidth - mKeyHintLetterPadding;
+                    paint.setTextAlign(Align.RIGHT);
+                } else {
+                    hintBaseline = -paint.ascent();
+                    hintX = centerX;
+                    paint.setTextAlign(Align.CENTER);
+                }
             }
             final float adjustmentY;
-            if (isTopRowNumberHintStacking) {
+            if (isTopRowNumberHintStacking || alignToTopRight) {
                 adjustmentY = 0f;
             } else if (isFunctionalKeyAndRoundedStyle) {
                 adjustmentY = hintBaseline * 0.5f;

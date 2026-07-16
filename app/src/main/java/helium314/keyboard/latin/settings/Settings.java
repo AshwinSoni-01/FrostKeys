@@ -71,7 +71,6 @@ public final class Settings implements SharedPreferences.OnSharedPreferenceChang
     public static final String PREF_FROSTED_COLOR_BLEND = "pref_frosted_color_blend";
     public static final String PREF_FROSTED_SATURATION = "pref_frosted_saturation";
     public static final String PREF_FROSTED_BG_TRANSPARENCY = "pref_frosted_bg_transparency";
-    public static final String PREF_FROSTED_EDGE_CONTRAST = "pref_frosted_edge_contrast";
     public static final String PREF_FROSTED_SPECIAL_VIBRANCY = "pref_frosted_special_vibrancy";
     public static final String PREF_FROSTED_ALPHABET_VIBRANCY = "pref_frosted_alphabet_vibrancy";
 
@@ -80,7 +79,6 @@ public final class Settings implements SharedPreferences.OnSharedPreferenceChang
     public static final String PREF_FROSTED_COLOR_BLEND_NIGHT = "pref_frosted_color_blend_night";
     public static final String PREF_FROSTED_SATURATION_NIGHT = "pref_frosted_saturation_night";
     public static final String PREF_FROSTED_BG_TRANSPARENCY_NIGHT = "pref_frosted_bg_transparency_night";
-    public static final String PREF_FROSTED_EDGE_CONTRAST_NIGHT = "pref_frosted_edge_contrast_night";
     public static final String PREF_FROSTED_SPECIAL_VIBRANCY_NIGHT = "pref_frosted_special_vibrancy_night";
     public static final String PREF_FROSTED_ALPHABET_VIBRANCY_NIGHT = "pref_frosted_alphabet_vibrancy_night";
     public static final String PREF_FROSTED_DUST_ENABLED = "pref_frosted_dust_enabled";
@@ -261,7 +259,6 @@ public final class Settings implements SharedPreferences.OnSharedPreferenceChang
         add(PREF_FROSTED_COLOR_BLEND);
         add(PREF_FROSTED_SATURATION);
         add(PREF_FROSTED_BG_TRANSPARENCY);
-        add(PREF_FROSTED_EDGE_CONTRAST);
         add(PREF_FROSTED_SPECIAL_VIBRANCY);
         add(PREF_FROSTED_ALPHABET_VIBRANCY);
         add(PREF_FROSTED_BLUR_RADIUS_NIGHT);
@@ -269,7 +266,6 @@ public final class Settings implements SharedPreferences.OnSharedPreferenceChang
         add(PREF_FROSTED_COLOR_BLEND_NIGHT);
         add(PREF_FROSTED_SATURATION_NIGHT);
         add(PREF_FROSTED_BG_TRANSPARENCY_NIGHT);
-        add(PREF_FROSTED_EDGE_CONTRAST_NIGHT);
         add(PREF_FROSTED_SPECIAL_VIBRANCY_NIGHT);
         add(PREF_FROSTED_ALPHABET_VIBRANCY_NIGHT);
         add(PREF_FROSTED_DUST_ENABLED);

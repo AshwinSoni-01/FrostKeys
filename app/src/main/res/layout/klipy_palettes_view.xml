@@ -257,50 +257,11 @@
             android:contentDescription="@string/abc_action_bar_up_description"
             android:layout_marginEnd="4dp" />
 
-        <LinearLayout
-            android:id="@+id/klipyTabs"
+        <androidx.compose.ui.platform.ComposeView
+            android:id="@+id/compose_klipy_tabs"
             android:layout_width="0dp"
             android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:orientation="horizontal"
-            android:gravity="center">
-
-            <TextView
-                android:id="@+id/tabGifs"
-                android:layout_width="0dp"
-                android:layout_height="36dp"
-                android:layout_weight="1"
-                android:text="@string/tab_gifs"
-                android:textColor="@color/textColorPrimary"
-                android:layout_marginHorizontal="4dp"
-                android:background="@drawable/klipy_tab_background_ripple"
-                android:gravity="center"
-                android:padding="0dp"
-                android:clickable="true"
-                android:focusable="true"
-                android:drawableStart="@drawable/ic_tab_gif"
-                android:drawablePadding="4dp"
-                android:paddingStart="12dp"
-                android:paddingEnd="12dp" />
-
-            <TextView
-                android:id="@+id/tabStickers"
-                android:layout_width="0dp"
-                android:layout_height="36dp"
-                android:layout_weight="1"
-                android:text="@string/tab_stickers"
-                android:textColor="@color/textColorPrimary"
-                android:layout_marginHorizontal="4dp"
-                android:background="@drawable/klipy_tab_background_ripple"
-                android:gravity="center"
-                android:padding="0dp"
-                android:clickable="true"
-                android:focusable="true"
-                android:drawableStart="@drawable/ic_tab_stickers"
-                android:drawablePadding="4dp"
-                android:paddingStart="12dp"
-                android:paddingEnd="12dp" />
-        </LinearLayout>
+            android:layout_weight="1" />
     </LinearLayout>
 
     <TextView
