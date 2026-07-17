@@ -18,6 +18,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import helium314.keyboard.keyboard.KeyboardTypeface
 import helium314.keyboard.keyboard.KeyboardSwitcher
+import helium314.keyboard.keyboard.emoji.SupportedEmojis
 import helium314.keyboard.latin.R
 import helium314.keyboard.latin.common.FileUtils
 import helium314.keyboard.latin.utils.DeviceProtectedUtils
@@ -69,7 +70,8 @@ fun CustomFontPreference(setting: Setting, fontFile: File, title: Int) {
                 fontFile.delete()
                 tempFile.renameTo(fontFile)
                 KeyboardTypeface.clearCache()
-                KeyboardSwitcher.getInstance().setThemeNeedsReload()
+                SupportedEmojis.load(ctx)
+                KeyboardSwitcher.getInstance().reloadKeyboard()
             }
         } catch (_: Exception) {
             showErrorDialog = true
@@ -95,7 +97,8 @@ fun CustomFontPreference(setting: Setting, fontFile: File, title: Int) {
                 showDialog = false
                 fontFile.delete()
                 KeyboardTypeface.clearCache()
-                KeyboardSwitcher.getInstance().setThemeNeedsReload()
+                SupportedEmojis.load(ctx)
+                KeyboardSwitcher.getInstance().reloadKeyboard()
             },
             neutralButtonText = stringResource(R.string.delete),
             confirmButtonText = stringResource(R.string.load),
@@ -120,7 +123,8 @@ fun CustomFontPreference(setting: Setting, fontFile: File, title: Int) {
                 fontFile.delete()
                 tempFile.renameTo(fontFile)
                 KeyboardTypeface.clearCache()
-                KeyboardSwitcher.getInstance().setThemeNeedsReload()
+                SupportedEmojis.load(ctx)
+                KeyboardSwitcher.getInstance().reloadKeyboard()
             },
             title = { Text(stringResource(title)) },
             content = { Text(stringResource(warningStringRes)) }

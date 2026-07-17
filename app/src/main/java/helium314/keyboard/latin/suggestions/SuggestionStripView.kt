@@ -57,6 +57,7 @@ import helium314.keyboard.latin.settings.DebugSettings
 import helium314.keyboard.latin.settings.Defaults
 import helium314.keyboard.latin.settings.Settings
 import helium314.keyboard.latin.utils.Log
+import helium314.keyboard.latin.utils.ResourceUtils
 import helium314.keyboard.latin.utils.MAX_PINNED_TOOLBAR_KEYS
 import helium314.keyboard.latin.utils.TOOLBAR_DRAG_CLIP_LABEL
 import helium314.keyboard.latin.utils.ToolbarDragSource
@@ -85,6 +86,59 @@ import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import androidx.compose.ui.platform.ComposeView
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.ButtonGroup
+import androidx.compose.material3.ButtonGroupDefaults
+import androidx.compose.material3.Text
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.background
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.ViewCompositionStrategy
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.material3.LocalTextStyle
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.ui.graphics.Color as ComposeColor
+import androidx.compose.material3.Icon
+import androidx.compose.ui.res.painterResource
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.LifecycleRegistry
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.ViewModelStoreOwner
+import androidx.lifecycle.ViewModelStore
+import androidx.lifecycle.setViewTreeLifecycleOwner
+import androidx.lifecycle.setViewTreeViewModelStoreOwner
+import androidx.savedstate.SavedStateRegistryOwner
+import androidx.savedstate.SavedStateRegistry
+import androidx.savedstate.SavedStateRegistryController
+import androidx.savedstate.setViewTreeSavedStateRegistryOwner
+import androidx.compose.ui.Alignment
+import androidx.compose.foundation.LocalIndication
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalDensity
+import java.util.Locale
 
 @SuppressLint("InflateParams")
 class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int) :
@@ -137,9 +191,18 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
     private val toolbar: ViewGroup = findViewById(R.id.toolbar)
     private val toolbarContainer: View = findViewById(R.id.toolbar_container)
     private val suggestionsMiddleContainer: ViewGroup = findViewById(R.id.suggestions_middle_container)
-    private val pinnedKeys: ViewGroup = findViewById(R.id.pinned_keys_container)
+    private val pinnedKeys: ComposeView = findViewById(R.id.pinned_keys_container)
     private val suggestionsStrip: ViewGroup = findViewById(R.id.suggestions_strip)
     private val persistentToolbarKey: ImageButton = findViewById(R.id.persistent_toolbar_key)
+
+    private var composeLifecycleOwner: ComposeLifecycleOwner? = null
+    private val slotsState = mutableStateOf<List<Any>>(emptyList())
+    private val colorsState = mutableStateOf<Colors?>(null)
+    private val activatedStateVersion = mutableStateOf(0)
+    private val draggingKeyInComposeState = mutableStateOf<ToolbarKey?>(null)
+
+    private data class PinnedSlotBounds(val tag: Any, val left: Float, val right: Float)
+    private val pinnedSlotBounds = HashMap<Int, PinnedSlotBounds>()
     private val accessPointTriggerBtn: ImageButton = findViewById(R.id.access_point_trigger_btn)
     private val toolbarExpandKey: ImageButton? = null
     private val incognitoIcon = KeyboardIconsSet.instance.getNewDrawable(ToolbarKey.INCOGNITO.name, context)
@@ -199,7 +262,228 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
         suggestionsChipScroll.setOnDragListener(pinnedDropListener)
         pinnedKeys.setOnDragListener(pinnedDropListener)
 
+        setupComposePinnedKeys()
         updateKeys()
+    }
+
+    @OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalFoundationApi::class)
+    private fun setupComposePinnedKeys() {
+        val owner = ComposeLifecycleOwner()
+        composeLifecycleOwner = owner
+        pinnedKeys.setViewTreeLifecycleOwner(owner)
+        pinnedKeys.setViewTreeSavedStateRegistryOwner(owner)
+        pinnedKeys.setViewTreeViewModelStoreOwner(owner)
+        pinnedKeys.setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
+        pinnedKeys.setContent {
+            val slots by slotsState
+            val draggingKey by draggingKeyInComposeState
+            val keyboardColors = colorsState.value ?: Settings.getValues().mColors
+            val isNight = ResourceUtils.isNight(context.resources)
+            val version by activatedStateVersion
+
+            val primaryVal = ComposeColor(keyboardColors.get(ColorType.SPECIAL_KEY_BACKGROUND))
+            val onPrimaryVal = ComposeColor(keyboardColors.get(ColorType.ACTION_KEY_ICON))
+            val surfaceVal = ComposeColor(keyboardColors.get(ColorType.KEY_BACKGROUND))
+            val onSurfaceVal = ComposeColor(keyboardColors.get(ColorType.KEY_TEXT))
+
+            val themeStyle = keyboardColors.themeStyle
+            val isSquareStyle = themeStyle == KeyboardTheme.STYLE_MATERIAL || themeStyle == KeyboardTheme.STYLE_HOLO
+
+            val baseShape = when (themeStyle) {
+                KeyboardTheme.STYLE_HOLO -> RoundedCornerShape(0.dp)
+                KeyboardTheme.STYLE_MATERIAL -> RoundedCornerShape(8.dp)
+                else -> RoundedCornerShape(percent = 50)
+            }
+
+            val colorScheme = if (isNight) {
+                androidx.compose.material3.darkColorScheme(
+                    primary = primaryVal,
+                    onPrimary = onPrimaryVal,
+                    surface = surfaceVal,
+                    onSurface = onSurfaceVal,
+                    secondaryContainer = surfaceVal,
+                    onSecondaryContainer = onSurfaceVal,
+                    surfaceVariant = surfaceVal,
+                    onSurfaceVariant = onSurfaceVal,
+                    outline = ComposeColor.Transparent,
+                    outlineVariant = ComposeColor.Transparent
+                )
+            } else {
+                androidx.compose.material3.lightColorScheme(
+                    primary = primaryVal,
+                    onPrimary = onPrimaryVal,
+                    surface = surfaceVal,
+                    onSurface = onSurfaceVal,
+                    secondaryContainer = surfaceVal,
+                    onSecondaryContainer = onSurfaceVal,
+                    surfaceVariant = surfaceVal,
+                    onSurfaceVariant = onSurfaceVal,
+                    outline = ComposeColor.Transparent,
+                    outlineVariant = ComposeColor.Transparent
+                )
+            }
+
+            val customFontFamily = KeyboardTypeface.customFontFamily()
+
+            MaterialTheme(colorScheme = colorScheme) {
+                CompositionLocalProvider(
+                    LocalTextStyle provides LocalTextStyle.current.copy(
+                        fontFamily = customFontFamily,
+                        fontSize = 14.sp
+                    )
+                ) {
+                    val density = LocalDensity.current
+                    BoxWithConstraints(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (constraints.maxWidth > 0) {
+                            val availableWidthPx = constraints.maxWidth
+                            val widthDp = remember(slots.size, availableWidthPx) {
+                                with(density) { pinnedButtonWidth(slots.size, availableWidthPx).toDp() }
+                            }
+                            val totalGaps = if (slots.size > 1) slots.size - 1 else 0
+                            val minNeededWidth = (8.dp * totalGaps) + 8.dp
+
+                            if (maxWidth >= minNeededWidth) {
+                                ButtonGroup(
+                                    overflowIndicator = {},
+                                    expandedRatio = 0.25f,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 4.dp)
+                                        .layout { measurable, constraints ->
+                                            val relaxedConstraints = constraints.copy(minWidth = 0, minHeight = 0)
+                                            val placeable = measurable.measure(relaxedConstraints)
+                                            layout(placeable.width, placeable.height) {
+                                                placeable.placeRelative(0, 0)
+                                            }
+                                        },
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                slots.forEachIndexed { index, slot ->
+                                    if (slot == ToolbarKey.VOICE && !Settings.getValues().mShowsVoiceInputKey) {
+                                        return@forEachIndexed
+                                    }
+                                    if (slot === PinnedDropPlaceholder) {
+                                        customItem(
+                                            buttonGroupContent = {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(width = widthDp, height = 34.dp)
+                                                        .background(
+                                                            color = surfaceVal.copy(alpha = 0.45f),
+                                                            shape = baseShape
+                                                        )
+                                                        .onGloballyPositioned { coordinates ->
+                                                            val bounds = coordinates.boundsInRoot()
+                                                            pinnedSlotBounds[index] = PinnedSlotBounds(slot, bounds.left, bounds.right)
+                                                        }
+                                                )
+                                            },
+                                            menuContent = {}
+                                        )
+                                    } else if (slot is ToolbarKey) {
+                                        val isSelected = isToolbarKeyActivated(slot)
+                                        val isDragging = draggingKey == slot
+                                        val resId = KeyboardIconsSet.instance.iconIds[slot.name.lowercase(Locale.US)]
+                                        val containerColor = if (isSelected) primaryVal else surfaceVal
+                                        val contentColor = if (isSelected) onPrimaryVal else onSurfaceVal
+
+                                        customItem(
+                                            buttonGroupContent = {
+                                                val interactionSource = remember { MutableInteractionSource() }
+                                                val isPressed by interactionSource.collectIsPressedAsState()
+
+                                                val buttonShape = if (isPressed) {
+                                                    when (themeStyle) {
+                                                        KeyboardTheme.STYLE_HOLO, KeyboardTheme.STYLE_MATERIAL -> RoundedCornerShape(4.dp)
+                                                        else -> RoundedCornerShape(8.dp)
+                                                    }
+                                                } else {
+                                                    baseShape
+                                                }
+
+                                                Box(
+                                                    contentAlignment = Alignment.Center,
+                                                    modifier = Modifier
+                                                        .size(width = widthDp, height = 34.dp)
+                                                        .background(color = containerColor, shape = buttonShape)
+                                                        .onGloballyPositioned { coordinates ->
+                                                            val bounds = coordinates.boundsInRoot()
+                                                            pinnedSlotBounds[index] = PinnedSlotBounds(slot, bounds.left, bounds.right)
+                                                        }
+                                                        .animateWidth(interactionSource)
+                                                        .graphicsLayer {
+                                                            alpha = if (isDragging) 0f else 1f
+                                                        }
+                                                        .combinedClickable(
+                                                            interactionSource = interactionSource,
+                                                            indication = LocalIndication.current,
+                                                            onClick = {
+                                                                AudioAndHapticFeedbackManager.getInstance().performHapticAndAudioFeedback(
+                                                                    KeyCode.NOT_SPECIFIED,
+                                                                    pinnedKeys,
+                                                                    HapticEvent.KEY_PRESS
+                                                                )
+                                                                val code = getCodeForToolbarKey(slot)
+                                                                if (code != KeyCode.UNSPECIFIED) {
+                                                                    listener.onCodeInput(code, Constants.SUGGESTION_STRIP_COORDINATE, Constants.SUGGESTION_STRIP_COORDINATE, false)
+                                                                }
+                                                            },
+                                                            onLongClick = {
+                                                                AudioAndHapticFeedbackManager.getInstance().performHapticFeedback(
+                                                                    pinnedKeys,
+                                                                    HapticEvent.KEY_LONG_PRESS
+                                                                )
+                                                                startPinnedToolbarDragFromCompose(slot)
+                                                            }
+                                                        )
+                                                ) {
+                                                    if (resId != null) {
+                                                        Icon(
+                                                            painter = painterResource(resId),
+                                                            contentDescription = slot.name,
+                                                            tint = contentColor,
+                                                            modifier = Modifier.size(20.dp)
+                                                        )
+                                                    }
+                                                }
+                                            },
+                                            menuContent = {}
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private fun isToolbarKeyActivated(key: ToolbarKey): Boolean {
+        val prefs = context.prefs()
+        return when (key) {
+            ToolbarKey.INCOGNITO -> prefs.getBoolean(Settings.PREF_ALWAYS_INCOGNITO_MODE, Defaults.PREF_ALWAYS_INCOGNITO_MODE)
+            ToolbarKey.ONE_HANDED -> Settings.getValues().mOneHandedModeEnabled
+            ToolbarKey.SPLIT -> Settings.getValues().mIsSplitKeyboardEnabled
+            ToolbarKey.AUTOCORRECT -> Settings.getValues().mAutoCorrectionEnabledPerUserSettings
+            else -> true
+        }
+    }
+
+    private fun startPinnedToolbarDragFromCompose(key: ToolbarKey) {
+        draggingKeyInComposeState.value = key
+        isPinnedToolbarDragActive = true
+        val clipData = ClipData.newPlainText(TOOLBAR_DRAG_CLIP_LABEL, key.name)
+        val shadowBuilder = ButtonDragShadowBuilder(context, key)
+        pinnedKeys.startDragAndDropCompat(
+            clipData,
+            shadowBuilder,
+            ToolbarDragState(key, ToolbarDragSource.PINNED_ROW, pinnedKeys)
+        )
     }
 
     private lateinit var listener: Listener
@@ -270,7 +554,7 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
         populatePinnedKeys()
         suggestionsStrip.isVisible = false
         suggestionsChipScroll.isVisible = false
-        pinnedKeys.isVisible = pinnedKeys.childCount > 0
+        pinnedKeys.isVisible = slotsState.value.isNotEmpty()
         // Swap access point icon to back arrow while menu is open
         setAccessPointMenuOpen(true)
     }
@@ -339,7 +623,7 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
     // overrides: necessarily public, but not used from outside
 
     override fun onSharedPreferenceChanged(prefs: SharedPreferences, key: String?) {
-        setToolbarButtonsActivatedStateOnPrefChange(pinnedKeys, key)
+        activatedStateVersion.value++
         setToolbarButtonsActivatedStateOnPrefChange(toolbar, key)
         if (key == Settings.PREF_ALWAYS_INCOGNITO_MODE
             || key == Settings.PREF_PINNED_TOOLBAR_KEYS
@@ -359,8 +643,37 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
             updateSuggestionContainersVisibility(visibility == VISIBLE && !toolbarContainer.isVisible)
     }
 
+    private fun getLatinIME(): helium314.keyboard.latin.LatinIME? {
+        var ctx = context
+        while (ctx is android.content.ContextWrapper) {
+            if (ctx is helium314.keyboard.latin.LatinIME) return ctx
+            ctx = ctx.baseContext
+        }
+        return ctx as? helium314.keyboard.latin.LatinIME
+    }
+
+    override fun onAttachedToWindow() {
+        val latinIME = getLatinIME()
+        if (latinIME != null) {
+            val root = rootView
+            if (root != null) {
+                root.setViewTreeLifecycleOwner(latinIME)
+                root.setViewTreeSavedStateRegistryOwner(latinIME)
+                root.setViewTreeViewModelStoreOwner(latinIME)
+            }
+            setViewTreeLifecycleOwner(latinIME)
+            setViewTreeSavedStateRegistryOwner(latinIME)
+            setViewTreeViewModelStoreOwner(latinIME)
+        }
+        super.onAttachedToWindow()
+        composeLifecycleOwner?.start()
+    }
+
     override fun onDetachedFromWindow() {
         super.onDetachedFromWindow()
+        composeLifecycleOwner?.stop()
+        composeLifecycleOwner?.destroy()
+        composeLifecycleOwner = null
         dismissMoreSuggestionsPanel()
     }
 
@@ -571,7 +884,7 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
     fun updateVoiceKey() {
         val show = Settings.getValues().mShowsVoiceInputKey
         toolbar.findViewWithTag<View>(ToolbarKey.VOICE)?.isVisible = show
-        pinnedKeys.findViewWithTag<View>(ToolbarKey.VOICE)?.isVisible = show
+        activatedStateVersion.value++
         if (persistentToolbarKey.tag == ToolbarKey.VOICE) {
             persistentToolbarKey.isVisible = show
         }
@@ -609,16 +922,16 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
             pinnedKeys.isVisible = true
             return
         }
+        val hasPinnedKeys = slotsState.value.isNotEmpty()
         if (isAccessPointMenuOpen) {
             suggestionsStrip.isVisible = false
             suggestionsChipScroll.isVisible = false
-            pinnedKeys.isVisible = pinnedKeys.childCount > 0
+            pinnedKeys.isVisible = hasPinnedKeys
             return
         }
         val toolbarMode = Settings.getValues().mToolbarMode
         val allowPinnedKeys = toolbarMode == ToolbarMode.EXPANDABLE || toolbarMode == ToolbarMode.TOOLBAR_KEYS
         val allowSuggestions = toolbarMode == ToolbarMode.EXPANDABLE || toolbarMode == ToolbarMode.SUGGESTION_STRIP
-        val hasPinnedKeys = pinnedKeys.childCount > 0
         val preferPinnedKeys = showSuggestions &&
                 allowPinnedKeys &&
                 hasPinnedKeys &&
@@ -636,30 +949,10 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
     private fun populatePinnedKeys(
         previewSlots: List<Any>? = null,
     ) {
-        pinnedKeys.removeAllViews()
         val persistentKey = Settings.getValues().mPersistentToolbarKey
         val slots = previewSlots ?: getPinnedToolbarKeys(context.prefs(), persistentKey)
-        val colors = Settings.getValues().mColors
-        if (slots.isEmpty()) return
-        val slotWidth = pinnedButtonWidth(slots.size)
-        pinnedKeys.addView(View(context), pinnedSpacerLayoutParams())
-        for (slot in slots) {
-            if (slot === PinnedDropPlaceholder) {
-                pinnedKeys.addView(createPinnedDropPlaceholder(colors), pinnedSlotLayoutParams(slotWidth))
-                pinnedKeys.addView(View(context), pinnedSpacerLayoutParams())
-                continue
-            }
-            val key = slot as? ToolbarKey ?: continue
-            val button = createToolbarKey(context, key)
-            button.layoutParams = pinnedSlotLayoutParams(slotWidth)
-            setupKey(button, colors)
-            applyAlphabetIconTint(button, colors)
-            applyToolbarPillBackground(button, colors)
-            button.setOnClickListener(this)
-            button.setOnLongClickListener(this)
-            pinnedKeys.addView(button)
-            pinnedKeys.addView(View(context), pinnedSpacerLayoutParams())
-        }
+        slotsState.value = slots
+        pinnedKeys.isVisible = slots.isNotEmpty()
     }
 
     private fun updatePersistentToolbarKey() {
@@ -683,12 +976,7 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
             applySpecialKeyCircleBackground(it, colors)
         }
         updatePersistentToolbarKey()
-        val childCount = pinnedKeys.childCount
-        for (i in 0 until childCount) {
-            val child = pinnedKeys.getChildAt(i) as? ImageButton ?: continue
-            applyAlphabetIconTint(child, colors)
-            applyToolbarPillBackground(child, colors)
-        }
+        colorsState.value = colors
         invalidate()
     }
 
@@ -735,40 +1023,44 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
         return pinnedRowEnabled && key != ToolbarKey.CLOSE_HISTORY && key != Settings.getValues().mPersistentToolbarKey
     }
 
+    private fun getSortedSlotBounds(): List<PinnedSlotBounds> {
+        return pinnedSlotBounds.values.sortedBy { it.left }
+    }
+
     private fun pinnedDropIndexFromEvent(target: View, event: DragEvent, source: ToolbarDragSource): Int? {
-        val slotViews = pinnedSlotViews()
-        if (slotViews.isEmpty()) return if (source == ToolbarDragSource.ACCESS_POINT_MENU) 0 else null
+        val slots = getSortedSlotBounds()
+        if (slots.isEmpty()) return if (source == ToolbarDragSource.ACCESS_POINT_MENU) 0 else null
 
         target.getLocationOnScreen(dragTargetScreenLocation)
         pinnedKeys.getLocationOnScreen(pinnedScreenLocation)
         val xInPinned = event.x + dragTargetScreenLocation[0] - pinnedScreenLocation[0]
 
-        for (i in slotViews.indices) {
-            val child = slotViews[i]
-            if (xInPinned >= child.left.toFloat() && xInPinned <= child.right.toFloat()) {
-                return visualIndexToPinnedIndex(i, slotViews.size)
+        for (i in slots.indices) {
+            val child = slots[i]
+            if (xInPinned >= child.left && xInPinned <= child.right) {
+                return visualIndexToPinnedIndex(i, slots.size)
             }
         }
 
         val physicalIndex = when {
-            xInPinned < slotViews.first().left -> 0
-            xInPinned > slotViews.last().right -> {
-                if (slotViews.size >= MAX_PINNED_TOOLBAR_KEYS && source == ToolbarDragSource.ACCESS_POINT_MENU) return null
-                slotViews.size
+            xInPinned < slots.first().left -> 0
+            xInPinned > slots.last().right -> {
+                if (slots.size >= MAX_PINNED_TOOLBAR_KEYS && source == ToolbarDragSource.ACCESS_POINT_MENU) return null
+                slots.size
             }
             else -> {
-                val gapIndex = slotViews.indexOfFirst { xInPinned < it.left }
-                if (gapIndex >= 0) gapIndex else slotViews.size
+                val gapIndex = slots.indexOfFirst { xInPinned < it.left }
+                if (gapIndex >= 0) gapIndex else slots.size
             }
         }
-        return visualIndexToPinnedIndex(physicalIndex, slotViews.size)
+        return visualIndexToPinnedIndex(physicalIndex, slots.size)
     }
 
     private fun showPinnedDropPreview(key: ToolbarKey, requestedIndex: Int, source: ToolbarDragSource) {
         if (pinnedDropPreviewKey == key
             && pinnedDropPreviewSource == source
             && pinnedDropPreviewRequestedIndex == requestedIndex
-            && pinnedKeys.childCount > 0
+            && slotsState.value.isNotEmpty()
         ) {
             return
         }
@@ -785,7 +1077,7 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
             slots.take(MAX_PINNED_TOOLBAR_KEYS)
         }
         val previewIndex = previewSlots.indexOf(PinnedDropPlaceholder).coerceAtLeast(0)
-        if (pinnedDropPreviewKey == key && pinnedDropPreviewIndex == previewIndex && pinnedKeys.childCount > 0) {
+        if (pinnedDropPreviewKey == key && pinnedDropPreviewIndex == previewIndex && slotsState.value.isNotEmpty()) {
             return
         }
         isPinnedToolbarDragActive = true
@@ -807,15 +1099,16 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
         }
     }
 
-    private fun pinnedButtonWidth(slotCount: Int): Int {
+    private fun pinnedButtonWidth(slotCount: Int, availableWidthOverride: Int = 0): Int {
         val circleVisualSize = 40.dpToPx(resources) - 2 * 3.dpToPx(resources) // 34dp to match circle buttons
         val desiredWidth = (circleVisualSize * 1.58f).toInt()
-        val availableWidth = pinnedKeys.width.takeIf { it > 0 } ?: suggestionsMiddleContainer.width
+        val availableWidth = availableWidthOverride.takeIf { it > 0 } ?: pinnedKeys.width.takeIf { it > 0 } ?: suggestionsMiddleContainer.width
         if (availableWidth <= 0) return desiredWidth
         val visibleSlotCount = slotCount.coerceIn(1, MAX_PINNED_TOOLBAR_KEYS)
-        val totalGaps = visibleSlotCount + 1
-        val reservedGapWidth = 4.dpToPx(resources) * totalGaps
-        val maxWidthForSlots = ((availableWidth - reservedGapWidth) / visibleSlotCount).coerceAtLeast(1)
+        // Horizontal padding (4dp on each side) = 8dp. Spacing between visibleSlotCount items = (visibleSlotCount - 1) * 8dp.
+        // Total spacing + padding = visibleSlotCount * 8dp!
+        val spacingAndPadding = 8.dpToPx(resources) * visibleSlotCount
+        val maxWidthForSlots = ((availableWidth - spacingAndPadding) / visibleSlotCount).coerceAtLeast(1)
         val minimumWidth = 32.dpToPx(resources).coerceAtMost(maxWidthForSlots)
         return desiredWidth.coerceAtMost(maxWidthForSlots).coerceAtLeast(minimumWidth)
     }
@@ -849,7 +1142,11 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
     }
 
     private fun clearPinnedDropPreview() {
-        if (!isPinnedToolbarDragActive && pinnedDropPreviewKey == null) return
+        draggingKeyInComposeState.value = null
+        if (!isPinnedToolbarDragActive && pinnedDropPreviewKey == null) {
+            updateKeys()
+            return
+        }
         isPinnedToolbarDragActive = false
         pinnedDropPreviewKey = null
         pinnedDropPreviewSource = null
@@ -997,5 +1294,65 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
 
         @Deprecated("Deprecated in Java")
         override fun getOpacity(): Int = wrapped.opacity
+    }
+
+    private class ButtonDragShadowBuilder(
+        context: Context,
+        val key: ToolbarKey
+    ) : View.DragShadowBuilder() {
+        private val icon = KeyboardIconsSet.instance.getNewDrawable(key.name, context)
+        private val size = 34.dpToPx(context.resources)
+
+        init {
+            val colors = Settings.getValues().mColors
+            icon?.mutate()?.setTint(colors.get(ColorType.KEY_TEXT))
+        }
+
+        override fun onProvideShadowMetrics(outShadowSize: android.graphics.Point, outShadowTouchPoint: android.graphics.Point) {
+            outShadowSize.set(size, size)
+            outShadowTouchPoint.set(size / 2, size / 2)
+        }
+
+        override fun onDrawShadow(canvas: android.graphics.Canvas) {
+            icon?.let {
+                it.setBounds(0, 0, size, size)
+                it.draw(canvas)
+            }
+        }
+    }
+
+    private class ComposeLifecycleOwner : LifecycleOwner, SavedStateRegistryOwner, ViewModelStoreOwner {
+        private val lifecycleRegistry = LifecycleRegistry(this)
+        private val savedStateRegistryController = SavedStateRegistryController.create(this)
+        private val store = ViewModelStore()
+
+        init {
+            savedStateRegistryController.performRestore(null)
+            lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_CREATE)
+        }
+
+        fun start() {
+            lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_START)
+            lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_RESUME)
+        }
+
+        fun stop() {
+            lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_PAUSE)
+            lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_STOP)
+        }
+
+        fun destroy() {
+            lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_DESTROY)
+            store.clear()
+        }
+
+        override val lifecycle: Lifecycle
+            get() = lifecycleRegistry
+
+        override val savedStateRegistry: SavedStateRegistry
+            get() = savedStateRegistryController.savedStateRegistry
+
+        override val viewModelStore: ViewModelStore
+            get() = store
     }
 }

@@ -240,9 +240,10 @@ fun createAdvancedSettings(context: Context) = listOf(
             name = setting.title,
             key = setting.key,
             default = 0,
-            range = 21f..36f,
+            range = 21f..37f,
+            stepSize = 1,
             description = {
-                "Android " + when(it) {
+                val baseDescription = "Android " + when(it) {
                     21 -> "5.0"
                     22 -> "5.1"
                     23 -> "6"
@@ -259,12 +260,39 @@ fun createAdvancedSettings(context: Context) = listOf(
                     34 -> "14"
                     35 -> "15"
                     36 -> "16"
+                    37 -> "17"
                     else -> "version unknown"
+                }
+                val dynamicMax = SupportedEmojis.getDynamicMaxSdk(ctx)
+                if (it > dynamicMax) {
+                    val supportedName = when(dynamicMax) {
+                        21 -> "5.0"
+                        22 -> "5.1"
+                        23 -> "6"
+                        24 -> "7.0"
+                        25 -> "7.1"
+                        26 -> "8.0"
+                        27 -> "8.1"
+                        28 -> "9"
+                        29 -> "10"
+                        30 -> "11"
+                        31 -> "12"
+                        32 -> "12L"
+                        33 -> "13"
+                        34 -> "14"
+                        35 -> "15"
+                        36 -> "16"
+                        37 -> "17"
+                        else -> "current version"
+                    }
+                    baseDescription + "\n⚠️ Warning: Emojis above Android $supportedName are not supported by your system or font and could show as tofu."
+                } else {
+                    baseDescription
                 }
             },
             onConfirmed = {
                 SupportedEmojis.load(ctx)
-                KeyboardSwitcher.getInstance().setThemeNeedsReload()
+                KeyboardSwitcher.getInstance().reloadKeyboard()
             }
         )
     },
