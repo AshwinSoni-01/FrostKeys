@@ -423,7 +423,7 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
                                                             onClick = {
                                                                 AudioAndHapticFeedbackManager.getInstance().performHapticAndAudioFeedback(
                                                                     KeyCode.NOT_SPECIFIED,
-                                                                    pinnedKeys,
+                                                                    this@SuggestionStripView,
                                                                     HapticEvent.KEY_PRESS
                                                                 )
                                                                 val code = getCodeForToolbarKey(slot)
@@ -433,7 +433,7 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
                                                             },
                                                             onLongClick = {
                                                                 AudioAndHapticFeedbackManager.getInstance().performHapticFeedback(
-                                                                    pinnedKeys,
+                                                                    this@SuggestionStripView,
                                                                     HapticEvent.KEY_LONG_PRESS
                                                                 )
                                                                 startPinnedToolbarDragFromCompose(slot)
