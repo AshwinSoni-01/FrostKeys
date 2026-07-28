@@ -282,7 +282,7 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
             val version by activatedStateVersion
 
             val primaryVal = ComposeColor(keyboardColors.get(ColorType.SPECIAL_KEY_BACKGROUND))
-            val onPrimaryVal = ComposeColor(keyboardColors.get(ColorType.ACTION_KEY_ICON))
+            val onPrimaryVal = ComposeColor(keyboardColors.get(if (isNight) ColorType.ACTION_KEY_ICON else ColorType.KEY_TEXT))
             val surfaceVal = ComposeColor(keyboardColors.get(ColorType.KEY_BACKGROUND))
             val onSurfaceVal = ComposeColor(keyboardColors.get(ColorType.KEY_TEXT))
 
