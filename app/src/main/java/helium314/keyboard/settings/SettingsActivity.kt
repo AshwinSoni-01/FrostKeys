@@ -371,6 +371,7 @@ open class SettingsActivity : ComponentActivity(), SharedPreferences.OnSharedPre
         var forceNight: Boolean? = null
         var forceTheme: String? = null
         var clickedTelegramJoin = false
+        var activeOverlay: (@androidx.compose.runtime.Composable (dev.chrisbanes.haze.HazeState) -> Unit)? = null
     }
 
     override fun onSharedPreferenceChanged(prefereces: SharedPreferences?, key: String?) {

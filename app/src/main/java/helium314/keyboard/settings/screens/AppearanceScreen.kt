@@ -4,6 +4,8 @@ package helium314.keyboard.settings.screens
 import android.content.Context
 import android.os.Build
 import androidx.compose.foundation.layout.Column
+import dev.chrisbanes.haze.haze
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -97,11 +99,24 @@ fun AppearanceScreen(
             Settings.PREF_EMOJI_SKIN_TONE else null,
         Settings.PREF_PERSISTENT_EMOJI_ROW,
     )
-    SearchSettingsScreen(
-        onClickBack = onClickBack,
-        title = stringResource(R.string.settings_screen_appearance),
-        settings = items
-    )
+    val hazeState = remember { dev.chrisbanes.haze.HazeState() }
+
+    androidx.compose.runtime.DisposableEffect(Unit) {
+        onDispose {
+            helium314.keyboard.settings.SettingsActivity.activeOverlay = null
+        }
+    }
+
+    androidx.compose.foundation.layout.Box(modifier = androidx.compose.ui.Modifier.fillMaxSize()) {
+        androidx.compose.foundation.layout.Box(modifier = androidx.compose.ui.Modifier.fillMaxSize().haze(state = hazeState)) {
+            SearchSettingsScreen(
+                onClickBack = onClickBack,
+                title = stringResource(R.string.settings_screen_appearance),
+                settings = items
+            )
+        }
+        helium314.keyboard.settings.SettingsActivity.activeOverlay?.invoke(hazeState)
+    }
 }
 
 fun createAppearanceSettings(context: Context) = listOf(
@@ -367,16 +382,16 @@ fun createAppearanceSettings(context: Context) = listOf(
         SwitchPreference(it, Defaults.PREF_PERSISTENT_EMOJI_ROW) { KeyboardSwitcher.getInstance().setThemeNeedsReload() }
     },
     Setting(context, "adjust_frosted_glass_dialog", R.string.button_adjust_frosted_glass) { setting ->
-        var showDialog by rememberSaveable { mutableStateOf(false) }
         Preference(
             name = setting.title,
-            onClick = { showDialog = true }
+            onClick = { 
+                helium314.keyboard.settings.SettingsActivity.activeOverlay = { hazeState ->
+                    helium314.keyboard.settings.dialogs.FrostedGlassAdjustDialog(
+                        onDismissRequest = { helium314.keyboard.settings.SettingsActivity.activeOverlay = null }
+                    )
+                }
+            }
         )
-        if (showDialog) {
-            helium314.keyboard.settings.dialogs.FrostedGlassAdjustDialog(
-                onDismissRequest = { showDialog = false }
-            )
-        }
     },
 )
 

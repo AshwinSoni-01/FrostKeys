@@ -31,5 +31,5 @@ tools/*.txt
 /*logcat*.txt
 /*.code-workspace
 
-remove_strings.py
+/*.py
 pr2_body.txt

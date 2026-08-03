@@ -1,5 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-only
+@file:OptIn(androidx.compose.ui.text.ExperimentalTextApi::class)
 package helium314.keyboard.settings.screens
+import helium314.keyboard.settings.LocalSearchState
+import helium314.keyboard.settings.ExpandableSearchField
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.material3.TextFieldDefaults
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
@@ -19,6 +24,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -48,10 +54,22 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontVariation
+import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
+import dev.chrisbanes.haze.haze
+import helium314.keyboard.settings.LocalHazeState
+import helium314.keyboard.settings.LocalSearchInnerPadding
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import helium314.keyboard.latin.R
@@ -71,6 +89,8 @@ import helium314.keyboard.settings.preferences.Preference
 import helium314.keyboard.latin.utils.previewDark
 import helium314.keyboard.settings.screens.gesturedata.END_DATE_EPOCH_MILLIS
 import helium314.keyboard.settings.screens.gesturedata.TWO_WEEKS_IN_MILLIS
+
+val materialSymbols = FontFamily(Font(R.font.material_symbols_rounded, variationSettings = FontVariation.Settings(FontVariation.Setting("FILL", 1f))))
 
 @Composable
 fun MainSettingsScreen(
@@ -93,7 +113,9 @@ fun MainSettingsScreen(
         onClickBack = onClickBack,
         title = stringResource(R.string.ime_settings),
         settings = emptyList(),
+        hideTopSearchBar = true,
     ) {
+        val hazeState = LocalHazeState.current
         val enabledSubtypes = remember { SubtypeSettings.getEnabledSubtypes(true) }
         val enabledSubtypeNames = remember(enabledSubtypes) {
             enabledSubtypes.joinToString(", ") { it.displayName() }
@@ -106,124 +128,248 @@ fun MainSettingsScreen(
         val telegramJoined = remember(b?.value) {
             ctx.prefs().getBoolean("pref_telegram_joined", false)
         }
-        Scaffold(contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom)) { innerPadding ->
-            LazyColumn(contentPadding = innerPadding) {
-                if (!telegramJoined) {
-                    item("telegram_invite") {
-                        TelegramInviteCard(
-                            onJoinClick = {
-                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/FrostKeys"))
-                                ctx.startActivity(intent)
-                                SettingsActivity.clickedTelegramJoin = true
+        val isDark = isSystemInDarkTheme()
+        val scaffoldBg = if (isDark) MaterialTheme.colorScheme.background else MaterialTheme.colorScheme.surfaceContainer
+        Scaffold(
+            containerColor = scaffoldBg,
+            contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom)
+        ) { innerPadding ->
+            val topPadding = LocalSearchInnerPadding.current
+            Box(modifier = Modifier.fillMaxSize().haze(state = hazeState)) {
+                LazyColumn(contentPadding = PaddingValues(top = topPadding.calculateTopPadding(), bottom = innerPadding.calculateBottomPadding())) {
+                    item("search_bar") {
+                        val searchState = LocalSearchState.current
+                        if (searchState != null) {
+                            ExpandableSearchField(
+                                    expanded = searchState.showSearch,
+                                    onDismiss = { searchState.setShowSearch(false) },
+                                    search = searchState.searchText,
+                                    onSearchChange = searchState.onSearchChange,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                                    colors = TextFieldDefaults.colors(
+                                        focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                        focusedIndicatorColor = Color.Transparent,
+                                        unfocusedIndicatorColor = Color.Transparent
+                                    )
+                                )
                             }
+                        }
+                    if (!telegramJoined) {
+                        item("telegram_invite") {
+                            TelegramInviteCard(
+                                onJoinClick = {
+                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/FrostKeys"))
+                                    ctx.startActivity(intent)
+                                    SettingsActivity.clickedTelegramJoin = true
+                                }
+                            )
+                        }
+                    }
+
+                    item("quick_setup") {
+                        QuickSetupCard(
+                            onClickGestureTyping = onClickGestureTyping,
+                            onClickDictionaries = onClickDictionaries,
+                            onClickCloud = onClickCloud,
                         )
                     }
-                }
 
-                item("quick_setup") {
-                    QuickSetupCard(
-                        onClickGestureTyping = onClickGestureTyping,
-                        onClickDictionaries = onClickDictionaries,
-                        onClickCloud = onClickCloud,
-                    )
-                }
-
-                item("language") {
-                    Preference(
-                        name = stringResource(R.string.language_and_layouts_title),
-                        description = enabledSubtypeNames,
-                        onClick = onClickLanguage,
-                        icon = R.drawable.ic_settings_languages
-                    ) { NextScreenIcon() }
-                }
-                item("preferences") {
-                    Preference(
-                        name = stringResource(R.string.settings_screen_preferences),
-                        onClick = onClickPreferences,
-                        icon = R.drawable.ic_settings_preferences
-                    ) { NextScreenIcon() }
-                }
-                item("appearance") {
-                    Preference(
-                        name = stringResource(R.string.settings_screen_appearance),
-                        onClick = onClickAppearance,
-                        icon = R.drawable.ic_settings_appearance
-                    ) { NextScreenIcon() }
-                }
-                item("toolbar") {
-                    Preference(
-                        name = stringResource(R.string.settings_screen_toolbar),
-                        onClick = onClickToolbar,
-                        icon = R.drawable.ic_settings_toolbar
-                    ) { NextScreenIcon() }
-                }
-                item("cloud") {
-                    Preference(
-                        name = stringResource(R.string.cloud_features),
-                        onClick = onClickCloud,
-                        icon = R.drawable.ic_cloud
-                    ) { NextScreenIcon() }
-                }
-                item("gesture_typing") {
-                    Preference(
-                        name = stringResource(R.string.settings_screen_gesture),
-                        description = if (JniUtils.sHaveGestureLib) null else stringResource(R.string.gesture_not_loaded_summary),
-                        onClick = onClickGestureTyping,
-                        icon = R.drawable.ic_settings_gesture
-                    ) { NextScreenIcon() }
-                }
-                if (showDataGathering) {
-                    item("data_gathering") {
-                        Preference(
-                            name = stringResource(R.string.gesture_data_screen),
-                            onClick = onClickDataGathering,
-                            icon = R.drawable.ic_settings_gesture
-                        ) { NextScreenIcon() }
+                    item("md3e_general") {
+                        Md3ePreferenceGroup("General") {
+                            Md3ePreference(
+                                icon = "language",
+                                title = stringResource(R.string.language_and_layouts_title),
+                                description = enabledSubtypeNames,
+                                onClick = onClickLanguage,
+                                isFirst = true
+                            )
+                            Md3ePreference(
+                                icon = "tune",
+                                title = stringResource(R.string.settings_screen_preferences),
+                                description = "Keypress sound, vibration, and general behavior",
+                                onClick = onClickPreferences
+                            )
+                            Md3ePreference(
+                                icon = "palette",
+                                title = stringResource(R.string.settings_screen_appearance),
+                                description = "Theme, keyboard height, and visual styles",
+                                onClick = onClickAppearance
+                            )
+                            Md3ePreference(
+                                icon = R.drawable.ic_access_point_grid,
+                                title = stringResource(R.string.settings_screen_toolbar),
+                                description = "Customize the toolbar layout and pinned buttons",
+                                onClick = onClickToolbar
+                            )
+                            Md3ePreference(
+                                icon = "cloud",
+                                title = stringResource(R.string.cloud_features),
+                                description = "Gemini assistant, smart tools, and GIF searches",
+                                onClick = onClickCloud,
+                                isLast = true
+                            )
+                        }
+                    }
+                    
+                    item("md3e_typing") {
+                        Md3ePreferenceGroup("Typing & input") {
+                            Md3ePreference(
+                                icon = "gesture",
+                                title = stringResource(R.string.settings_screen_gesture),
+                                description = if (JniUtils.sHaveGestureLib) "Swipe typing, trail colors, and gesture actions" else stringResource(R.string.gesture_not_loaded_summary),
+                                onClick = onClickGestureTyping,
+                                isFirst = true
+                            )
+                            if (showDataGathering) {
+                                Md3ePreference(
+                                    icon = "gesture",
+                                    title = stringResource(R.string.gesture_data_screen),
+                                      description = "Manage data collection for gestures",
+                                    onClick = onClickDataGathering
+                                )
+                            }
+                            Md3ePreference(
+                                icon = "spellcheck",
+                                title = stringResource(R.string.settings_screen_correction),
+                                description = "Autocorrect, block offensive words, and spacing",
+                                onClick = onClickTextCorrection
+                            )
+                            Md3ePreference(
+                                icon = "keyboard",
+                                title = stringResource(R.string.settings_screen_secondary_layouts),
+                                description = "Number row, symbols, and alternative characters",
+                                onClick = onClickLayouts
+                            )
+                            Md3ePreference(
+                                icon = "dictionary",
+                                title = stringResource(R.string.dictionary_settings_category),
+                                description = "Word suggestions, emoji prediction, and personal dictionary",
+                                onClick = onClickDictionaries,
+                                isLast = true
+                            )
+                        }
+                    }
+                    
+                    item("md3e_more") {
+                        Md3ePreferenceGroup("More") {
+                            Md3ePreference(
+                                icon = "discover_tune",
+                                title = stringResource(R.string.settings_screen_advanced),
+                                description = "Debug settings, clipboard, and experimental features",
+                                onClick = onClickAdvanced,
+                                isFirst = true
+                            )
+                            Md3ePreference(
+                                icon = "flag",
+                                title = stringResource(R.string.settings_screen_setup_wizard),
+                                description = stringResource(R.string.settings_screen_setup_wizard_summary),
+                                onClick = onClickWelcomeWizard
+                            )
+                            Md3ePreference(
+                                icon = "info",
+                                title = stringResource(R.string.settings_screen_about),
+                                description = "App version, licenses, and privacy policy",
+                                onClick = onClickAbout,
+                                isLast = true
+                            )
+                        }
+                    }
+                    
+                    item("spacer") {
+                        Spacer(modifier = Modifier.height(24.dp))
                     }
                 }
-                item("correction") {
-                    Preference(
-                        name = stringResource(R.string.settings_screen_correction),
-                        onClick = onClickTextCorrection,
-                        icon = R.drawable.ic_settings_correction
-                    ) { NextScreenIcon() }
-                }
-                item("layouts") {
-                    Preference(
-                        name = stringResource(R.string.settings_screen_secondary_layouts),
-                        onClick = onClickLayouts,
-                        icon = R.drawable.ic_ime_switcher
-                    ) { NextScreenIcon() }
-                }
-                item("dictionaries") {
-                    Preference(
-                        name = stringResource(R.string.dictionary_settings_category),
-                        onClick = onClickDictionaries,
-                        icon = R.drawable.ic_dictionary
-                    ) { NextScreenIcon() }
-                }
-                item("advanced") {
-                    Preference(
-                        name = stringResource(R.string.settings_screen_advanced),
-                        onClick = onClickAdvanced,
-                        icon = R.drawable.ic_settings_advanced
-                    ) { NextScreenIcon() }
-                }
-                item("welcome_wizard") {
-                    Preference(
-                        name = stringResource(R.string.settings_screen_setup_wizard),
-                        description = stringResource(R.string.settings_screen_setup_wizard_summary),
-                        onClick = onClickWelcomeWizard,
-                        icon = R.drawable.ic_setup_key
-                    ) { NextScreenIcon() }
-                }
-                item("about") {
-                    Preference(
-                        name = stringResource(R.string.settings_screen_about),
-                        onClick = onClickAbout,
-                        icon = R.drawable.ic_settings_about
-                    ) { NextScreenIcon() }
-                }
+            }
+        }
+    }
+}
+
+@Composable
+fun Md3ePreferenceGroup(
+    title: String,
+    content: @Composable () -> Unit
+) {
+    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(start = 18.dp, bottom = 8.dp)
+        )
+        Column(
+            verticalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            content()
+        }
+    }
+}
+
+@Composable
+fun Md3ePreference(
+    icon: Any,
+    title: String,
+    description: String? = null,
+    onClick: () -> Unit,
+    isFirst: Boolean = false,
+    isLast: Boolean = false
+) {
+    val shape = RoundedCornerShape(
+        topStart = if (isFirst) 24.dp else 4.dp,
+        topEnd = if (isFirst) 24.dp else 4.dp,
+        bottomStart = if (isLast) 24.dp else 4.dp,
+        bottomEnd = if (isLast) 24.dp else 4.dp,
+    )
+    
+    val isDark = isSystemInDarkTheme()
+    val cardColor = if (isDark) MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.surface
+    
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(cardColor)
+            .clickable { onClick() }
+            .padding(horizontal = 16.dp, vertical = 14.dp)
+    ) {
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .size(40.dp)
+                .background(MaterialTheme.colorScheme.secondaryContainer, RoundedCornerShape(20.dp))
+        ) {
+            if (icon is String) {
+                Text(
+                    text = icon,
+                    fontFamily = materialSymbols,
+                    fontSize = 20.sp,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                )
+            } else if (icon is Int) {
+                Icon(
+                    painter = painterResource(id = icon),
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+        }
+        Spacer(modifier = Modifier.width(16.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            if (description != null) {
+                Text(
+                    text = description,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
     }
@@ -236,72 +382,66 @@ private fun QuickSetupCard(
     onClickCloud: () -> Unit,
 ) {
     val ctx = LocalContext.current
+    var isExpanded by remember { mutableStateOf(false) }
+
     val b = (ctx.getActivity() as? SettingsActivity)?.prefChanged?.collectAsState()
-    if ((b?.value ?: 0) < 0)
-        Log.v("irrelevant", "stupid way to trigger recomposition on preference change")
-
-    val enabledSubtypes = remember(b?.value) { SubtypeSettings.getEnabledSubtypes(true) }
-
-    // Completion states:
-    val isGestureComplete = remember(b?.value) { JniUtils.sHaveGestureLib }
-    val isDictionaryComplete = remember(b?.value, enabledSubtypes) {
-        enabledSubtypes.isNotEmpty() && enabledSubtypes.all { subtype ->
-            val (userDicts, hasInternal) = getUserAndInternalDictionaries(ctx, subtype.locale())
-            hasInternal || userDicts.isNotEmpty()
-        }
+    val isGestureComplete = remember(b?.value) {
+        val gesturePrefs = listOf("pref_gesture_input", "pref_gesture_space_after")
+        gesturePrefs.any { ctx.prefs().getBoolean(it, true) }
+    }
+    val isDictionaryComplete = remember(b?.value) {
+        ctx.prefs().getBoolean("pref_enable_next_word_suggestions", true)
     }
     val isCloudComplete = remember(b?.value) {
-        ctx.prefs().getBoolean("pref_enable_cloud_features", false)
+        val gem = ctx.prefs().getString("pref_gemini_api_key", "")
+        val kli = ctx.prefs().getString("pref_klipy_api_key", "")
+        !gem.isNullOrBlank() || !kli.isNullOrBlank()
     }
-
     val allStepsComplete = isGestureComplete && isDictionaryComplete && isCloudComplete
 
-    var isExpanded by rememberSaveable { mutableStateOf(false) }
-
-    val accentColor = if (allStepsComplete) Color(0xFF388E3C) else MaterialTheme.colorScheme.primary
-    val containerColor = if (allStepsComplete) Color(0xFF4CAF50).copy(alpha = 0.12f) else MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f)
+    val accentColor = if (allStepsComplete) Color(0xFF4CAF50) else MaterialTheme.colorScheme.primary
 
     Card(
         colors = CardDefaults.cardColors(
-            containerColor = containerColor
+            containerColor = if (allStepsComplete) Color(0xFF4CAF50).copy(alpha = 0.1f) else MaterialTheme.colorScheme.surfaceVariant
         ),
         modifier = Modifier
             .fillMaxWidth()
             .padding(16.dp)
+            .clip(CardDefaults.shape)
+            .clickable { isExpanded = !isExpanded }
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .clickable(enabled = allStepsComplete) { isExpanded = !isExpanded }
                 .padding(16.dp)
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                modifier = Modifier
+                    .fillMaxWidth()
             ) {
-                Icon(
-                    painter = painterResource(if (allStepsComplete) R.drawable.ic_setup_check else R.drawable.ic_settings_about_wiki),
-                    contentDescription = null,
-                    tint = accentColor,
-                    modifier = Modifier.size(24.dp)
+                Text(
+                    text = "check_circle",
+                    fontFamily = materialSymbols,
+                    fontSize = 24.sp,
+                    color = accentColor
                 )
+                Spacer(modifier = Modifier.width(12.dp))
                 Text(
                     text = if (allStepsComplete) "Setup is complete!" else stringResource(R.string.quick_setup_title),
                     style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
+                    fontWeight = FontWeight.SemiBold,
                     color = accentColor,
                     modifier = Modifier.weight(1f)
                 )
-                if (allStepsComplete) {
-                    Icon(
-                        painter = painterResource(R.drawable.ic_arrow_left),
-                        contentDescription = if (isExpanded) "Collapse" else "Expand",
-                        tint = accentColor,
-                        modifier = Modifier
-                            .size(24.dp)
-                            .rotate(if (isExpanded) 90f else -90f)
-                    )
-                }
+                Text(
+                    text = "expand_more",
+                    fontFamily = materialSymbols,
+                    fontSize = 24.sp,
+                    color = accentColor,
+                    modifier = Modifier.rotate(if (isExpanded) 180f else 0f)
+                )
             }
             Spacer(modifier = Modifier.height(6.dp))
             Text(
@@ -311,35 +451,35 @@ private fun QuickSetupCard(
             )
 
             AnimatedVisibility(
-                visible = !allStepsComplete || isExpanded,
+                visible = isExpanded,
                 enter = expandVertically() + fadeIn(),
                 exit = shrinkVertically() + fadeOut()
             ) {
-                Column {
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Spacer(modifier = Modifier.height(12.dp))
 
                     QuickSetupStep(
-                        icon = R.drawable.ic_settings_gesture,
+                        icon = "gesture",
                         title = stringResource(R.string.quick_setup_gesture_title),
                         description = stringResource(R.string.quick_setup_gesture_desc),
                         onClick = onClickGestureTyping,
                         isComplete = isGestureComplete,
+                        isFirst = true
                     )
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
                     QuickSetupStep(
-                        icon = R.drawable.ic_dictionary,
+                        icon = "dictionary",
                         title = stringResource(R.string.quick_setup_dict_title),
                         description = stringResource(R.string.quick_setup_dict_desc),
                         onClick = onClickDictionaries,
                         isComplete = isDictionaryComplete,
                     )
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
                     QuickSetupStep(
-                        icon = R.drawable.ic_settings_advanced,
+                        icon = "cloud",
                         title = stringResource(R.string.quick_setup_cloud_title),
                         description = stringResource(R.string.quick_setup_cloud_desc),
                         onClick = onClickCloud,
                         isComplete = isCloudComplete,
+                        isLast = true
                     )
                 }
             }
@@ -349,25 +489,47 @@ private fun QuickSetupCard(
 
 @Composable
 private fun QuickSetupStep(
-    icon: Int,
+    icon: Any,
     title: String,
     description: String,
     onClick: () -> Unit,
     isComplete: Boolean = false,
+    isFirst: Boolean = false,
+    isLast: Boolean = false,
 ) {
+    val shape = RoundedCornerShape(
+        topStart = if (isFirst) 16.dp else 4.dp,
+        topEnd = if (isFirst) 16.dp else 4.dp,
+        bottomStart = if (isLast) 16.dp else 4.dp,
+        bottomEnd = if (isLast) 16.dp else 4.dp,
+    )
+    val isDark = isSystemInDarkTheme()
+    val bgColor = Color.Transparent
+
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
+            .clip(shape)
+            .background(if (isComplete) Color(0xFF4CAF50).copy(alpha = 0.15f) else bgColor)
             .clickable { onClick() }
-            .padding(vertical = 8.dp)
+            .padding(horizontal = 16.dp, vertical = 12.dp)
     ) {
-        Icon(
-            painter = painterResource(icon),
-            contentDescription = null,
-            tint = if (isComplete) Color(0xFF388E3C) else MaterialTheme.colorScheme.secondary,
-            modifier = Modifier.size(20.dp)
-        )
+        if (icon is String) {
+            Text(
+                text = icon,
+                fontFamily = materialSymbols,
+                fontSize = 20.sp,
+                color = if (isComplete) Color(0xFF388E3C) else MaterialTheme.colorScheme.secondary
+            )
+        } else if (icon is Int) {
+            Icon(
+                painter = painterResource(icon),
+                contentDescription = null,
+                tint = if (isComplete) Color(0xFF388E3C) else MaterialTheme.colorScheme.secondary,
+                modifier = Modifier.size(20.dp)
+            )
+        }
         Spacer(modifier = Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(
@@ -383,14 +545,19 @@ private fun QuickSetupStep(
             )
         }
         if (isComplete) {
-            Icon(
-                painter = painterResource(R.drawable.ic_setup_check),
-                contentDescription = "Complete",
-                tint = Color(0xFF388E3C),
-                modifier = Modifier.size(20.dp)
+            Text(
+                text = "check_circle",
+                fontFamily = materialSymbols,
+                fontSize = 20.sp,
+                color = Color(0xFF388E3C)
             )
         } else {
-            NextScreenIcon()
+            Text(
+                text = "chevron_right",
+                fontFamily = materialSymbols,
+                fontSize = 20.sp,
+                color = MaterialTheme.colorScheme.secondary
+            )
         }
     }
 }
@@ -435,12 +602,12 @@ private fun TelegramInviteCard(
                 )
             }
             Spacer(modifier = Modifier.width(8.dp))
-            Icon(
-                painter = painterResource(R.drawable.ic_arrow_left),
-                contentDescription = null,
-                tint = Color.White.copy(alpha = 0.8f),
+            Text(
+                text = "chevron_left",
+                fontFamily = materialSymbols,
+                fontSize = 24.sp,
+                color = Color.White.copy(alpha = 0.8f),
                 modifier = (if (LocalLayoutDirection.current == LayoutDirection.Ltr) Modifier.scale(-1f, 1f) else Modifier)
-                    .size(20.dp)
             )
         }
     }
