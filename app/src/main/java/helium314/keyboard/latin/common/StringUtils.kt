@@ -268,13 +268,17 @@ val String.isSingleGrapheme: Boolean get() {
     if (length == 1) return true
 
     val iterator = localBreakIterator
-    iterator.setText(this)
-    iterator.next()
-    if (iterator.next() != BreakIterator.DONE) return false
-    // we have a single grapheme, but " 🏼" is detected as single grapheme which we don't want
-    val tone = indexOfFirst { it.code == 0xD83C }
-    return if (tone == -1) true // does not contain skin tone
-    else emoRegex.matches(this) // single grapheme only if it's a single emoji
+    return try {
+        iterator.setText(this)
+        iterator.next()
+        if (iterator.next() != BreakIterator.DONE) false
+        else {
+            val tone = indexOfFirst { it.code == 0xD83C }
+            if (tone == -1) true else emoRegex.matches(this)
+        }
+    } catch (_: Throwable) {
+        false
+    }
 }
 
 val String.lastGrapheme: String get() {

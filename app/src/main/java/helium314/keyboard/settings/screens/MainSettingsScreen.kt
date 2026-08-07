@@ -2,7 +2,7 @@
 @file:OptIn(androidx.compose.ui.text.ExperimentalTextApi::class)
 package helium314.keyboard.settings.screens
 import helium314.keyboard.settings.LocalSearchState
-import helium314.keyboard.settings.ExpandableSearchField
+import helium314.keyboard.settings.StaticSearchField
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.material3.TextFieldDefaults
 import android.content.Intent
@@ -114,6 +114,7 @@ fun MainSettingsScreen(
         title = stringResource(R.string.ime_settings),
         settings = emptyList(),
         hideTopSearchBar = true,
+        showBackButton = false,
     ) {
         val hazeState = LocalHazeState.current
         val enabledSubtypes = remember { SubtypeSettings.getEnabledSubtypes(true) }
@@ -140,21 +141,7 @@ fun MainSettingsScreen(
                     item("search_bar") {
                         val searchState = LocalSearchState.current
                         if (searchState != null) {
-                            ExpandableSearchField(
-                                    expanded = searchState.showSearch,
-                                    onDismiss = { searchState.setShowSearch(false) },
-                                    search = searchState.searchText,
-                                    onSearchChange = searchState.onSearchChange,
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                                    colors = TextFieldDefaults.colors(
-                                        focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                                        focusedIndicatorColor = Color.Transparent,
-                                        unfocusedIndicatorColor = Color.Transparent
-                                    )
-                                )
+                            searchState.searchField()
                             }
                         }
                     if (!telegramJoined) {

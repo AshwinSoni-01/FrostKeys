@@ -305,15 +305,20 @@ public final class RichInputConnection implements PrivateCommandPerformer {
         }
     }
 
+    private boolean mIsReloadingCursor = false;
+
     private void reloadCursorPosition() {
-        if (!isConnected()) return;
+        if (!isConnected() || mIsReloadingCursor) return;
         try {
+            mIsReloadingCursor = true;
             final ExtractedText et = mIC.getExtractedText(new ExtractedTextRequest(), 0);
             if (et == null) return;
             mExpectedSelStart = et.selectionStart + et.startOffset;
             mExpectedSelEnd = et.selectionEnd + et.startOffset;
         } catch (Exception e) {
             Log.w(TAG, "Exception in reloadCursorPosition getExtractedText", e);
+        } finally {
+            mIsReloadingCursor = false;
         }
     }
 

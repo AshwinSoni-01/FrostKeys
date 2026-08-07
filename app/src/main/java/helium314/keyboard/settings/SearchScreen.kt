@@ -47,16 +47,22 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.runtime.movableContentOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.layout.layout
+import kotlin.math.roundToInt
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
@@ -65,6 +71,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontVariation
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.haze
@@ -83,11 +90,19 @@ data class SearchState(
     val showSearch: Boolean,
     val searchText: TextFieldValue,
     val onSearchChange: (TextFieldValue) -> Unit,
-    val setShowSearch: (Boolean) -> Unit
+    val setShowSearch: (Boolean) -> Unit,
+    val searchField: @Composable () -> Unit
 )
 val LocalSearchState = staticCompositionLocalOf<SearchState?> { null }
 
 val materialSymbols = FontFamily(Font(R.font.material_symbols_rounded, variationSettings = FontVariation.Settings(FontVariation.Setting("FILL", 1f))))
+
+val googleSansFlex = FontFamily(
+    Font(R.font.google_sans_flex, weight = FontWeight.Normal, variationSettings = FontVariation.Settings(FontVariation.weight(400), FontVariation.Setting("ROND", 100f))),
+    Font(R.font.google_sans_flex, weight = FontWeight.Medium, variationSettings = FontVariation.Settings(FontVariation.weight(500), FontVariation.Setting("ROND", 100f))),
+    Font(R.font.google_sans_flex, weight = FontWeight.SemiBold, variationSettings = FontVariation.Settings(FontVariation.weight(600), FontVariation.Setting("ROND", 100f))),
+    Font(R.font.google_sans_flex, weight = FontWeight.Bold, variationSettings = FontVariation.Settings(FontVariation.weight(700), FontVariation.Setting("ROND", 100f)))
+)
 
 @Composable
 fun SearchSettingsScreen(
@@ -95,22 +110,30 @@ fun SearchSettingsScreen(
     title: String,
     settings: List<Any?>,
     hideTopSearchBar: Boolean = false,
+    showBackButton: Boolean = true,
     content: @Composable (ColumnScope.() -> Unit)? = null // overrides settings if not null
 ) {
     SearchScreen(
         onClickBack = onClickBack,
         hideTopSearchBar = hideTopSearchBar,
-        title = { Text(title) },
+        showBackButton = showBackButton,
+        title = { Text(title, maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis) },
         content = {
             if (content != null) content()
             else {
                 val hazeState = LocalHazeState.current
+                val topPadding = LocalSearchInnerPadding.current
                 Scaffold(
                     contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom)
                 ) { innerPadding ->
                     Box(modifier = Modifier.fillMaxSize().haze(state = hazeState)) {
                         Column(
-                            Modifier.verticalScroll(rememberScrollState()).then(Modifier.padding(innerPadding))
+                            Modifier
+                                .verticalScroll(rememberScrollState())
+                                .padding(
+                                    top = topPadding.calculateTopPadding(),
+                                    bottom = innerPadding.calculateBottomPadding()
+                                )
                         ) {
                             settings.forEach {
                                 if (it is Int) {
@@ -143,6 +166,7 @@ fun <T: Any?> SearchScreen(
     icon: @Composable (() -> Unit)? = null,
     menu: List<Pair<String, () -> Unit>>? = null,
     hideTopSearchBar: Boolean = false,
+    showBackButton: Boolean = true,
     content: @Composable (ColumnScope.() -> Unit)? = null,
 ) {
     var searchText by remember { mutableStateOf(TextFieldValue()) }
@@ -165,65 +189,113 @@ fun <T: Any?> SearchScreen(
     
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     
-    val searchState = remember(showSearch, searchText) {
+    val searchFieldContent = remember {
+        movableContentOf {
+            StaticSearchField(
+                search = searchText,
+                onSearchChange = { searchText = it },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                colors = TextFieldDefaults.colors(
+                    focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                    focusedIndicatorColor = Color.Transparent,
+                    unfocusedIndicatorColor = Color.Transparent
+                )
+            )
+        }
+    }
+
+    val searchState = remember(showSearch, searchText, searchFieldContent) {
         SearchState(
             showSearch = showSearch,
             searchText = searchText,
             onSearchChange = { searchText = it },
-            setShowSearch = ::setShowSearch
+            setShowSearch = ::setShowSearch,
+            searchField = searchFieldContent
         )
     }
-    
-    val customScrollConnection = remember(scrollBehavior, showSearch) {
-        object : androidx.compose.ui.input.nestedscroll.NestedScrollConnection {
-            override fun onPreScroll(available: androidx.compose.ui.geometry.Offset, source: androidx.compose.ui.input.nestedscroll.NestedScrollSource): androidx.compose.ui.geometry.Offset {
-                return scrollBehavior.nestedScrollConnection.onPreScroll(available, source)
-            }
-            override fun onPostScroll(consumed: androidx.compose.ui.geometry.Offset, available: androidx.compose.ui.geometry.Offset, source: androidx.compose.ui.input.nestedscroll.NestedScrollSource): androidx.compose.ui.geometry.Offset {
-                if (available.y > 10f && scrollBehavior.state.collapsedFraction == 0f && !showSearch) {
-                    setShowSearch(true)
-                }
-                return scrollBehavior.nestedScrollConnection.onPostScroll(consumed, available, source)
-            }
-        }
-    }
-    
     CompositionLocalProvider(
         LocalHazeState provides hazeState,
         LocalSearchState provides searchState
     ) {
         Scaffold(
-            modifier = Modifier.nestedScroll(customScrollConnection),
+            modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
             containerColor = scaffoldBg,
             contentWindowInsets = WindowInsets(0),
             topBar = {
-                val collapsedFraction = scrollBehavior.state.collapsedFraction
-                Surface(
-                    color = Color.Transparent,
-                    modifier = Modifier.hazeChild(state = hazeState, style = HazeStyle(blurRadius = 24.dp * collapsedFraction, tint = topBarBg.copy(alpha = 0.3f * collapsedFraction)))
-                ) {
-                    Column {
-                        LargeTopAppBar(
-                            title = { Box(modifier = Modifier.padding(start = 12.dp)) { title() } },
+                Box {
+                    Box(
+                        modifier = Modifier
+                            .matchParentSize()
+                            .graphicsLayer { alpha = scrollBehavior.state.collapsedFraction }
+                            .hazeChild(state = hazeState, style = HazeStyle(blurRadius = 24.dp, tint = topBarBg.copy(alpha = 0.3f)))
+                    )
+                    Column(
+                        modifier = Modifier.layout { measurable, constraints ->
+                            val fraction = scrollBehavior.state.collapsedFraction
+                            val bottomPadding = (32.dp.toPx() * (1f - fraction)).roundToInt()
+                            val placeable = measurable.measure(constraints)
+                            layout(placeable.width, placeable.height + bottomPadding) {
+                                placeable.placeRelative(0, 0)
+                            }
+                        }
+                    ) {
+                        MaterialTheme(
+                            colorScheme = MaterialTheme.colorScheme,
+                            shapes = MaterialTheme.shapes,
+                            typography = MaterialTheme.typography.copy(
+                                headlineMedium = MaterialTheme.typography.headlineMedium.copy(
+                                    fontFamily = googleSansFlex,
+                                    fontSize = 36.sp,
+                                    lineHeight = 44.sp,
+                                    fontWeight = FontWeight.Medium
+                                ),
+                                titleLarge = MaterialTheme.typography.titleLarge.copy(
+                                    fontFamily = googleSansFlex,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            )
+                        ) {
+                            LargeTopAppBar(
+                                title = { 
+                                    Box(
+                                        modifier = Modifier
+                                            .padding(start = 12.dp)
+                                            .layout { measurable, constraints ->
+                                                val fraction = scrollBehavior.state.collapsedFraction
+                                                val topPadding = (40.dp.toPx() * (1f - fraction)).roundToInt()
+                                                val placeable = measurable.measure(constraints)
+                                                layout(placeable.width, placeable.height + topPadding) {
+                                                    placeable.placeRelative(0, topPadding)
+                                                }
+                                            }
+                                    ) { title() } 
+                                },
                             scrollBehavior = scrollBehavior,
                             navigationIcon = {
-                                IconButton(
-                                    onClick = {
-                                        if (showSearch) setShowSearch(false)
-                                        else onClickBack()
-                                    },
-                                    modifier = Modifier
-                                        .padding(start = 12.dp)
-                                        .size(32.dp)
-                                        .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape)
-                                ) {
-                                    Text("arrow_back", fontFamily = materialSymbols, fontSize = 20.sp, color = MaterialTheme.colorScheme.onSurface)
+                                if (showBackButton) {
+                                    IconButton(
+                                        onClick = {
+                                            if (showSearch) setShowSearch(false)
+                                            else onClickBack()
+                                        },
+                                        modifier = Modifier.padding(start = 12.dp)
+                                    ) {
+                                        Box(
+                                            contentAlignment = Alignment.Center,
+                                            modifier = Modifier
+                                                .size(28.dp)
+                                                .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape)
+                                        ) {
+                                            Text("arrow_back", fontFamily = materialSymbols, fontSize = 18.sp, color = MaterialTheme.colorScheme.onSurface)
+                                        }
+                                    }
                                 }
                             },
                             actions = {
-                                if (icon == null)
-                                    IconButton(onClick = { setShowSearch(!showSearch) }) { Text("search", fontFamily = materialSymbols, fontSize = 24.sp, color = MaterialTheme.colorScheme.onSurface) }
-                                else
+                                if (icon != null)
                                     icon()
                                 if (menu != null)
                                     Box {
@@ -247,21 +319,6 @@ fun <T: Any?> SearchScreen(
                             colors = TopAppBarDefaults.topAppBarColors(
                                 containerColor = Color.Transparent,
                                 scrolledContainerColor = Color.Transparent
-                            )
-                        )
-                        if (!hideTopSearchBar) {
-                            ExpandableSearchField(
-                                expanded = showSearch,
-                                onDismiss = { setShowSearch(false) },
-                            search = searchText,
-                            onSearchChange = { searchText = it },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 8.dp),
-                            colors = TextFieldDefaults.colors(
-                                focusedContainerColor = MaterialTheme.colorScheme.surface,
-                                focusedIndicatorColor = Color.Transparent,
-                                unfocusedIndicatorColor = Color.Transparent
                             )
                         )
                         }
@@ -291,6 +348,14 @@ fun <T: Any?> SearchScreen(
                                     bottom = innerPadding2.calculateBottomPadding()
                                 )
                             ) {
+                                if (content != null) {
+                                    item {
+                                        val searchState = LocalSearchState.current
+                                        if (searchState != null) {
+                                            searchState.searchField()
+                                        }
+                                    }
+                                }
                                 if (itemKey == null) {
                                     items(items) {
                                         itemContent(it)
@@ -310,36 +375,24 @@ fun <T: Any?> SearchScreen(
 }
 
 // from StreetComplete
-/** Expandable text field that can be dismissed and requests focus when it is expanded */
+/** Static text field for searching */
 @Composable
-fun ExpandableSearchField(
-    expanded: Boolean,
-    onDismiss: () -> Unit,
+fun StaticSearchField(
     search: TextFieldValue,
     onSearchChange: (TextFieldValue) -> Unit,
     modifier: Modifier = Modifier,
     colors: TextFieldColors = TextFieldDefaults.colors(),
 ) {
-    val focusRequester = remember { FocusRequester() }
-
-    LaunchedEffect(expanded) {
-        if (expanded) focusRequester.requestFocus()
-    }
-    AnimatedVisibility(visible = expanded, modifier = Modifier.fillMaxWidth()) {
-        TextField(
-            value = search,
-            onValueChange = onSearchChange,
-            shape = androidx.compose.foundation.shape.CircleShape,
-            modifier = modifier.focusRequester(focusRequester),
-            leadingIcon = { Text("search", fontFamily = materialSymbols, fontSize = 24.sp, color = MaterialTheme.colorScheme.onSurface) },
-            trailingIcon = { IconButton(onClick = {
-                if (search.text.isBlank()) onDismiss()
-                else onSearchChange(TextFieldValue())
-            }) { Text("close", fontFamily = materialSymbols, fontSize = 24.sp, color = MaterialTheme.colorScheme.onSurface) } },
-            singleLine = true,
-            colors = colors,
-            textStyle = contentTextDirectionStyle,
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search)
-        )
-    }
+    TextField(
+        value = search,
+        onValueChange = onSearchChange,
+        shape = androidx.compose.foundation.shape.CircleShape,
+        modifier = modifier,
+        leadingIcon = { Text("search", fontFamily = materialSymbols, fontSize = 24.sp, color = MaterialTheme.colorScheme.onSurface) },
+        placeholder = { Text("Search Settings") },
+        singleLine = true,
+        colors = colors,
+        textStyle = contentTextDirectionStyle,
+        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search)
+    )
 }

@@ -78,6 +78,11 @@ import helium314.keyboard.settings.ActionRow
 import helium314.keyboard.latin.utils.DefaultButton
 import helium314.keyboard.latin.utils.DeleteButton
 import helium314.keyboard.settings.DropDownField
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import dev.chrisbanes.haze.haze
+import helium314.keyboard.settings.LocalHazeState
+import helium314.keyboard.settings.LocalSearchInnerPadding
 import helium314.keyboard.settings.SearchScreen
 import helium314.keyboard.settings.SettingsActivity
 import helium314.keyboard.latin.utils.Theme
@@ -148,14 +153,22 @@ fun SubtypeScreen(
         itemContent = { },
         filteredItems = { emptyList<String>() }
     ) {
+        val hazeState = LocalHazeState.current
+        val topPadding = LocalSearchInnerPadding.current
         Scaffold(
             contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom)
         ) { innerPadding ->
-            Column(
-                modifier = Modifier.verticalScroll(scrollState).padding(horizontal = 12.dp)
-                    .then(Modifier.padding(innerPadding)),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
+            Box(modifier = Modifier.fillMaxSize().haze(state = hazeState)) {
+                Column(
+                    modifier = Modifier
+                        .verticalScroll(scrollState)
+                        .padding(horizontal = 12.dp)
+                        .padding(
+                            top = topPadding.calculateTopPadding(),
+                            bottom = innerPadding.calculateBottomPadding()
+                        ),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
                 MainLayoutRow(currentSubtype, customMainLayouts) { setCurrentSubtype(it) }
                 if (availableLocalesForScript.size > 1) {
                     WithSmallTitle(stringResource(R.string.secondary_locale)) {
@@ -291,6 +304,7 @@ fun SubtypeScreen(
                 }
             }
         }
+    }
         if (showSecondaryLocaleDialog)
             MultiListPickerDialog(
                 onDismissRequest = { showSecondaryLocaleDialog = false },

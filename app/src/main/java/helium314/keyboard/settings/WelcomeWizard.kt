@@ -107,6 +107,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import kotlinx.coroutines.withContext
 
 enum class WizardScreen {
     Splash,
@@ -163,19 +168,36 @@ fun WelcomeWizard(
     var isEnabled by remember { mutableStateOf(UncachedInputMethodManagerUtils.isThisImeEnabled(ctx, imm)) }
     var isCurrent by remember { mutableStateOf(UncachedInputMethodManagerUtils.isThisImeCurrent(ctx, imm)) }
 
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                isEnabled = UncachedInputMethodManagerUtils.isThisImeEnabled(ctx, imm)
+                isCurrent = UncachedInputMethodManagerUtils.isThisImeCurrent(ctx, imm)
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
         isEnabled = UncachedInputMethodManagerUtils.isThisImeEnabled(ctx, imm)
         isCurrent = UncachedInputMethodManagerUtils.isThisImeCurrent(ctx, imm)
     }
 
-    val scope = rememberCoroutineScope { Dispatchers.IO }
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(isEnabled, isCurrent) {
         if (isEnabled && !isCurrent) {
-            scope.launch {
+            scope.launch(Dispatchers.IO) {
                 while (!UncachedInputMethodManagerUtils.isThisImeCurrent(ctx, imm)) {
-                    delay(500)
-                    isCurrent = UncachedInputMethodManagerUtils.isThisImeCurrent(ctx, imm)
+                    delay(100)
+                    val current = UncachedInputMethodManagerUtils.isThisImeCurrent(ctx, imm)
+                    withContext(Dispatchers.Main) {
+                        isCurrent = current
+                    }
                 }
             }
         }
@@ -332,6 +354,19 @@ fun WelcomeWizard(
                                     },
                                     onSwitchClicked = {
                                         imm.showInputMethodPicker()
+                                        scope.launch(Dispatchers.IO) {
+                                            val startTime = System.currentTimeMillis()
+                                            while (System.currentTimeMillis() - startTime < 5000) {
+                                                val current = UncachedInputMethodManagerUtils.isThisImeCurrent(ctx, imm)
+                                                val enabled = UncachedInputMethodManagerUtils.isThisImeEnabled(ctx, imm)
+                                                withContext(Dispatchers.Main) {
+                                                    isCurrent = current
+                                                    isEnabled = enabled
+                                                }
+                                                if (current) break
+                                                delay(50)
+                                            }
+                                        }
                                     },
                                     onBack = { currentScreen = WizardScreen.Splash },
                                     showToast = showToast,

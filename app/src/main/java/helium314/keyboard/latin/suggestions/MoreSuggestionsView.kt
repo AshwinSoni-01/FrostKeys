@@ -96,6 +96,8 @@ class MoreSuggestionsView @JvmOverloads constructor(
         updateKeyDrawParams(keyHeight)
     }
 
+
+
     private fun setModalMode() {
         isInModalMode = true
         // Set vertical correction to zero (Reset popup keys keyboard sliding allowance R.dimen.config_popup_keys_keyboard_slide_allowance).
@@ -126,11 +128,12 @@ class MoreSuggestionsView @JvmOverloads constructor(
         suggestedWords: SuggestedWords, fromIndex: Int, container: View,
         layoutHelper: SuggestionStripLayoutHelper, parentView: View
     ): Boolean {
-        val maxWidth = parentView.width - container.paddingLeft - container.paddingRight
+        val maxWidth = (parentView.width - container.paddingLeft - container.paddingRight).coerceAtLeast(1)
         val parentKeyboard = mainKeyboardView.keyboard ?: return false
+        val minWidth = (maxWidth * layoutHelper.mMinMoreSuggestionsWidth).toInt().coerceIn(1, maxWidth)
         val keyboard = moreSuggestionsBuilder.layout(
             suggestedWords, fromIndex, maxWidth,
-            (maxWidth * layoutHelper.mMinMoreSuggestionsWidth).toInt(),
+            minWidth,
             layoutHelper.maxMoreSuggestionsRow, parentKeyboard
         ).build()
         setKeyboard(keyboard)

@@ -175,7 +175,10 @@ class DynamicColors(context: Context, override val themeStyle: String, override 
     private val adjustedKeyBackground: Int = brighten(keyBackground)
     /** further brightened variant of [adjustedKeyBackground] */
     private val doubleAdjustedKeyBackground: Int = brighten(adjustedKeyBackground)
-    private var backgroundSetupDone = false
+    private var rawKeyboardBackground: Drawable? = keyboardBackground
+    private var preparedBackground: Drawable? = null
+    private var lastWidth: Int = -1
+    private var lastHeight: Int = -1
 
     init {
         accentColorFilter = colorFilter(doubleAdjustedAccent)
@@ -184,7 +187,7 @@ class DynamicColors(context: Context, override val themeStyle: String, override 
             val darkerBackground = adjustLuminosityAndKeepAlpha(background, -0.2f)
             navBar = darkerBackground
             keyboardBackground = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(background, darkerBackground))
-            backgroundSetupDone = true
+            rawKeyboardBackground = keyboardBackground
         } else {
             navBar = background
         }
@@ -376,12 +379,17 @@ class DynamicColors(context: Context, override val themeStyle: String, override 
                 } else view.background.colorFilter = adjustedBackgroundFilter
             }
             MAIN_BACKGROUND -> {
-                if (keyboardBackground != null) {
-                    if (!backgroundSetupDone) {
-                        keyboardBackground = keyboardBackground!!.toBitmap(view.width, view.height).toDrawable(view.context.resources)
-                        backgroundSetupDone = true
+                if (rawKeyboardBackground != null) {
+                    if (view.width > 0 && view.height > 0) {
+                        if (preparedBackground == null || view.width != lastWidth || view.height != lastHeight) {
+                            lastWidth = view.width
+                            lastHeight = view.height
+                            preparedBackground = createCenterCroppedDrawable(rawKeyboardBackground!!, view.width, view.height, view.context.resources)
+                        }
+                        view.background = preparedBackground
+                    } else {
+                        view.background = NoIntrinsicSizeDrawable(rawKeyboardBackground!!)
                     }
-                    view.background = keyboardBackground
                 } else {
                     view.background.colorFilter = backgroundFilter
                 }
@@ -443,7 +451,10 @@ class DefaultColors (
         if (isBrightColor(suggestionText)) darken(darken(suggestionText))
         else brighten(brighten(suggestionText))
     )
-    private var backgroundSetupDone = false
+    private var rawKeyboardBackground: Drawable? = keyboardBackground
+    private var preparedBackground: Drawable? = null
+    private var lastWidth: Int = -1
+    private var lastHeight: Int = -1
 
     init {
         if (isDarkColor(background)) {
@@ -485,7 +496,7 @@ class DefaultColors (
             val darkerBackground = adjustLuminosityAndKeepAlpha(background, -0.2f)
             navBar = darkerBackground
             keyboardBackground = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(background, darkerBackground))
-            backgroundSetupDone = true
+            rawKeyboardBackground = keyboardBackground
         } else {
             navBar = background
         }
@@ -626,12 +637,17 @@ class DefaultColors (
                     applyPillShape(bg)
             }
             MAIN_BACKGROUND -> {
-                if (keyboardBackground != null) {
-                    if (!backgroundSetupDone) {
-                        keyboardBackground = keyboardBackground!!.toBitmap(view.width, view.height).toDrawable(view.context.resources)
-                        backgroundSetupDone = true
+                if (rawKeyboardBackground != null) {
+                    if (view.width > 0 && view.height > 0) {
+                        if (preparedBackground == null || view.width != lastWidth || view.height != lastHeight) {
+                            lastWidth = view.width
+                            lastHeight = view.height
+                            preparedBackground = createCenterCroppedDrawable(rawKeyboardBackground!!, view.width, view.height, view.context.resources)
+                        }
+                        view.background = preparedBackground
+                    } else {
+                        view.background = NoIntrinsicSizeDrawable(rawKeyboardBackground!!)
                     }
-                    view.background = keyboardBackground
                 } else {
                     if (shouldFilter) bg.colorFilter = backgroundFilter
                 }
@@ -664,8 +680,11 @@ class DefaultColors (
 
 class AllColors(private val colorMap: EnumMap<ColorType, Int>, override val themeStyle: String, override val hasKeyBorders: Boolean, backgroundImage: Drawable?) : Colors {
     private var keyboardBackground: Drawable? = backgroundImage
+    private var rawKeyboardBackground: Drawable? = backgroundImage
+    private var preparedBackground: Drawable? = null
+    private var lastWidth: Int = -1
+    private var lastHeight: Int = -1
     private val stateListMap = EnumMap<ColorType, ColorStateList>(ColorType::class.java)
-    private var backgroundSetupDone = false
     private val colorFilters = hashMapOf<ColorType, ColorFilter>()
     override fun get(color: ColorType): Int {
         val baseColor = colorMap[color] ?: color.default()
@@ -712,12 +731,17 @@ class AllColors(private val colorMap: EnumMap<ColorType, Int>, override val them
                     applyPillShape(view.background)
             }
             MAIN_BACKGROUND -> {
-                if (keyboardBackground != null) {
-                    if (!backgroundSetupDone) {
-                        keyboardBackground = keyboardBackground!!.toBitmap(view.width, view.height).toDrawable(view.context.resources)
-                        backgroundSetupDone = true
+                if (rawKeyboardBackground != null) {
+                    if (view.width > 0 && view.height > 0) {
+                        if (preparedBackground == null || view.width != lastWidth || view.height != lastHeight) {
+                            lastWidth = view.width
+                            lastHeight = view.height
+                            preparedBackground = createCenterCroppedDrawable(rawKeyboardBackground!!, view.width, view.height, view.context.resources)
+                        }
+                        view.background = preparedBackground
+                    } else {
+                        view.background = NoIntrinsicSizeDrawable(rawKeyboardBackground!!)
                     }
-                    view.background = keyboardBackground
                 } else {
                     setColor(view.background, color)
                 }
@@ -836,3 +860,54 @@ enum class ColorType {
 
 // this is not used any more, but we keep in case a colorMap does not get filled for whatever reason
 fun ColorType.default() = ColorUtils.setAlphaComponent(name.hashCode() and 0xffffff, 255)
+
+class NoIntrinsicSizeDrawable(private val drawable: Drawable) : Drawable() {
+    override fun draw(canvas: android.graphics.Canvas) {
+        drawable.bounds = bounds
+        drawable.draw(canvas)
+    }
+
+    override fun setAlpha(alpha: Int) {
+        drawable.alpha = alpha
+    }
+
+    override fun setColorFilter(colorFilter: ColorFilter?) {
+        drawable.colorFilter = colorFilter
+    }
+
+    @Deprecated("Deprecated in Java")
+    override fun getOpacity(): Int = drawable.opacity
+
+    override fun getIntrinsicWidth(): Int = -1
+    override fun getIntrinsicHeight(): Int = -1
+}
+
+private fun createCenterCroppedDrawable(
+    drawable: Drawable,
+    targetWidth: Int,
+    targetHeight: Int,
+    resources: android.content.res.Resources
+): Drawable {
+    val srcBitmap = (drawable as? android.graphics.drawable.BitmapDrawable)?.bitmap ?: drawable.toBitmap()
+    val srcWidth = srcBitmap.width.toFloat()
+    val srcHeight = srcBitmap.height.toFloat()
+    if (srcWidth <= 0f || srcHeight <= 0f) return NoIntrinsicSizeDrawable(drawable)
+
+    val scale = maxOf(targetWidth.toFloat() / srcWidth, targetHeight.toFloat() / srcHeight)
+    val scaledWidth = srcWidth * scale
+    val scaledHeight = srcHeight * scale
+    val dx = (targetWidth - scaledWidth) / 2f
+    val dy = (targetHeight - scaledHeight) / 2f
+
+    val outputBitmap = android.graphics.Bitmap.createBitmap(targetWidth, targetHeight, android.graphics.Bitmap.Config.ARGB_8888)
+    val canvas = android.graphics.Canvas(outputBitmap)
+    val matrix = android.graphics.Matrix().apply {
+        postScale(scale, scale)
+        postTranslate(dx, dy)
+    }
+    val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG or android.graphics.Paint.FILTER_BITMAP_FLAG)
+    canvas.drawBitmap(srcBitmap, matrix, paint)
+
+    val bitmapDrawable = android.graphics.drawable.BitmapDrawable(resources, outputBitmap)
+    return NoIntrinsicSizeDrawable(bitmapDrawable)
+}

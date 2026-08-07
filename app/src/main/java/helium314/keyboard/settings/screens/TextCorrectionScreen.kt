@@ -241,6 +241,7 @@ fun createCorrectionSettings(context: Context) = listOf(
     ) { setting ->
         val activity = LocalContext.current.getActivity() ?: return@Setting
         var granted by remember { mutableStateOf(PermissionsUtil.checkAllPermissionsGranted(activity, Manifest.permission.READ_CONTACTS)) }
+        var showDisclosureDialog by remember { mutableStateOf(false) }
         val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
             granted = it
             if (granted)
@@ -249,11 +250,22 @@ fun createCorrectionSettings(context: Context) = listOf(
         SwitchPreference(setting, Defaults.PREF_USE_CONTACTS,
             allowCheckedChange = {
                 if (it && !granted) {
-                    launcher.launch(Manifest.permission.READ_CONTACTS)
+                    showDisclosureDialog = true
                     false
                 } else true
             }
         )
+        if (showDisclosureDialog) {
+            ConfirmationDialog(
+                title = { Text(stringResource(R.string.contacts_permission_disclosure_title)) },
+                onDismissRequest = { showDisclosureDialog = false },
+                onConfirmed = {
+                    showDisclosureDialog = false
+                    launcher.launch(Manifest.permission.READ_CONTACTS)
+                },
+                content = { Text(stringResource(R.string.contacts_permission_disclosure_message)) }
+            )
+        }
     },
     Setting(context, Settings.PREF_USE_APPS,
         R.string.use_apps_dict, R.string.use_apps_dict_summary

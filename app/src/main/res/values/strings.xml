@@ -105,6 +105,8 @@
     <string name="use_contacts_dict">Look up contact names</string>
     <!-- Description for option enabling or disabling the use of names of people in Contacts for suggestion and correction -->
     <string name="use_contacts_dict_summary">Use names from Contacts for suggestions and corrections</string>
+    <string name="contacts_permission_disclosure_title">Contacts Disclosure</string>
+    <string name="contacts_permission_disclosure_message">FrostKeys accesses your device contacts solely to suggest contact names as you type.\n\nYour contact data remains 100% private and stored locally on your device. It is never uploaded or shared with any third party.</string>
     <!-- Option name for enabling or disabling the use of installed app names for suggestion and correction -->
     <string name="use_apps_dict">Look up app names</string>
     <!-- Description for option enabling or disabling the use of installed app names for suggestion and correction -->
@@ -854,6 +856,9 @@ New dictionary:
     <string name="save_log">Save log</string>
     <!-- license for about screen-->
     <string name="license">Open-source license</string>
+    <!-- privacy policy for about screen -->
+    <string name="privacy_policy">Privacy Policy</string>
+    <string name="privacy_policy_summary">Read our privacy policy online</string>
     <!-- license link for about screen-->
     <string name="gnu_gpl">GNU General Public License v3.0</string>
     <!-- Button to close a dialog where neither "ok" nor "cancel" are suitable. Preferably 10 characters or less. -->

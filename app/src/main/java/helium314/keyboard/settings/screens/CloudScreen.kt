@@ -38,6 +38,16 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.material3.Scaffold
+import dev.chrisbanes.haze.haze
+import helium314.keyboard.settings.LocalHazeState
+import helium314.keyboard.settings.LocalSearchInnerPadding
+
 @Composable
 fun CloudScreen(onClickBack: () -> Unit) {
     val context = LocalContext.current
@@ -46,60 +56,72 @@ fun CloudScreen(onClickBack: () -> Unit) {
         title = stringResource(R.string.cloud_features),
         settings = emptyList(),
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-        ) {
-            Card(
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                ),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp)
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        text = stringResource(R.string.cloud_intro_desc),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Button(
-                        onClick = {
-                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://aistudio.google.com/"))
-                            context.startActivity(intent)
-                        },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(text = stringResource(R.string.gemini_get_key_btn))
-                    }
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Button(
-                        onClick = {
-                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://klipy.com/api-overview#overview"))
-                            context.startActivity(intent)
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.secondary
+        val hazeState = LocalHazeState.current
+        val topPadding = LocalSearchInnerPadding.current
+        Scaffold(
+            contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom)
+        ) { innerPadding ->
+            Box(modifier = Modifier.fillMaxSize().haze(state = hazeState)) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(
+                            top = topPadding.calculateTopPadding(),
+                            bottom = innerPadding.calculateBottomPadding()
                         )
+                ) {
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp)
                     ) {
-                        Text(text = stringResource(R.string.klipy_get_key_btn))
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text(
+                                text = stringResource(R.string.cloud_intro_desc),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Button(
+                                onClick = {
+                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://aistudio.google.com/"))
+                                    context.startActivity(intent)
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(text = stringResource(R.string.gemini_get_key_btn))
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Button(
+                                onClick = {
+                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://klipy.com/api-overview#overview"))
+                                    context.startActivity(intent)
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.secondary
+                                )
+                            ) {
+                                Text(text = stringResource(R.string.klipy_get_key_btn))
+                            }
+                        }
+                    }
+
+                    val settingsList = listOf(
+                        CloudManager.PREF_ENABLE_CLOUD_FEATURES,
+                        CloudManager.PREF_GEMINI_API_KEY,
+                        CloudManager.PREF_KLIPY_API_KEY,
+                        Settings.PREF_SEND_GIFS_AS_STICKERS,
+                        CloudManager.PREF_TEST_CONNECTION
+                    )
+                    settingsList.forEach { key ->
+                        SettingsActivity.settingsContainer[key]?.Preference()
                     }
                 }
-            }
-
-            val settingsList = listOf(
-                CloudManager.PREF_ENABLE_CLOUD_FEATURES,
-                CloudManager.PREF_GEMINI_API_KEY,
-                CloudManager.PREF_KLIPY_API_KEY,
-                Settings.PREF_SEND_GIFS_AS_STICKERS,
-                CloudManager.PREF_TEST_CONNECTION
-            )
-            settingsList.forEach { key ->
-                SettingsActivity.settingsContainer[key]?.Preference()
             }
         }
     }

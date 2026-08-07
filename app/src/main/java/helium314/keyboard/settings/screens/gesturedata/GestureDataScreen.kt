@@ -7,6 +7,11 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import dev.chrisbanes.haze.haze
+import helium314.keyboard.settings.LocalHazeState
+import helium314.keyboard.settings.LocalSearchInnerPadding
+import helium314.keyboard.settings.SearchSettingsScreen
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
@@ -357,7 +362,7 @@ fun GestureDataScreen(
                             hintLocales = dict?.let { LocaleList(it.locale.toLanguageTag()) }
                         ),
                         keyboardActions = KeyboardActions { nextWord(false) },
-                        modifier = Modifier.focusRequester(focusRequester),
+        modifier = Modifier.focusRequester(focusRequester),
                     )
                 }
             }
@@ -366,86 +371,76 @@ fun GestureDataScreen(
             dictsBox()
     }
 
-    val scrollState = rememberScrollState()
-    Scaffold(
-        contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom),
-        bottomBar = { BottomBar(sessionWordCount + dbActiveWordCount > 0) { dbActiveWordCount = dao.count(activeMode = true) } }
-    ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .verticalScroll(scrollState)
-                .padding(horizontal = 12.dp)
-                .then(Modifier.padding(innerPadding)),
-        ) {
-            var showInfoDialog by remember { mutableStateOf(false) }
-            var showPrivacyDialog by remember { mutableStateOf(false) }
-            if (maybeNotEnoughSpace) {
-                val top = with(LocalDensity.current) { WindowInsets.statusBars.getTop(this).toDp() }
-                Spacer(Modifier.height(top))
-            } else {
-                TopAppBar(
-                    title = { Text(stringResource(R.string.gesture_data_screen)) },
-                    navigationIcon = {
-                        IconButton(onClick = { if (activeGathering) activeGathering = false else onClickBack() }) {
-                            Icon(
-                                painterResource(R.drawable.ic_arrow_back),
-                                stringResource(R.string.spoken_description_action_previous)
-                            )
+    SearchSettingsScreen(
+        onClickBack = { if (activeGathering) activeGathering = false else onClickBack() },
+        title = stringResource(R.string.gesture_data_screen),
+        settings = emptyList(),
+    ) {
+        val hazeState = LocalHazeState.current
+        val topPadding = LocalSearchInnerPadding.current
+        val scrollState = rememberScrollState()
+        Scaffold(
+            contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom),
+            bottomBar = { BottomBar(sessionWordCount + dbActiveWordCount > 0) { dbActiveWordCount = dao.count(activeMode = true) } }
+        ) { innerPadding ->
+            Box(modifier = Modifier.fillMaxSize().haze(state = hazeState)) {
+                Column(
+                    modifier = Modifier
+                        .verticalScroll(scrollState)
+                        .padding(horizontal = 12.dp)
+                        .padding(
+                            top = topPadding.calculateTopPadding(),
+                            bottom = innerPadding.calculateBottomPadding()
+                        ),
+                ) {
+                    var showInfoDialog by remember { mutableStateOf(false) }
+                    var showPrivacyDialog by remember { mutableStateOf(false) }
+                    if (maybeNotEnoughSpace) {
+                        val top = with(LocalDensity.current) { WindowInsets.statusBars.getTop(this).toDp() }
+                        Spacer(Modifier.height(top))
+                    }
+                    BackHandler(enabled = activeGathering) { activeGathering = false }
+                    if (activeGathering) { // AnimatedVisibility results in buggy behavior for some reason
+                        activeGathering()
+                    }
+                    AnimatedVisibility(!activeGathering) {
+                        // this part is hidden in active gathering mode because in active mode
+                        // neither the keyboard nor the floating buttons (!) should cover any text
+                        Column {
+                            ButtonWithText(stringResource(R.string.gesture_data_info), Modifier.fillMaxWidth()) {
+                                showInfoDialog = true
+                            }
+                            ButtonWithText(stringResource(R.string.gesture_data_privacy), Modifier.fillMaxWidth()) {
+                                showPrivacyDialog = true
+                            }
+                            Spacer(Modifier.height(12.dp))
+                            HorizontalDivider()
+                            ButtonWithText(
+                                stringResource(R.string.gesture_data_active_start),
+                                Modifier.fillMaxWidth(),
+                                System.currentTimeMillis() < END_DATE_EPOCH_MILLIS - TWO_WEEKS_IN_MILLIS // disabled when close to end
+                            ) {
+                                activeGathering = true
+                                lastData = null
+                                wordFromDict = null
+                            }
+                            ButtonWithText(stringResource(R.string.gesture_data_how_to_use), Modifier.fillMaxWidth()) {
+                                showActiveInfoDialog = true
+                            }
                         }
-                    },
-                )
-            }
-            BackHandler(enabled = activeGathering) { activeGathering = false }
-            if (activeGathering) { // AnimatedVisibility results in buggy behavior for some reason
-                activeGathering()
-            }
-            AnimatedVisibility(!activeGathering) {
-                // this part is hidden in active gathering mode because in active mode
-                // neither the keyboard nor the floating buttons (!) should cover any text
-                Column {
-                    ButtonWithText(stringResource(R.string.gesture_data_info), Modifier.fillMaxWidth()) {
-                        showInfoDialog = true
                     }
-                    ButtonWithText(stringResource(R.string.gesture_data_privacy), Modifier.fillMaxWidth()) {
-                        showPrivacyDialog = true
-                    }
+                    if (showInfoDialog)
+                        InfoDialog(AnnotatedString.fromHtml(
+                            stringResource(R.string.gesture_data_description,
+                                DateFormat.getDateInstance(DateFormat.LONG).format(Date(END_DATE_EPOCH_MILLIS)))
+                        ) + AnnotatedString("\n\n" + stringResource(R.string.gesture_data_description_modes))) { showInfoDialog = false }
+                    if (showPrivacyDialog)
+                        InfoDialog(stringResource(R.string.gesture_data_description_privacy)) { showPrivacyDialog = false }
+                    if (showActiveInfoDialog)
+                        InfoDialog(AnnotatedString.fromHtml(stringResource(R.string.gesture_data_active_description, Links.DICTIONARY_URL))) { showActiveInfoDialog = false }
                     Spacer(Modifier.height(12.dp))
-                    HorizontalDivider()
-                    ButtonWithText(
-                        stringResource(R.string.gesture_data_active_start),
-                        Modifier.fillMaxWidth(),
-                        System.currentTimeMillis() < END_DATE_EPOCH_MILLIS - TWO_WEEKS_IN_MILLIS // disabled when close to end
-                    ) {
-                        activeGathering = true
-                        lastData = null
-                        wordFromDict = null
-                    }
-                    ButtonWithText(stringResource(R.string.gesture_data_how_to_use), Modifier.fillMaxWidth()) {
-                        showActiveInfoDialog = true
-                    }
                 }
             }
-            if (showInfoDialog)
-                InfoDialog(AnnotatedString.fromHtml(
-                    stringResource(R.string.gesture_data_description,
-                        DateFormat.getDateInstance(DateFormat.LONG).format(Date(END_DATE_EPOCH_MILLIS)))
-                ) + AnnotatedString("\n\n" + stringResource(R.string.gesture_data_description_modes))) { showInfoDialog = false }
-            if (showPrivacyDialog)
-                InfoDialog(stringResource(R.string.gesture_data_description_privacy)) { showPrivacyDialog = false }
-            if (showActiveInfoDialog)
-                InfoDialog(AnnotatedString.fromHtml(stringResource(R.string.gesture_data_active_description, Links.DICTIONARY_URL))) { showActiveInfoDialog = false }
-            Spacer(Modifier.height(12.dp))
-            // PassiveGathering & Review are not finished and will be completed + enabled later
-/*
-            HorizontalDivider()
-            PassiveGathering()
-            Spacer(Modifier.height(12.dp))
-            HorizontalDivider()
-            // maybe move the review screen content in here if we have enough space (but landscape mode will be bad)
-            TextButton(onClick = { SettingsDestination.navigateTo(SettingsDestination.DataReview) }) {
-                Text(stringResource(R.string.gesture_data_review_screen_title))
-            }
- */
         }
     }
     // showing at top left in preview, but correctly on device

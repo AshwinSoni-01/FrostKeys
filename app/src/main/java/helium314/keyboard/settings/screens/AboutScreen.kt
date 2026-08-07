@@ -53,6 +53,7 @@ fun AboutScreen(
     val items = listOf(
         SettingsWithoutKey.APP,
         SettingsWithoutKey.VERSION,
+        SettingsWithoutKey.PRIVACY_POLICY,
         SettingsWithoutKey.LICENSE,
         SettingsWithoutKey.HIDDEN_FEATURES,
         SettingsWithoutKey.GITHUB_WIKI,
@@ -90,6 +91,20 @@ fun createAboutSettings(context: Context) = listOf(
                 if (count < 5) return@Preference
                 prefs.edit { putBoolean(DebugSettings.PREF_SHOW_DEBUG_SETTINGS, true) }
                 Toast.makeText(ctx, R.string.prefs_debug_settings_enabled, Toast.LENGTH_LONG).show()
+            },
+            icon = R.drawable.ic_settings_about
+        )
+    },
+    Setting(context, SettingsWithoutKey.PRIVACY_POLICY, R.string.privacy_policy, R.string.privacy_policy_summary) {
+        val ctx = LocalContext.current
+        Preference(
+            name = it.title,
+            description = it.description,
+            onClick = {
+                val intent = Intent()
+                intent.data = Links.PRIVACY_POLICY.toUri()
+                intent.action = Intent.ACTION_VIEW
+                ctx.startActivity(intent)
             },
             icon = R.drawable.ic_settings_about
         )

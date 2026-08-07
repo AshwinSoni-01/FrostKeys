@@ -72,6 +72,7 @@ object SettingsWithoutKey {
     const val EDIT_PERSONAL_DICTIONARY = "edit_personal_dictionary"
     const val APP = "app"
     const val VERSION = "version"
+    const val PRIVACY_POLICY = "privacy_policy"
     const val LICENSE = "license"
     const val HIDDEN_FEATURES = "hidden_features"
     const val GITHUB = "github"

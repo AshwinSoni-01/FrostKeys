@@ -62,6 +62,12 @@ import helium314.keyboard.settings.initPreview
 import helium314.keyboard.latin.utils.previewDark
 import java.io.File
 import java.util.Locale
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import dev.chrisbanes.haze.haze
+import helium314.keyboard.settings.LocalHazeState
+import androidx.compose.foundation.layout.PaddingValues
+import helium314.keyboard.settings.LocalSearchInnerPadding
 
 @Composable
 fun DictionaryScreen(
@@ -128,10 +134,18 @@ fun DictionaryScreen(
         itemContent = { locale -> DictionaryItem(locale) }
     ) {
         val context = LocalContext.current
+        val hazeState = LocalHazeState.current
+        val topPadding = LocalSearchInnerPadding.current
         androidx.compose.material3.Scaffold(
             contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom)
         ) { innerPadding ->
-            LazyColumn(contentPadding = innerPadding) {
+            Box(modifier = Modifier.fillMaxSize().haze(state = hazeState)) {
+                LazyColumn(
+                    contentPadding = PaddingValues(
+                        top = topPadding.calculateTopPadding(),
+                        bottom = innerPadding.calculateBottomPadding()
+                    )
+                ) {
                 item {
                     Card(
                         colors = CardDefaults.cardColors(
@@ -183,6 +197,7 @@ fun DictionaryScreen(
                 }
             }
         }
+    }
     }
     if (showAddDictDialog) {
         ConfirmationDialog(

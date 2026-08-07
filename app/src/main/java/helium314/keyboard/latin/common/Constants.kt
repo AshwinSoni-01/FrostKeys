@@ -18,6 +18,7 @@ object Links {
     const val GESTURE_DATA_VIDEO_YOUTUBE = "https://youtu.be/CyjumVTWtJA"
     const val SWIPE_O_SCOPE = "https://codeberg.org/eclexic/swipe-o-scope"
     const val GESTURE_DATA_WIKI = "$WIKI_URL/Tutorial:-How-to-Contribute-Gesture-Data"
+    const val PRIVACY_POLICY = "https://ashwinsoni-01.github.io/FrostKeys/PrivacyPolicy.html"
 }
 
 val combiningRange = 0x300..0x35b
