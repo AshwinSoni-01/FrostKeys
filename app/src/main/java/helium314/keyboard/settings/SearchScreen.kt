@@ -4,6 +4,11 @@ package helium314.keyboard.settings
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
@@ -60,6 +65,7 @@ import androidx.compose.ui.layout.layout
 import kotlin.math.roundToInt
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.Alignment
@@ -126,7 +132,7 @@ fun SearchSettingsScreen(
                 Scaffold(
                     contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom)
                 ) { innerPadding ->
-                    Box(modifier = Modifier.fillMaxSize().haze(state = hazeState)) {
+                    Box(modifier = Modifier.fillMaxSize()) {
                         Column(
                             Modifier
                                 .verticalScroll(rememberScrollState())
@@ -220,107 +226,117 @@ fun <T: Any?> SearchScreen(
         LocalHazeState provides hazeState,
         LocalSearchState provides searchState
     ) {
-        Scaffold(
-            modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
-            containerColor = scaffoldBg,
-            contentWindowInsets = WindowInsets(0),
-            topBar = {
-                Box {
-                    Box(
-                        modifier = Modifier
-                            .matchParentSize()
-                            .graphicsLayer { alpha = scrollBehavior.state.collapsedFraction }
-                            .hazeChild(state = hazeState, style = HazeStyle(blurRadius = 24.dp, tint = topBarBg.copy(alpha = 0.3f)))
-                    )
-                    Column(
-                        modifier = Modifier.layout { measurable, constraints ->
-                            val fraction = scrollBehavior.state.collapsedFraction
-                            val bottomPadding = (32.dp.toPx() * (1f - fraction)).roundToInt()
-                            val placeable = measurable.measure(constraints)
-                            layout(placeable.width, placeable.height + bottomPadding) {
-                                placeable.placeRelative(0, 0)
-                            }
-                        }
+        Box(modifier = Modifier.fillMaxSize()) {
+            Scaffold(
+                modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+                containerColor = scaffoldBg,
+                contentWindowInsets = WindowInsets(0),
+                topBar = {
+                    val topBarHazeStyle = remember(topBarBg) {
+                        HazeStyle(blurRadius = 16.dp, tint = topBarBg.copy(alpha = 0.3f))
+                    }
+                    AnimatedVisibility(
+                        visible = !SettingsActivity.isTopBarHidden && SettingsActivity.activeOverlay == null,
+                        enter = fadeIn(animationSpec = tween(350)) + slideInVertically(initialOffsetY = { -it }, animationSpec = tween(350)),
+                        exit = fadeOut(animationSpec = tween(350)) + slideOutVertically(targetOffsetY = { -it }, animationSpec = tween(350))
                     ) {
-                        MaterialTheme(
-                            colorScheme = MaterialTheme.colorScheme,
-                            shapes = MaterialTheme.shapes,
-                            typography = MaterialTheme.typography.copy(
-                                headlineMedium = MaterialTheme.typography.headlineMedium.copy(
-                                    fontFamily = googleSansFlex,
-                                    fontSize = 36.sp,
-                                    lineHeight = 44.sp,
-                                    fontWeight = FontWeight.Medium
-                                ),
-                                titleLarge = MaterialTheme.typography.titleLarge.copy(
-                                    fontFamily = googleSansFlex,
-                                    fontWeight = FontWeight.Medium
-                                )
-                            )
+                    Box {
+                        Box(
+                            modifier = Modifier
+                                .matchParentSize()
+                                .graphicsLayer { alpha = scrollBehavior.state.collapsedFraction }
+                                .hazeChild(state = hazeState, style = topBarHazeStyle)
+                        )
+                        Column(
+                            modifier = Modifier.layout { measurable, constraints ->
+                                val fraction = scrollBehavior.state.collapsedFraction
+                                val bottomPadding = (32.dp.toPx() * (1f - fraction)).roundToInt()
+                                val placeable = measurable.measure(constraints)
+                                layout(placeable.width, placeable.height + bottomPadding) {
+                                    placeable.placeRelative(0, 0)
+                                }
+                            }
                         ) {
-                            LargeTopAppBar(
-                                title = { 
-                                    Box(
-                                        modifier = Modifier
-                                            .padding(start = 12.dp)
-                                            .layout { measurable, constraints ->
-                                                val fraction = scrollBehavior.state.collapsedFraction
-                                                val topPadding = (40.dp.toPx() * (1f - fraction)).roundToInt()
-                                                val placeable = measurable.measure(constraints)
-                                                layout(placeable.width, placeable.height + topPadding) {
-                                                    placeable.placeRelative(0, topPadding)
+                            MaterialTheme(
+                                colorScheme = MaterialTheme.colorScheme,
+                                shapes = MaterialTheme.shapes,
+                                typography = MaterialTheme.typography.copy(
+                                    headlineMedium = MaterialTheme.typography.headlineMedium.copy(
+                                        fontFamily = googleSansFlex,
+                                        fontSize = 36.sp,
+                                        lineHeight = 44.sp,
+                                        fontWeight = FontWeight.Medium
+                                    ),
+                                    titleLarge = MaterialTheme.typography.titleLarge.copy(
+                                        fontFamily = googleSansFlex,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                )
+                            ) {
+                                LargeTopAppBar(
+                                    title = { 
+                                        Box(
+                                            modifier = Modifier
+                                                .padding(start = 12.dp)
+                                                .layout { measurable, constraints ->
+                                                    val fraction = scrollBehavior.state.collapsedFraction
+                                                    val topPadding = (40.dp.toPx() * (1f - fraction)).roundToInt()
+                                                    val placeable = measurable.measure(constraints)
+                                                    layout(placeable.width, placeable.height + topPadding) {
+                                                        placeable.placeRelative(0, topPadding)
+                                                    }
+                                                }
+                                        ) { title() } 
+                                    },
+                                scrollBehavior = scrollBehavior,
+                                navigationIcon = {
+                                    if (showBackButton) {
+                                        IconButton(
+                                            onClick = {
+                                                if (showSearch) setShowSearch(false)
+                                                else onClickBack()
+                                            },
+                                            modifier = Modifier.padding(start = 12.dp)
+                                        ) {
+                                            Box(
+                                                contentAlignment = Alignment.Center,
+                                                modifier = Modifier
+                                                    .size(28.dp)
+                                                    .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape)
+                                            ) {
+                                                Text("arrow_back", fontFamily = materialSymbols, fontSize = 18.sp, color = MaterialTheme.colorScheme.onSurface)
+                                            }
+                                        }
+                                    }
+                                },
+                                actions = {
+                                    if (icon != null)
+                                        icon()
+                                    if (menu != null)
+                                        Box {
+                                            var showMenu by remember { mutableStateOf(false) }
+                                            IconButton(
+                                                onClick = { showMenu = true }
+                                            ) { Text("more_vert", fontFamily = materialSymbols, fontSize = 24.sp, color = MaterialTheme.colorScheme.onSurface) }
+                                            DropdownMenu(
+                                                expanded = showMenu,
+                                                onDismissRequest = { showMenu = false }
+                                            ) {
+                                                menu.forEach {
+                                                    DropdownMenuItem(
+                                                        text = { Text(it.first) },
+                                                        onClick = { showMenu = false; it.second() }
+                                                    )
                                                 }
                                             }
-                                    ) { title() } 
+                                        }
                                 },
-                            scrollBehavior = scrollBehavior,
-                            navigationIcon = {
-                                if (showBackButton) {
-                                    IconButton(
-                                        onClick = {
-                                            if (showSearch) setShowSearch(false)
-                                            else onClickBack()
-                                        },
-                                        modifier = Modifier.padding(start = 12.dp)
-                                    ) {
-                                        Box(
-                                            contentAlignment = Alignment.Center,
-                                            modifier = Modifier
-                                                .size(28.dp)
-                                                .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape)
-                                        ) {
-                                            Text("arrow_back", fontFamily = materialSymbols, fontSize = 18.sp, color = MaterialTheme.colorScheme.onSurface)
-                                        }
-                                    }
-                                }
-                            },
-                            actions = {
-                                if (icon != null)
-                                    icon()
-                                if (menu != null)
-                                    Box {
-                                        var showMenu by remember { mutableStateOf(false) }
-                                        IconButton(
-                                            onClick = { showMenu = true }
-                                        ) { Text("more_vert", fontFamily = materialSymbols, fontSize = 24.sp, color = MaterialTheme.colorScheme.onSurface) }
-                                        DropdownMenu(
-                                            expanded = showMenu,
-                                            onDismissRequest = { showMenu = false }
-                                        ) {
-                                            menu.forEach {
-                                                DropdownMenuItem(
-                                                    text = { Text(it.first) },
-                                                    onClick = { showMenu = false; it.second() }
-                                                )
-                                            }
-                                        }
-                                    }
-                            },
-                            colors = TopAppBarDefaults.topAppBarColors(
-                                containerColor = Color.Transparent,
-                                scrolledContainerColor = Color.Transparent
+                                colors = TopAppBarDefaults.topAppBarColors(
+                                    containerColor = Color.Transparent,
+                                    scrolledContainerColor = Color.Transparent
+                                )
                             )
-                        )
+                            }
                         }
                     }
                 }
@@ -331,8 +347,15 @@ fun <T: Any?> SearchScreen(
 
                 if (searchText.text.isBlank() && content != null) {
                     CompositionLocalProvider(LocalSearchInnerPadding provides innerPadding) {
-                        Column(modifier = contentModifier) {
-                            content()
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+                                .haze(state = hazeState)
+                        ) {
+                            Column(modifier = contentModifier) {
+                                content()
+                            }
                         }
                     }
                 } else {
@@ -341,7 +364,12 @@ fun <T: Any?> SearchScreen(
                         modifier = contentModifier,
                         contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom)
                     ) { innerPadding2 ->
-                        Box(modifier = Modifier.fillMaxSize().haze(state = hazeState)) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+                                .haze(state = hazeState)
+                        ) {
                             LazyColumn(
                                 contentPadding = androidx.compose.foundation.layout.PaddingValues(
                                     top = innerPadding.calculateTopPadding(),
@@ -371,7 +399,9 @@ fun <T: Any?> SearchScreen(
                 }
             }
         }
+        SettingsActivity.activeOverlay?.invoke(hazeState)
     }
+}
 }
 
 // from StreetComplete

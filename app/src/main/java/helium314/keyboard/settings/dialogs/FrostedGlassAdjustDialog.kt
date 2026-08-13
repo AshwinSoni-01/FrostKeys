@@ -6,6 +6,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.result.PickVisualMediaRequest
 import android.graphics.BitmapFactory
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -28,9 +30,17 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.HazeStyle
+import dev.chrisbanes.haze.haze
+import dev.chrisbanes.haze.hazeChild
 import helium314.keyboard.keyboard.FrostedLiveValues
 import helium314.keyboard.keyboard.KeyboardTheme
 import helium314.keyboard.latin.R
@@ -63,6 +73,7 @@ private data class FrostedSettingsSnapshot(
 
 @Composable
 fun FrostedGlassAdjustDialog(
+    hazeState: HazeState,
     onDismissRequest: () -> Unit
 ) {
     val context = LocalContext.current
@@ -179,9 +190,9 @@ fun FrostedGlassAdjustDialog(
     // 3. The Tab Switch Effect is now handled explicitly in the Tab onClick to prevent "redraw floods"
     // during the unmounting process.
 
-    // 4. The Rollback Mechanism
     DisposableEffect(Unit) {
         onDispose {
+            helium314.keyboard.settings.SettingsActivity.isTopBarHidden = false
             if (!isSaved) {
                 // User cancelled or dismissed! Roll back preferences to the snapshot
                 writeSnapshotToPrefs(initialSnapshot)
@@ -206,6 +217,10 @@ fun FrostedGlassAdjustDialog(
         ) 
     }
     var wallpaperBitmap by remember { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
+
+    LaunchedEffect(wallpaperBitmap) {
+        helium314.keyboard.settings.SettingsActivity.isTopBarHidden = (wallpaperBitmap != null)
+    }
 
     LaunchedEffect(selectedImageUri) {
         if (selectedImageUri != null) {
@@ -242,33 +257,38 @@ fun FrostedGlassAdjustDialog(
         }
     }
 
-    Dialog(
-        onDismissRequest = onDismissRequest,
-        properties = DialogProperties(
-            usePlatformDefaultWidth = false,
-            decorFitsSystemWindows = false
-        )
-    ) {
-        val view = androidx.compose.ui.platform.LocalView.current
-        LaunchedEffect(view) {
-            val window = (view.parent as? androidx.compose.ui.window.DialogWindowProvider)?.window
-            if (window != null) {
-                window.setDimAmount(0f)
-                window.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT))
-                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
-                    window.setFlags(
-                        android.view.WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
-                        android.view.WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
-                    )
-                }
-            }
-        }
+    BackHandler {
+        onDismissRequest()
+    }
 
+    val panelShape = MaterialTheme.shapes.extraLarge
+    val surfaceColor = MaterialTheme.colorScheme.surface
+    val panelTint = remember(surfaceColor) { surfaceColor.copy(alpha = 0.55f) }
+    val dialogHazeStyle = remember(panelTint) {
+        HazeStyle(blurRadius = 18.dp, tint = panelTint)
+    }
+
+    Box(
+        modifier = Modifier.fillMaxSize()
+    ) {
+        // Transparent scrim background capturing clicks outside the panel (no background dimming)
         Box(
-            modifier = Modifier.fillMaxSize()
-        ) {
-            // Full screen background image behind dialog and keyboard
-            if (wallpaperBitmap != null) {
+            modifier = Modifier
+                .fillMaxSize()
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null
+                ) { onDismissRequest() }
+        )
+
+        // Full screen background image behind dialog and keyboard
+        if (wallpaperBitmap != null) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+                    .haze(state = hazeState)
+            ) {
                 Image(
                     bitmap = wallpaperBitmap!!,
                     contentDescription = null,
@@ -276,30 +296,42 @@ fun FrostedGlassAdjustDialog(
                     contentScale = ContentScale.Crop
                 )
             }
+        }
 
-            // Dialog content container
+        // Dialog content container
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .imePadding()
+                .systemBarsPadding(),
+            contentAlignment = Alignment.TopCenter
+        ) {
             Box(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .imePadding()
-                    .systemBarsPadding(),
-                contentAlignment = Alignment.TopCenter
+                    .fillMaxWidth(0.95f)
+                    .wrapContentHeight()
+                    .padding(16.dp)
+                    .clip(panelShape)
+                    .hazeChild(
+                        state = hazeState,
+                        shape = panelShape,
+                        style = dialogHazeStyle
+                    )
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    ) {}
             ) {
-                Surface(
+                Column(
                     modifier = Modifier
-                        .fillMaxWidth(0.95f)
+                        .fillMaxWidth()
                         .wrapContentHeight()
-                        .padding(16.dp),
-                    shape = MaterialTheme.shapes.extraLarge,
-                    color = MaterialTheme.colorScheme.surface,
-                    tonalElevation = 6.dp
                 ) {
                     Column(
                         modifier = Modifier
-                            .padding(24.dp)
-                            .fillMaxWidth()
-                            .wrapContentHeight()
+                            .weight(1f, fill = false)
                             .verticalScroll(rememberScrollState())
+                            .padding(20.dp)
                     ) {
                         Text(
                             text = stringResource(R.string.theme_frosted_glass_settings_header),
@@ -559,12 +591,21 @@ fun FrostedGlassAdjustDialog(
                                 )
                             }
                         }
+                    }
 
-                        Spacer(modifier = Modifier.height(12.dp))
+                    HorizontalDivider(
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f),
+                        thickness = 1.dp
+                    )
 
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 12.dp)
+                    ) {
                         Row(
-                            modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             OutlinedButton(
@@ -607,15 +648,42 @@ fun FrostedGlassAdjustDialog(
                                         resetProfile,
                                         Defaults.PREF_FROSTED_DUST_ENABLED
                                     )
-                                }
+                                },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(44.dp),
+                                shape = RoundedCornerShape(percent = 50),
+                                border = androidx.compose.foundation.BorderStroke(
+                                    1.dp,
+                                    MaterialTheme.colorScheme.outline.copy(alpha = 0.4f)
+                                ),
+                                colors = ButtonDefaults.outlinedButtonColors(
+                                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
                             ) {
-                                Text(stringResource(R.string.button_reset))
+                                Text(
+                                    text = stringResource(R.string.button_reset),
+                                    style = MaterialTheme.typography.labelLarge,
+                                    fontWeight = FontWeight.Medium
+                                )
                             }
 
-                            TextButton(
-                                onClick = onDismissRequest
+                            FilledTonalButton(
+                                onClick = onDismissRequest,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(44.dp),
+                                shape = RoundedCornerShape(percent = 50),
+                                colors = ButtonDefaults.filledTonalButtonColors(
+                                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                    contentColor = MaterialTheme.colorScheme.onSurface
+                                )
                             ) {
-                                Text(stringResource(android.R.string.cancel))
+                                Text(
+                                    text = stringResource(android.R.string.cancel),
+                                    style = MaterialTheme.typography.labelLarge,
+                                    fontWeight = FontWeight.Medium
+                                )
                             }
 
                             Button(
@@ -623,14 +691,22 @@ fun FrostedGlassAdjustDialog(
                                     isSaved = true
                                     writeSnapshotToPrefs(snapshot)
                                     onDismissRequest()
-                                }
+                                },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(44.dp),
+                                shape = RoundedCornerShape(percent = 50),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.primary,
+                                    contentColor = MaterialTheme.colorScheme.onPrimary
+                                )
                             ) {
-                                Text(stringResource(R.string.save))
+                                Text(
+                                    text = stringResource(R.string.save),
+                                    style = MaterialTheme.typography.labelLarge,
+                                    fontWeight = FontWeight.Bold
+                                )
                             }
-                        }
-
-                        LaunchedEffect(Unit) {
-                            focusRequester.requestFocus()
                         }
                     }
                 }

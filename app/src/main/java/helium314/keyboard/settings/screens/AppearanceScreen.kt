@@ -99,24 +99,17 @@ fun AppearanceScreen(
             Settings.PREF_EMOJI_SKIN_TONE else null,
         Settings.PREF_PERSISTENT_EMOJI_ROW,
     )
-    val hazeState = remember { dev.chrisbanes.haze.HazeState() }
-
     androidx.compose.runtime.DisposableEffect(Unit) {
         onDispose {
             helium314.keyboard.settings.SettingsActivity.activeOverlay = null
         }
     }
 
-    androidx.compose.foundation.layout.Box(modifier = androidx.compose.ui.Modifier.fillMaxSize()) {
-        androidx.compose.foundation.layout.Box(modifier = androidx.compose.ui.Modifier.fillMaxSize().haze(state = hazeState)) {
-            SearchSettingsScreen(
-                onClickBack = onClickBack,
-                title = stringResource(R.string.settings_screen_appearance),
-                settings = items
-            )
-        }
-        helium314.keyboard.settings.SettingsActivity.activeOverlay?.invoke(hazeState)
-    }
+    SearchSettingsScreen(
+        onClickBack = onClickBack,
+        title = stringResource(R.string.settings_screen_appearance),
+        settings = items
+    )
 }
 
 fun createAppearanceSettings(context: Context) = listOf(
@@ -387,6 +380,7 @@ fun createAppearanceSettings(context: Context) = listOf(
             onClick = { 
                 helium314.keyboard.settings.SettingsActivity.activeOverlay = { hazeState ->
                     helium314.keyboard.settings.dialogs.FrostedGlassAdjustDialog(
+                        hazeState = hazeState,
                         onDismissRequest = { helium314.keyboard.settings.SettingsActivity.activeOverlay = null }
                     )
                 }

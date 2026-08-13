@@ -27,14 +27,28 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.spring
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.util.VelocityTracker
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.IntOffset
+import kotlin.math.abs
+import kotlin.math.roundToInt
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
@@ -64,6 +78,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.graphics.compositeOver
 import dev.chrisbanes.haze.haze
 import helium314.keyboard.settings.LocalHazeState
 import helium314.keyboard.settings.LocalSearchInnerPadding
@@ -78,8 +93,8 @@ import helium314.keyboard.latin.utils.SubtypeLocaleUtils.displayName
 import helium314.keyboard.latin.utils.SubtypeSettings
 import helium314.keyboard.latin.utils.NextScreenIcon
 import helium314.keyboard.latin.utils.getActivity
-import helium314.keyboard.latin.utils.prefs
 import helium314.keyboard.latin.utils.locale
+import helium314.keyboard.latin.utils.prefs
 import helium314.keyboard.latin.utils.Log
 import helium314.keyboard.settings.SearchSettingsScreen
 import helium314.keyboard.settings.SettingsActivity
@@ -116,16 +131,17 @@ fun MainSettingsScreen(
         hideTopSearchBar = true,
         showBackButton = false,
     ) {
+        val ctx = LocalContext.current
+        val b = (ctx.getActivity() as? SettingsActivity)?.prefChanged?.collectAsState()
+
         val hazeState = LocalHazeState.current
-        val enabledSubtypes = remember { SubtypeSettings.getEnabledSubtypes(true) }
+        val enabledSubtypes = remember(b?.value) { SubtypeSettings.getEnabledSubtypes(true) }
         val enabledSubtypeNames = remember(enabledSubtypes) {
             enabledSubtypes.joinToString(", ") { it.displayName() }
         }
         val showDataGathering = remember {
             JniUtils.sHaveGestureLib && System.currentTimeMillis() < END_DATE_EPOCH_MILLIS + TWO_WEEKS_IN_MILLIS
         }
-        val ctx = LocalContext.current
-        val b = (ctx.getActivity() as? SettingsActivity)?.prefChanged?.collectAsState()
         val telegramJoined = remember(b?.value) {
             ctx.prefs().getBoolean("pref_telegram_joined", false)
         }
@@ -136,6 +152,24 @@ fun MainSettingsScreen(
             contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom)
         ) { innerPadding ->
             val topPadding = LocalSearchInnerPadding.current
+            
+            val isGestureComplete = remember(b?.value) {
+                val gesturePrefs = listOf("pref_gesture_input", "pref_gesture_space_after")
+                gesturePrefs.any { ctx.prefs().getBoolean(it, true) }
+            }
+            val isDictionaryComplete = remember(b?.value) {
+                ctx.prefs().getBoolean("pref_enable_next_word_suggestions", true)
+            }
+            val isCloudComplete = remember(b?.value) {
+                val gem = ctx.prefs().getString("pref_gemini_api_key", "")
+                val kli = ctx.prefs().getString("pref_klipy_api_key", "")
+                !gem.isNullOrBlank() || !kli.isNullOrBlank()
+            }
+            val allStepsComplete = isGestureComplete && isDictionaryComplete && isCloudComplete
+            val isDismissed = remember(b?.value) {
+                ctx.prefs().getBoolean("pref_quick_setup_dismissed", false)
+            }
+
             Box(modifier = Modifier.fillMaxSize().haze(state = hazeState)) {
                 LazyColumn(contentPadding = PaddingValues(top = topPadding.calculateTopPadding(), bottom = innerPadding.calculateBottomPadding())) {
                     item("search_bar") {
@@ -156,12 +190,21 @@ fun MainSettingsScreen(
                         }
                     }
 
-                    item("quick_setup") {
-                        QuickSetupCard(
-                            onClickGestureTyping = onClickGestureTyping,
-                            onClickDictionaries = onClickDictionaries,
-                            onClickCloud = onClickCloud,
-                        )
+                    if (!isDismissed || !allStepsComplete) {
+                        item("quick_setup") {
+                            QuickSetupCard(
+                                onClickGestureTyping = onClickGestureTyping,
+                                onClickDictionaries = onClickDictionaries,
+                                onClickCloud = onClickCloud,
+                                onDismiss = {
+                                    ctx.prefs().edit().putBoolean("pref_quick_setup_dismissed", true).apply()
+                                },
+                                isGestureComplete = isGestureComplete,
+                                isDictionaryComplete = isDictionaryComplete,
+                                isCloudComplete = isCloudComplete,
+                                allStepsComplete = allStepsComplete
+                            )
+                        }
                     }
 
                     item("md3e_general") {
@@ -367,107 +410,185 @@ private fun QuickSetupCard(
     onClickGestureTyping: () -> Unit,
     onClickDictionaries: () -> Unit,
     onClickCloud: () -> Unit,
+    onDismiss: () -> Unit,
+    isGestureComplete: Boolean,
+    isDictionaryComplete: Boolean,
+    isCloudComplete: Boolean,
+    allStepsComplete: Boolean,
 ) {
     val ctx = LocalContext.current
     var isExpanded by remember { mutableStateOf(false) }
-
-    val b = (ctx.getActivity() as? SettingsActivity)?.prefChanged?.collectAsState()
-    val isGestureComplete = remember(b?.value) {
-        val gesturePrefs = listOf("pref_gesture_input", "pref_gesture_space_after")
-        gesturePrefs.any { ctx.prefs().getBoolean(it, true) }
-    }
-    val isDictionaryComplete = remember(b?.value) {
-        ctx.prefs().getBoolean("pref_enable_next_word_suggestions", true)
-    }
-    val isCloudComplete = remember(b?.value) {
-        val gem = ctx.prefs().getString("pref_gemini_api_key", "")
-        val kli = ctx.prefs().getString("pref_klipy_api_key", "")
-        !gem.isNullOrBlank() || !kli.isNullOrBlank()
-    }
-    val allStepsComplete = isGestureComplete && isDictionaryComplete && isCloudComplete
+    val coroutineScope = rememberCoroutineScope()
 
     val accentColor = if (allStepsComplete) Color(0xFF4CAF50) else MaterialTheme.colorScheme.primary
+    val baseCardColor = MaterialTheme.colorScheme.surfaceVariant
+    val opaqueContainerColor = if (allStepsComplete) Color(0xFF4CAF50).copy(alpha = 0.15f).compositeOver(baseCardColor) else baseCardColor
 
-    Card(
-        colors = CardDefaults.cardColors(
-            containerColor = if (allStepsComplete) Color(0xFF4CAF50).copy(alpha = 0.1f) else MaterialTheme.colorScheme.surfaceVariant
-        ),
+    val offsetX = remember { Animatable(0f) }
+    var cardWidth by remember { mutableStateOf(0f) }
+    val dismissThreshold = cardWidth * 0.4f
+
+    Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(16.dp)
-            .clip(CardDefaults.shape)
-            .clickable { isExpanded = !isExpanded }
+            .padding(vertical = 8.dp)
+            .onSizeChanged { cardWidth = it.width.toFloat() }
     ) {
-        Column(
+        val absoluteOffset = abs(offsetX.value)
+        val isSwiping = absoluteOffset > 0f
+
+        if (isSwiping) {
+            val isSwipingLeft = offsetX.value < 0
+            val alignment = if (isSwipingLeft) Alignment.CenterEnd else Alignment.CenterStart
+            val revealWidth = with(LocalDensity.current) { absoluteOffset.toDp() }
+            // To ensure no gap between the cards, we can stretch the reveal card slightly wider
+            val extraOverlap = 20.dp
+            
+            // Dynamic corner radius: starts as pill (height/2), then blends to match card corners (12dp) on the inner edge
+            // Material Card default corner radius is typically 12dp.
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .padding(horizontal = 16.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .align(alignment)
+                        .width(revealWidth + extraOverlap)
+                        .fillMaxHeight()
+                        .clip(RoundedCornerShape(
+                            topStart = if (isSwipingLeft) 50.dp else 12.dp,
+                            bottomStart = if (isSwipingLeft) 50.dp else 12.dp,
+                            topEnd = if (!isSwipingLeft) 50.dp else 12.dp,
+                            bottomEnd = if (!isSwipingLeft) 50.dp else 12.dp
+                        ))
+                        .background(MaterialTheme.colorScheme.primaryContainer),
+                    contentAlignment = alignment
+                ) {
+                    val iconPadding = 24.dp
+                    Box(modifier = Modifier.padding(horizontal = iconPadding)) {
+                        Text(
+                            text = "check",
+                            fontFamily = materialSymbols,
+                            fontSize = 28.sp,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.scale(minOf(1f, absoluteOffset / 150f))
+                        )
+                    }
+                }
+            }
+        }
+
+        Card(
+            colors = CardDefaults.cardColors(
+                containerColor = opaqueContainerColor
+            ),
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp)
+                .padding(horizontal = 16.dp)
+                .offset { IntOffset(offsetX.value.roundToInt(), 0) }
+                .clip(CardDefaults.shape)
+                .clickable { isExpanded = !isExpanded }
+                .pointerInput(allStepsComplete) {
+                    if (!allStepsComplete) return@pointerInput
+                    val velocityTracker = VelocityTracker()
+                    detectHorizontalDragGestures(
+                        onDragEnd = {
+                            val velocity = velocityTracker.calculateVelocity().x
+                            coroutineScope.launch {
+                                if (abs(offsetX.value) > dismissThreshold || abs(velocity) > 800f) {
+                                    val target = if (offsetX.value > 0) cardWidth else -cardWidth
+                                    offsetX.animateTo(target, spring(stiffness = 200f))
+                                    onDismiss()
+                                } else {
+                                    offsetX.animateTo(0f, spring(dampingRatio = 0.8f, stiffness = 400f))
+                                }
+                            }
+                        },
+                        onDragCancel = {
+                            coroutineScope.launch { offsetX.animateTo(0f, spring(dampingRatio = 0.8f, stiffness = 400f)) }
+                        },
+                        onHorizontalDrag = { change, dragAmount ->
+                            change.consume()
+                            velocityTracker.addPosition(change.uptimeMillis, change.position)
+                            coroutineScope.launch {
+                                offsetX.snapTo(offsetX.value + dragAmount)
+                            }
+                        }
+                    )
+                }
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .padding(16.dp)
             ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                ) {
+                    Text(
+                        text = "check_circle",
+                        fontFamily = materialSymbols,
+                        fontSize = 24.sp,
+                        color = accentColor
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(
+                        text = if (allStepsComplete) "Setup is complete!" else stringResource(R.string.quick_setup_title),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = accentColor,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Text(
+                        text = "expand_more",
+                        fontFamily = materialSymbols,
+                        fontSize = 24.sp,
+                        color = accentColor,
+                        modifier = Modifier.rotate(if (isExpanded) 180f else 0f)
+                    )
+                }
+                Spacer(modifier = Modifier.height(6.dp))
                 Text(
-                    text = "check_circle",
-                    fontFamily = materialSymbols,
-                    fontSize = 24.sp,
-                    color = accentColor
+                    text = if (allStepsComplete) "All essential settings have been successfully configured." else stringResource(R.string.quick_setup_desc),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                Spacer(modifier = Modifier.width(12.dp))
-                Text(
-                    text = if (allStepsComplete) "Setup is complete!" else stringResource(R.string.quick_setup_title),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = accentColor,
-                    modifier = Modifier.weight(1f)
-                )
-                Text(
-                    text = "expand_more",
-                    fontFamily = materialSymbols,
-                    fontSize = 24.sp,
-                    color = accentColor,
-                    modifier = Modifier.rotate(if (isExpanded) 180f else 0f)
-                )
-            }
-            Spacer(modifier = Modifier.height(6.dp))
-            Text(
-                text = if (allStepsComplete) "All essential settings have been successfully configured." else stringResource(R.string.quick_setup_desc),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
 
-            AnimatedVisibility(
-                visible = isExpanded,
-                enter = expandVertically() + fadeIn(),
-                exit = shrinkVertically() + fadeOut()
-            ) {
-                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Spacer(modifier = Modifier.height(12.dp))
+                AnimatedVisibility(
+                    visible = isExpanded,
+                    enter = expandVertically() + fadeIn(),
+                    exit = shrinkVertically() + fadeOut()
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Spacer(modifier = Modifier.height(12.dp))
 
-                    QuickSetupStep(
-                        icon = "gesture",
-                        title = stringResource(R.string.quick_setup_gesture_title),
-                        description = stringResource(R.string.quick_setup_gesture_desc),
-                        onClick = onClickGestureTyping,
-                        isComplete = isGestureComplete,
-                        isFirst = true
-                    )
-                    QuickSetupStep(
-                        icon = "dictionary",
-                        title = stringResource(R.string.quick_setup_dict_title),
-                        description = stringResource(R.string.quick_setup_dict_desc),
-                        onClick = onClickDictionaries,
-                        isComplete = isDictionaryComplete,
-                    )
-                    QuickSetupStep(
-                        icon = "cloud",
-                        title = stringResource(R.string.quick_setup_cloud_title),
-                        description = stringResource(R.string.quick_setup_cloud_desc),
-                        onClick = onClickCloud,
-                        isComplete = isCloudComplete,
-                        isLast = true
-                    )
+                        QuickSetupStep(
+                            icon = "gesture",
+                            title = stringResource(R.string.quick_setup_gesture_title),
+                            description = stringResource(R.string.quick_setup_gesture_desc),
+                            onClick = onClickGestureTyping,
+                            isComplete = isGestureComplete,
+                            isFirst = true
+                        )
+                        QuickSetupStep(
+                            icon = "dictionary",
+                            title = stringResource(R.string.quick_setup_dict_title),
+                            description = stringResource(R.string.quick_setup_dict_desc),
+                            onClick = onClickDictionaries,
+                            isComplete = isDictionaryComplete,
+                        )
+                        QuickSetupStep(
+                            icon = "cloud",
+                            title = stringResource(R.string.quick_setup_cloud_title),
+                            description = stringResource(R.string.quick_setup_cloud_desc),
+                            onClick = onClickCloud,
+                            isComplete = isCloudComplete,
+                            isLast = true
+                        )
+                    }
                 }
             }
         }
