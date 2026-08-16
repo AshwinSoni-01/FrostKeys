@@ -61,7 +61,14 @@ fun CloudScreen(onClickBack: () -> Unit) {
         Scaffold(
             contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom)
         ) { innerPadding ->
-            Box(modifier = Modifier.fillMaxSize().haze(state = hazeState)) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .then(
+                        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) Modifier.haze(state = hazeState)
+                        else Modifier
+                    )
+            ) {
                 Column(
                     modifier = Modifier
                         .fillMaxSize()

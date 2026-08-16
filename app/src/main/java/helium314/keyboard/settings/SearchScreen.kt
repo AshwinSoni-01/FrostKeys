@@ -178,6 +178,7 @@ fun <T: Any?> SearchScreen(
     var searchText by remember { mutableStateOf(TextFieldValue()) }
     var showSearch by remember { mutableStateOf(false) }
     val hazeState = remember { HazeState() }
+    val isBlurSupported = remember { android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S }
     val ctx = LocalContext.current
 
     fun setShowSearch(value: Boolean) {
@@ -241,12 +242,20 @@ fun <T: Any?> SearchScreen(
                         exit = fadeOut(animationSpec = tween(350)) + slideOutVertically(targetOffsetY = { -it }, animationSpec = tween(350))
                     ) {
                     Box {
-                        Box(
-                            modifier = Modifier
-                                .matchParentSize()
-                                .graphicsLayer { alpha = scrollBehavior.state.collapsedFraction }
-                                .hazeChild(state = hazeState, style = topBarHazeStyle)
-                        )
+                        if (isBlurSupported) {
+                            Box(
+                                modifier = Modifier
+                                    .matchParentSize()
+                                    .graphicsLayer { alpha = scrollBehavior.state.collapsedFraction }
+                                    .hazeChild(state = hazeState, style = topBarHazeStyle)
+                            )
+                        } else {
+                            Box(
+                                modifier = Modifier
+                                    .matchParentSize()
+                                    .background(topBarBg)
+                            )
+                        }
                         Column(
                             modifier = Modifier.layout { measurable, constraints ->
                                 val fraction = scrollBehavior.state.collapsedFraction
@@ -350,8 +359,13 @@ fun <T: Any?> SearchScreen(
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
-                                .haze(state = hazeState)
+                                .then(
+                                    if (isBlurSupported) {
+                                        Modifier
+                                            .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+                                            .haze(state = hazeState)
+                                    } else Modifier
+                                )
                         ) {
                             Column(modifier = contentModifier) {
                                 content()
@@ -367,8 +381,13 @@ fun <T: Any?> SearchScreen(
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
-                                .haze(state = hazeState)
+                                .then(
+                                    if (isBlurSupported) {
+                                        Modifier
+                                            .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+                                            .haze(state = hazeState)
+                                    } else Modifier
+                                )
                         ) {
                             LazyColumn(
                                 contentPadding = androidx.compose.foundation.layout.PaddingValues(

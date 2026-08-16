@@ -888,26 +888,42 @@ private fun createCenterCroppedDrawable(
     targetHeight: Int,
     resources: android.content.res.Resources
 ): Drawable {
-    val srcBitmap = (drawable as? android.graphics.drawable.BitmapDrawable)?.bitmap ?: drawable.toBitmap()
+    if (targetWidth <= 0 || targetHeight <= 0) return NoIntrinsicSizeDrawable(drawable)
+
+    // Non-bitmap drawables (e.g. GradientDrawable for Holo theme, ColorDrawable) scale vectorially without bitmap cropping
+    val bitmapDrawable = when (drawable) {
+        is android.graphics.drawable.BitmapDrawable -> drawable
+        is NoIntrinsicSizeDrawable -> null
+        else -> null
+    } ?: return NoIntrinsicSizeDrawable(drawable)
+
+    val srcBitmap = bitmapDrawable.bitmap ?: return NoIntrinsicSizeDrawable(drawable)
+    if (srcBitmap.isRecycled) return NoIntrinsicSizeDrawable(drawable)
+
     val srcWidth = srcBitmap.width.toFloat()
     val srcHeight = srcBitmap.height.toFloat()
     if (srcWidth <= 0f || srcHeight <= 0f) return NoIntrinsicSizeDrawable(drawable)
 
-    val scale = maxOf(targetWidth.toFloat() / srcWidth, targetHeight.toFloat() / srcHeight)
-    val scaledWidth = srcWidth * scale
-    val scaledHeight = srcHeight * scale
-    val dx = (targetWidth - scaledWidth) / 2f
-    val dy = (targetHeight - scaledHeight) / 2f
+    return try {
+        val scale = maxOf(targetWidth.toFloat() / srcWidth, targetHeight.toFloat() / srcHeight)
+        val scaledWidth = srcWidth * scale
+        val scaledHeight = srcHeight * scale
+        val dx = (targetWidth - scaledWidth) / 2f
+        val dy = (targetHeight - scaledHeight) / 2f
 
-    val outputBitmap = android.graphics.Bitmap.createBitmap(targetWidth, targetHeight, android.graphics.Bitmap.Config.ARGB_8888)
-    val canvas = android.graphics.Canvas(outputBitmap)
-    val matrix = android.graphics.Matrix().apply {
-        postScale(scale, scale)
-        postTranslate(dx, dy)
+        val outputBitmap = android.graphics.Bitmap.createBitmap(targetWidth, targetHeight, android.graphics.Bitmap.Config.ARGB_8888)
+        val canvas = android.graphics.Canvas(outputBitmap)
+        val matrix = android.graphics.Matrix().apply {
+            postScale(scale, scale)
+            postTranslate(dx, dy)
+        }
+        val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG or android.graphics.Paint.FILTER_BITMAP_FLAG)
+        canvas.drawBitmap(srcBitmap, matrix, paint)
+
+        val croppedDrawable = android.graphics.drawable.BitmapDrawable(resources, outputBitmap)
+        NoIntrinsicSizeDrawable(croppedDrawable)
+    } catch (e: Throwable) {
+        NoIntrinsicSizeDrawable(drawable)
     }
-    val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG or android.graphics.Paint.FILTER_BITMAP_FLAG)
-    canvas.drawBitmap(srcBitmap, matrix, paint)
-
-    val bitmapDrawable = android.graphics.drawable.BitmapDrawable(resources, outputBitmap)
-    return NoIntrinsicSizeDrawable(bitmapDrawable)
 }
+

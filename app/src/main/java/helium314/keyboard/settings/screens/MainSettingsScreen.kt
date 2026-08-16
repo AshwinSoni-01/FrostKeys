@@ -170,7 +170,14 @@ fun MainSettingsScreen(
                 ctx.prefs().getBoolean("pref_quick_setup_dismissed", false)
             }
 
-            Box(modifier = Modifier.fillMaxSize().haze(state = hazeState)) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .then(
+                        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) Modifier.haze(state = hazeState)
+                        else Modifier
+                    )
+            ) {
                 LazyColumn(contentPadding = PaddingValues(top = topPadding.calculateTopPadding(), bottom = innerPadding.calculateBottomPadding())) {
                     item("search_bar") {
                         val searchState = LocalSearchState.current

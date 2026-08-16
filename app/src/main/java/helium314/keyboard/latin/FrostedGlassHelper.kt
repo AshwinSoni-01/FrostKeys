@@ -141,7 +141,7 @@ object FrostedGlassHelper {
 
                 // Select candidates
                 val unavailable = setOf("BLUR_MODE_WINDOW_CAPTURED", "BLUR_MODE_CAPTURED")
-                val preferred = listOf("BLUR_MODE_CANVAS", "BLUR_MODE_BACKGROUND", "BLUR_MODE_WINDOW")
+                val preferred = listOf("BLUR_MODE_WINDOW", "BLUR_MODE_BACKGROUND", "BLUR_MODE_CANVAS")
 
                 val preferredModes = preferred.mapNotNull { name -> distinctModes.firstOrNull { it.name == name } }
                 val remainingModes = distinctModes.filter { it.name !in preferred && it.name !in unavailable }
@@ -197,6 +197,8 @@ object FrostedGlassHelper {
 
     @JvmStatic
     fun isFrostedTheme(context: Context): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return false
+        if (isKnownFrostedGlassBlurUnsupportedDevice()) return false
         val prefs = context.prefs()
         var isNight = SettingsActivity.forceNight
             ?: (ResourceUtils.isNight(context.resources) && prefs.getBoolean(Settings.PREF_THEME_DAY_NIGHT, Defaults.PREF_THEME_DAY_NIGHT))
@@ -267,6 +269,11 @@ object FrostedGlassHelper {
             if (!hadAppliedFrostedGlass && !hadDefaultBlurEnabled && !hasNativeBlurFlag(window)) {
                 cancelPendingNativeBlurCleanup(nativeState)
                 clearNativeBlurReady(nativeState)
+                if (shouldTrySamsungBlur) {
+                    clearSamsungSemBlur(inputView?.findViewById(R.id.main_keyboard_frame))
+                    if (inputView != null) clearSamsungSemBlur(inputView)
+                    applySamsungLegacyBlur(window, false)
+                }
                 return
             }
 
@@ -413,9 +420,12 @@ object FrostedGlassHelper {
         inputView?.setBackgroundColor(Color.TRANSPARENT)
 
         if (!enable) {
-            val cleared = clearSamsungSemBlur(target)
+            clearSamsungSemBlur(inputView?.findViewById(R.id.main_keyboard_frame))
+            if (inputView != null) {
+                clearSamsungSemBlur(inputView)
+            }
             restoreFrostedThemeBackground(context, inputView)
-            return cleared
+            return true
         }
 
         if (target == null) {
@@ -480,11 +490,13 @@ object FrostedGlassHelper {
             val cornerRadiusPx = Settings.readKeyboardCornerRadius(context.prefs()) * context.resources.displayMetrics.density
 
             if (usePreset) {
-                SemBlurInfoReflect.setColorCurvePresetMethod!!.invoke(builder, samsungBlurPreset(context))
+                SemBlurInfoReflect.setColorCurvePresetMethod?.invoke(builder, samsungBlurPreset(context))
             } else {
                 SemBlurInfoReflect.setRadiusMethod?.invoke(builder, blurRadius(context))
             }
-            SemBlurInfoReflect.setBackgroundColorMethod?.invoke(builder, tint)
+            if (mode.name != "BLUR_MODE_CANVAS") {
+                SemBlurInfoReflect.setBackgroundColorMethod?.invoke(builder, tint)
+            }
             SemBlurInfoReflect.setBackgroundCornerRadiusMethod?.invoke(builder, cornerRadiusPx)
 
             val blurInfo = SemBlurInfoReflect.buildMethod!!.invoke(builder)

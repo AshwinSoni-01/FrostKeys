@@ -286,8 +286,13 @@ fun FrostedGlassAdjustDialog(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
-                    .haze(state = hazeState)
+                    .then(
+                        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                            Modifier
+                                .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+                                .haze(state = hazeState)
+                        } else Modifier
+                    )
             ) {
                 Image(
                     bitmap = wallpaperBitmap!!,
@@ -312,10 +317,16 @@ fun FrostedGlassAdjustDialog(
                     .wrapContentHeight()
                     .padding(16.dp)
                     .clip(panelShape)
-                    .hazeChild(
-                        state = hazeState,
-                        shape = panelShape,
-                        style = dialogHazeStyle
+                    .then(
+                        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                            Modifier.hazeChild(
+                                state = hazeState,
+                                shape = panelShape,
+                                style = dialogHazeStyle
+                            )
+                        } else {
+                            Modifier.background(surfaceColor)
+                        }
                     )
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },

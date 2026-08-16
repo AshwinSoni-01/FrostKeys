@@ -105,7 +105,7 @@ private constructor(val themeId: Int, @JvmField val mStyleId: Int) {
         fun getAvailableDefaultColors(prefs: SharedPreferences, isNight: Boolean) = listOfNotNull(
             if (!isNight) THEME_LIGHT else null, THEME_DARK,
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) THEME_DYNAMIC else null,
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) THEME_FROSTED_GLASS else null,
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !helium314.keyboard.latin.FrostedGlassHelper.isKnownFrostedGlassBlurUnsupportedDevice()) THEME_FROSTED_GLASS else null,
             if (prefs.getString(Settings.PREF_THEME_STYLE, Defaults.PREF_THEME_STYLE) == STYLE_HOLO) THEME_HOLO_WHITE else null,
             THEME_DARKER,
             THEME_BLACK,
@@ -183,6 +183,8 @@ private constructor(val themeId: Int, @JvmField val mStyleId: Int) {
             else
                 prefs.getString(Settings.PREF_THEME_COLORS, Defaults.PREF_THEME_COLORS)
             val themeStyle = prefs.getString(Settings.PREF_THEME_STYLE, Defaults.PREF_THEME_STYLE)
+            val hasBorders = prefs.getBoolean(Settings.PREF_THEME_KEY_BORDERS, Defaults.PREF_THEME_KEY_BORDERS)
+            helium314.keyboard.latin.utils.Log.i("KeyboardTheme", "Active theme: colors=$themeName, style=$themeStyle, hasBorders=$hasBorders, isNight=$isNight")
 
             return getThemeColors(themeName!!, themeStyle!!, context, prefs, isNight)
         }

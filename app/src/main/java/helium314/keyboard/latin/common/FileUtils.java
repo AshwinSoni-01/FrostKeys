@@ -61,8 +61,12 @@ public class FileUtils {
         final boolean[] allOk = new boolean[] { true };
         final CountDownLatch wait = new CountDownLatch(1);
         ExecutorUtils.getBackgroundExecutor(ExecutorUtils.KEYBOARD).execute(() -> {
-            try {
-                copyStreamToNewFile(context.getContentResolver().openInputStream(uri), outfile);
+            try (final InputStream in = context.getContentResolver().openInputStream(uri)) {
+                if (in == null) {
+                    allOk[0] = false;
+                } else {
+                    copyStreamToNewFile(in, outfile);
+                }
             } catch (IOException e) {
                 allOk[0] = false;
             } finally {
@@ -83,9 +87,9 @@ public class FileUtils {
         if (parentFile == null || (!parentFile.exists() && !parentFile.mkdirs())) {
             throw new IOException("could not create parent folder");
         }
-        FileOutputStream out = new FileOutputStream(outfile);
-        copyStreamToOtherStream(in, out);
-        out.close();
+        try (FileOutputStream out = new FileOutputStream(outfile)) {
+            copyStreamToOtherStream(in, out);
+        }
     }
 
     public static void copyStreamToOtherStream(final InputStream in, final OutputStream out) throws IOException {

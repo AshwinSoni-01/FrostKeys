@@ -269,11 +269,12 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
     @OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalFoundationApi::class)
     private fun setupComposePinnedKeys() {
         val owner = ComposeLifecycleOwner()
+        owner.start()
         composeLifecycleOwner = owner
         pinnedKeys.setViewTreeLifecycleOwner(owner)
         pinnedKeys.setViewTreeSavedStateRegistryOwner(owner)
         pinnedKeys.setViewTreeViewModelStoreOwner(owner)
-        pinnedKeys.setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
+        pinnedKeys.setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnLifecycleDestroyed(owner))
         pinnedKeys.setContent {
             val slots by slotsState
             val draggingKey by draggingKeyInComposeState
@@ -666,14 +667,16 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
             setViewTreeViewModelStoreOwner(latinIME)
         }
         super.onAttachedToWindow()
-        composeLifecycleOwner?.start()
+        if (composeLifecycleOwner == null) {
+            setupComposePinnedKeys()
+        } else {
+            composeLifecycleOwner?.start()
+        }
     }
 
     override fun onDetachedFromWindow() {
         super.onDetachedFromWindow()
         composeLifecycleOwner?.stop()
-        composeLifecycleOwner?.destroy()
-        composeLifecycleOwner = null
         dismissMoreSuggestionsPanel()
     }
 

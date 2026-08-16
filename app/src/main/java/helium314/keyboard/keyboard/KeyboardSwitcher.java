@@ -483,10 +483,10 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
             return;
         }
         mResizeModeActive = true;
+        suspendResizeOverlayBlur();
         setResizeModeFrostedTint(true);
         setAlphabetKeyboard();
         if (mKeyboardResizeOverlay != null) {
-            suspendResizeOverlayBlur();
             if (mMainKeyboardFrame != null) {
                 mMainKeyboardFrame.setOutlineProvider(mResizeOverlayOutlineProvider);
                 mMainKeyboardFrame.setClipToOutline(true);
@@ -626,7 +626,7 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
         }
         final helium314.keyboard.latin.common.Colors colors = KeyboardTheme
                 .getColorsForCurrentTheme(mCurrentInputView.getContext());
-        if (enabled && mMainKeyboardFrame.getBackground() != null) {
+        if (enabled) {
             final int washColor = KeyboardTheme.isDarkThemeActive(mCurrentInputView.getContext())
                     ? android.graphics.Color.BLACK
                     : android.graphics.Color.WHITE;
@@ -637,10 +637,21 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
             final int tintColor = ColorUtils.setAlphaComponent(
                     adjustedTintColor,
                     RESIZE_MODE_FROSTED_TINT_ALPHA);
-            mMainKeyboardFrame.getBackground().setColorFilter(
-                    BlendModeColorFilterCompat.createBlendModeColorFilterCompat(
-                            tintColor,
-                            BlendModeCompat.MODULATE));
+            final Drawable bg = mMainKeyboardFrame.getBackground();
+            boolean filterApplied = false;
+            if (bg != null && !"BackgroundBlurDrawable".equals(bg.getClass().getSimpleName())) {
+                try {
+                    bg.setColorFilter(
+                            BlendModeColorFilterCompat.createBlendModeColorFilterCompat(
+                                    tintColor,
+                                    BlendModeCompat.MODULATE));
+                    filterApplied = true;
+                } catch (Throwable ignored) {
+                }
+            }
+            if (!filterApplied) {
+                mMainKeyboardFrame.setBackgroundColor(tintColor);
+            }
         } else {
             colors.setBackground(mMainKeyboardFrame,
                     helium314.keyboard.latin.common.ColorType.MAIN_BACKGROUND);
