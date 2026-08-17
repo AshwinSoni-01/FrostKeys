@@ -141,6 +141,10 @@ fun SearchSettingsScreen(
                                     bottom = innerPadding.calculateBottomPadding()
                                 )
                         ) {
+                            val searchState = LocalSearchState.current
+                            if (searchState != null) {
+                                searchState.searchField()
+                            }
                             settings.forEach {
                                 if (it is Int) {
                                     PreferenceCategory(stringResource(it))
@@ -395,12 +399,10 @@ fun <T: Any?> SearchScreen(
                                     bottom = innerPadding2.calculateBottomPadding()
                                 )
                             ) {
-                                if (content != null) {
-                                    item {
-                                        val searchState = LocalSearchState.current
-                                        if (searchState != null) {
-                                            searchState.searchField()
-                                        }
+                                item {
+                                    val searchState = LocalSearchState.current
+                                    if (searchState != null) {
+                                        searchState.searchField()
                                     }
                                 }
                                 if (itemKey == null) {

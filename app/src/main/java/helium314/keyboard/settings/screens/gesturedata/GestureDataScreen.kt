@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import dev.chrisbanes.haze.haze
 import helium314.keyboard.settings.LocalHazeState
 import helium314.keyboard.settings.LocalSearchInnerPadding
+import helium314.keyboard.settings.LocalSearchState
 import helium314.keyboard.settings.SearchSettingsScreen
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -387,13 +388,17 @@ fun GestureDataScreen(
                 Column(
                     modifier = Modifier
                         .verticalScroll(scrollState)
-                        .padding(horizontal = 12.dp)
                         .padding(
                             top = topPadding.calculateTopPadding(),
                             bottom = innerPadding.calculateBottomPadding()
                         ),
                 ) {
-                    var showInfoDialog by remember { mutableStateOf(false) }
+                    val searchState = LocalSearchState.current
+                    if (searchState != null) {
+                        searchState.searchField()
+                    }
+                    Column(modifier = Modifier.padding(horizontal = 12.dp)) {
+                        var showInfoDialog by remember { mutableStateOf(false) }
                     var showPrivacyDialog by remember { mutableStateOf(false) }
                     if (maybeNotEnoughSpace) {
                         val top = with(LocalDensity.current) { WindowInsets.statusBars.getTop(this).toDp() }
@@ -438,7 +443,8 @@ fun GestureDataScreen(
                         InfoDialog(stringResource(R.string.gesture_data_description_privacy)) { showPrivacyDialog = false }
                     if (showActiveInfoDialog)
                         InfoDialog(AnnotatedString.fromHtml(stringResource(R.string.gesture_data_active_description, Links.DICTIONARY_URL))) { showActiveInfoDialog = false }
-                    Spacer(Modifier.height(12.dp))
+                        Spacer(Modifier.height(12.dp))
+                    }
                 }
             }
         }

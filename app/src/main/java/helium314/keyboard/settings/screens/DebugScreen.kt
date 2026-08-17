@@ -3,6 +3,7 @@ package helium314.keyboard.settings.screens
 
 import android.content.Context
 import android.content.Intent
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Surface
@@ -19,6 +20,8 @@ import helium314.keyboard.latin.define.DebugFlags
 import helium314.keyboard.latin.settings.DebugSettings
 import helium314.keyboard.latin.settings.Defaults
 import helium314.keyboard.latin.utils.prefs
+import helium314.keyboard.settings.LocalSearchInnerPadding
+import helium314.keyboard.settings.LocalSearchState
 import helium314.keyboard.settings.Setting
 import helium314.keyboard.settings.preferences.Preference
 import helium314.keyboard.settings.SearchSettingsScreen
@@ -57,8 +60,17 @@ fun DebugScreen(
         title = stringResource(R.string.debug_settings_title),
         settings = emptyList()
     ) {
+        val topPadding = LocalSearchInnerPadding.current
         // the preferences are not in SettingsContainer, so set content instead
-        LazyColumn {
+        LazyColumn(
+            contentPadding = PaddingValues(top = topPadding.calculateTopPadding())
+        ) {
+            item("search_bar") {
+                val searchState = LocalSearchState.current
+                if (searchState != null) {
+                    searchState.searchField()
+                }
+            }
             items(items, key = { it }) { item ->
                 if (item is Int) PreferenceCategory(stringResource(item))
                 else settings.first { it.key == item }.Preference()

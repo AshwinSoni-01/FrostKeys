@@ -83,6 +83,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import dev.chrisbanes.haze.haze
 import helium314.keyboard.settings.LocalHazeState
 import helium314.keyboard.settings.LocalSearchInnerPadding
+import helium314.keyboard.settings.LocalSearchState
 import helium314.keyboard.settings.SearchScreen
 import helium314.keyboard.settings.SettingsActivity
 import helium314.keyboard.latin.utils.Theme
@@ -169,14 +170,21 @@ fun SubtypeScreen(
                 Column(
                     modifier = Modifier
                         .verticalScroll(scrollState)
-                        .padding(horizontal = 12.dp)
                         .padding(
                             top = topPadding.calculateTopPadding(),
                             bottom = innerPadding.calculateBottomPadding()
                         ),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                MainLayoutRow(currentSubtype, customMainLayouts) { setCurrentSubtype(it) }
+                    val searchState = LocalSearchState.current
+                    if (searchState != null) {
+                        searchState.searchField()
+                    }
+                    Column(
+                        modifier = Modifier.padding(horizontal = 12.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        MainLayoutRow(currentSubtype, customMainLayouts) { setCurrentSubtype(it) }
                 if (availableLocalesForScript.size > 1) {
                     WithSmallTitle(stringResource(R.string.secondary_locale)) {
                         ActionRow(onClick = { showSecondaryLocaleDialog = true }) {
@@ -307,6 +315,7 @@ fun SubtypeScreen(
                                     isNameValid = null
                                 )
                         }
+                    }
                     }
                 }
             }

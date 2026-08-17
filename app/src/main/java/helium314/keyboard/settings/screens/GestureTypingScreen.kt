@@ -49,6 +49,8 @@ import helium314.keyboard.latin.utils.Log
 import helium314.keyboard.latin.utils.getActivity
 import helium314.keyboard.latin.utils.prefs
 import helium314.keyboard.latin.utils.protectedPrefs
+import helium314.keyboard.settings.LocalSearchInnerPadding
+import helium314.keyboard.settings.LocalSearchState
 import helium314.keyboard.settings.Setting
 import helium314.keyboard.settings.SearchSettingsScreen
 import helium314.keyboard.settings.SettingsActivity
@@ -152,18 +154,29 @@ fun GestureLibrarySetupGuide() {
         }
     }
 
+    val topPadding = LocalSearchInnerPadding.current
     Column(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(16.dp),
+            .padding(
+                top = topPadding.calculateTopPadding(),
+                bottom = 16.dp
+            ),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
+        val searchState = LocalSearchState.current
+        if (searchState != null) {
+            searchState.searchField()
+        }
+
         Card(
             colors = CardDefaults.cardColors(
                 containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
             ),
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Row(
@@ -193,7 +206,9 @@ fun GestureLibrarySetupGuide() {
         }
 
         Card(
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(
@@ -220,7 +235,9 @@ fun GestureLibrarySetupGuide() {
         }
 
         Card(
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(

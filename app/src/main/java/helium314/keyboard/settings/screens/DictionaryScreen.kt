@@ -68,6 +68,7 @@ import dev.chrisbanes.haze.haze
 import helium314.keyboard.settings.LocalHazeState
 import androidx.compose.foundation.layout.PaddingValues
 import helium314.keyboard.settings.LocalSearchInnerPadding
+import helium314.keyboard.settings.LocalSearchState
 
 @Composable
 fun DictionaryScreen(
@@ -146,8 +147,14 @@ fun DictionaryScreen(
                         bottom = innerPadding.calculateBottomPadding()
                     )
                 ) {
-                item {
-                    Card(
+                    item("search_bar") {
+                        val searchState = LocalSearchState.current
+                        if (searchState != null) {
+                            searchState.searchField()
+                        }
+                    }
+                    item {
+                        Card(
                         colors = CardDefaults.cardColors(
                             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
                         ),
