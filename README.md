@@ -103,8 +103,6 @@ If you love using FrostKeys and want to support ongoing development, maintenance
 
 [<img src="https://img.shields.io/badge/Sponsor-%E2%9D%A4-ea4aaa?style=for-the-badge&logo=github-sponsors&logoColor=white" alt="Sponsor on GitHub" height="35">](https://github.com/sponsors/AshwinSoni-01)
 
-* **GitHub Sponsors:** [Sponsor @AshwinSoni-01 on GitHub](https://github.com/sponsors/AshwinSoni-01)
-
 ---
 
 ### Support HeliBoard
