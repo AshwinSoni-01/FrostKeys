@@ -6,6 +6,20 @@
 
 FrostKeys takes the privacy-focused foundation of HeliBoard and adds modern, high-performance features for users who want more from their keyboard without sacrificing their data.
 
+> [!NOTE]
+> ### 🚀 Distribution & Availability
+> **FrostKeys is transitioning to official distribution via Google Play Store.**
+> * **Closed Beta:** Currently underway (all tester slots are currently full).
+> * **Public Launch:** Will be available directly on Google Play Store upon completing the closed testing phase.
+> * **GitHub Releases:** Pre-compiled standalone APK binaries are no longer hosted here. In full compliance with the GPL v3.0 license, the complete source code remains open in this repository for local compilation and inspection.
+>
+> ⚠️ **Important Security Notice**
+> 
+> **Avoid Sideloading Unofficial Builds & Extracted APKs**
+> 
+> A keyboard app handles your most sensitive inputs such as passwords, private messages, and personal credentials. Sideloading forwarded APKs or unofficial builds from third party channels carries high risks of tampering and keylogging injection. Only official builds on Google Play Store carry verified developer signatures and receive direct bug/security updates.
+> 
+> So please consider getting the app only from the official source, and wait for the full store release. 
 ---
 
 ## 📸 Screenshots
