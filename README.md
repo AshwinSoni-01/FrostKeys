@@ -95,6 +95,24 @@ FrostKeys embraces Google's latest **Material Design 3 Expressive** design langu
 
 ---
 
+## 🛠️ Tech Stack
+
+| Category | Technology |
+| :--- | :--- |
+| **Languages** | [Kotlin](https://kotlinlang.org/) + [Java](https://dev.java/) + [C/C++ (NDK)](https://developer.android.com/ndk) |
+| **UI Framework** | [Jetpack Compose](https://developer.android.com/compose) + Android View System |
+| **Design System** | [Material Design 3](https://m3.material.io/) + Custom Frosted Glass Engine |
+| **Glassmorphism / Blur** | [Haze](https://github.com/chrisbanes/haze) + `RenderEffect` |
+| **AI Engine** | [Google Gemini API](https://ai.google.dev/) |
+| **Media & GIF Engine** | [Klipy API](https://klipy.co/) + [webp-android](https://github.com/aureusapps/webp-android) (`libwebp` JNI) |
+| **Image Loading** | [Coil](https://coil-kt.github.io/coil/) (Static Images & GIFs) |
+| **Networking & Serialization** | [OkHttp 3](https://square.github.io/okhttp/) + `kotlinx.serialization` |
+| **Build & Tooling** | Gradle (Kotlin DSL), NDK (ndk-build) |
+
+
+
+---
+
 ## Contributing & Support ❤️
 FrostKeys is a personal project, but the heavy lifting was done by the HeliBoard team.
 
@@ -129,6 +147,9 @@ As a derivative work, FrostKeys is licensed under the **GNU General Public Licen
 * **Preservation:** All original copyright and license notices from the HeliBoard, OpenBoard, and AOSP projects have been preserved in the source headers.
 * **Apache 2.0:** Since the app is based on the Apache 2.0 licensed AOSP Keyboard, those original terms also apply.
 * **Brand Assets:** The **FrostKeys** icon (by Orion) is licensed under [Creative Commons BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/).
+
+> [!IMPORTANT]
+> No fork of this project will receive support, If you are using a third-party fork or custom build, please direct questions and issue reports to that fork's maintainer.
 
 **Disclaimer:** *Google Gemini is a trademark of Google LLC. Klipy is a trademark of Klipy. FrostKeys is not affiliated with or endorsed by Google or Klipy. Use of Gemini and Klipy features requires personal API keys and is subject to their respective Terms of Service.*
 
