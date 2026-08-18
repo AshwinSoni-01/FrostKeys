@@ -2,10 +2,10 @@
 
 <img src="assets/icon/FrostKeys_Icon_with_bg.png" alt="FrostKeys Icon" width="200">
 
-**A personalized fork of [HeliBoard](https://github.com/HeliBorg/HeliBoard) with custom themes, AI writing tools, and Klipy GIF & animated sticker support.**
+**A personalized fork of [HeliBoard](https://github.com/HeliBorg/HeliBoard) with Blur UI effects, AI writing tools, and Klipy GIF & animated sticker support.**
 
-FrostKeys takes the privacy-focused foundation of HeliBoard and adds modern, high-performance features for users who want more from their keyboard without sacrificing their data.
-
+FrostKeys takes the privacy focused foundation of HeliBoard and adds modern, high performance features for users who want more from their keyboard without sacrificing their data.
+>
 > [!NOTE]
 > ### 🚀 Distribution & Availability
 > **FrostKeys is transitioning to official distribution via Google Play Store.**
@@ -35,7 +35,7 @@ FrostKeys takes the privacy-focused foundation of HeliBoard and adds modern, hig
 
 ## 📋 Table of Contents
 - [New Features](#-new-features)
-- [Original Features](#original-features)
+- [Original Features](#original-features-from-heliboard)
 - [Contributing & Support](contributing--support-#)
 - [License & Legal](#license--legal)
 - [Credits](#credits)
@@ -50,11 +50,20 @@ The Emoji and Media panel has been completely rebuilt to integrate the Klipy API
 * **Flawless WhatsApp Integration:** Say goodbye to the share sheet and flattened static images! FrostKeys uses a custom-built `libwebp` processing engine to format and drop animated stickers *directly* into your WhatsApp chat bubbles with full animation intact.
 * **Bring Your Own Key:** Just like our AI tools, you are in control. Simply input your own personal Klipy API key in the settings to unlock unlimited GIF and sticker searches.
 
-### 2. Frosted Glass Design (Material You Evolution) (ALPHA)
+### 2. Frosted Glass Design (Material You Evolution)
 Experience a modern, high-fidelity UI with our brand-new **Frosted Glass** engine.
 * **Dynamic Blur:** Real-time background blur for both Light and Dark modes.
 * **Fully Customizable:** Adjust the opacity, saturation, and "frost" intensity to match your wallpaper and device aesthetic.
-> ⚠️ **Note:** Live background blur is currently only supported on Google Pixel devices and a select few high-end Samsung devices. Because this feature is still in the alpha stage, it may not work perfectly on every device.
+
+> [!NOTE]
+> ### ⚠️ Live Background Blur & Device Compatibility
+> Live background blur relies directly on **Android 12+ native cross-window blur APIs**. Because this is hardware and OEMdependent, compatibility varies:
+> 
+> * **Hardware Support Required:** The feature only works on devices running **Android 12 or newer** where the manufacturer has enabled native window blur support.
+> * **OEM Limitations:** Many brands disable real time window blurs on budget and mid-range devices to preserve performance, meaning the frosted effect will not render. Some manufacturers (like Samsung on budget devices) use a static snapshot blur in the UI, this is not a true real time blur and does not guarantee support for live keyboard blur.
+> * **Legacy Versions & Crashes:** On older Android versions or unsupported hardware, enabling blur effects may cause instability or crashes.
+> 
+> *If you experience crashes or visual glitches when toggling blur on your device, please share the logfile and report it in the [Telegram Group](https://t.me/FrostKeys) so we can implement a proper fallback for your device model.*
 
 ### 3. Access Point Menu (Enhanced Toolbar)
 We have retired the old static toolbar in favor of the **Access Point Menu**.
@@ -71,9 +80,13 @@ FrostKeys brings modern AI writing tools directly into your text field.
 * **AI Writing Assistant:** Proofread, rewrite, or change the tone of your text instantly.
 * **Bring Your Own Key:** Powered by Google Gemini. Simply input your own Gemini API key in settings to unlock local AI power without subscription fees.
 
+### 6. Material Design 3 Expressive UI
+FrostKeys embraces Google's latest **Material Design 3 Expressive** design language, delivering a fluid, modern visual experience.
+* **Expressive Styling:** Redesigned Ui elements, refined shapes, and modernized dynamic color palettes that seamlessly match your system theme.
+* **Refreshing Animations:** Smooth, tactile motion and bouncy physics integrated throughout.
 ---
 
-## Original Features
+## Original Features From HeliBoard
 * **Privacy-First:** Based on AOSP / OpenBoard.
 * **Custom Dictionaries:** Add your own for suggestions and spell check.
 * **Multilingual Typing:** Support for over 70+ languages.
@@ -84,6 +97,15 @@ FrostKeys brings modern AI writing tools directly into your text field.
 
 ## Contributing & Support ❤️
 FrostKeys is a personal project, but the heavy lifting was done by the HeliBoard team.
+
+### Support FrostKeys
+If you love using FrostKeys and want to support ongoing development, maintenance, and new features, consider becoming a sponsor! Every bit of support directly helps keep this project alive and ad-free.
+
+[<img src="https://img.shields.io/badge/Sponsor-%E2%9D%A4-ea4aaa?style=for-the-badge&logo=github-sponsors&logoColor=white" alt="Sponsor on GitHub" height="35">](https://github.com/sponsors/AshwinSoni-01)
+
+* **GitHub Sponsors:** [Sponsor @AshwinSoni-01 on GitHub](https://github.com/sponsors/AshwinSoni-01)
+
+---
 
 ### Support HeliBoard
 **Please support the upstream HeliBoard project!** This fork would not be possible without their incredible work on open-source privacy. You can support them via their official channels:
