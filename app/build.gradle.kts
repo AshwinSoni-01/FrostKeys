@@ -38,7 +38,7 @@ android {
         minSdk = 23
         targetSdk = 36
         versionCode = providers.of(GitCommitCountValueSource::class.java) {}.get()
-        versionName = "2.5.7"
+        versionName = "2.5.8"
         buildConfigField("String", "CONTENT_PROVIDER_AUTHORITY", "\"${applicationId}.stickercontentprovider\"")
         manifestPlaceholders["stickerAuthority"] = "${applicationId}.stickercontentprovider"
         manifestPlaceholders["stickerProviderAuthority"] = "${applicationId}.stickercontentprovider"
@@ -99,7 +99,7 @@ android {
             }
             variant.outputs.forEach { output ->
                 if (output is com.android.build.api.variant.impl.VariantOutputImpl) {
-                    output.outputFileName = "FrostKeys_${defaultConfig.versionName}-${variant.buildType}.apk"
+                    output.outputFileName = "FrostKeys_${defaultConfig.versionName}.apk"
                 }
             }
         }
