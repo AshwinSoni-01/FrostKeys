@@ -512,8 +512,11 @@ public final class StringUtils {
         return true;
     }
 
+    /**
+     * Returns 1-based index following the first whitespace character found in s, or -1 if none found.
+     */
     public static int charIndexOfFirstWhitespace(final CharSequence s) {
-        for (int i = 0; i < s.length() - 1; i++) {
+        for (int i = 0; i < s.length(); i++) {
             final char c = s.charAt(i);
             if (Character.isWhitespace(c)) {
                 return i + 1;

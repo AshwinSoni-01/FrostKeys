@@ -38,7 +38,7 @@ android {
         minSdk = 23
         targetSdk = 36
         versionCode = providers.of(GitCommitCountValueSource::class.java) {}.get()
-        versionName = "2.5.7"
+        versionName = "2.5.9"
         buildConfigField("String", "CONTENT_PROVIDER_AUTHORITY", "\"${applicationId}.stickercontentprovider\"")
         manifestPlaceholders["stickerAuthority"] = "${applicationId}.stickercontentprovider"
         manifestPlaceholders["stickerProviderAuthority"] = "${applicationId}.stickercontentprovider"
@@ -72,8 +72,7 @@ android {
             // and for better performance in case users want to install a debug APK
             isMinifyEnabled = false
             isJniDebuggable = false
-            applicationIdSuffix = ".debug"
-            manifestPlaceholders["stickerProviderAuthority"] = "${defaultConfig.applicationId}.debug.stickercontentprovider"
+            manifestPlaceholders["stickerProviderAuthority"] = "${defaultConfig.applicationId}.stickercontentprovider"
         }
         create("runTests") { // build variant for running tests on CI that skips tests known to fail
             isMinifyEnabled = false
@@ -84,8 +83,7 @@ android {
             isMinifyEnabled = false
             isJniDebuggable = false
             signingConfig = signingConfigs.getByName("debug")
-            applicationIdSuffix = ".debug"
-            manifestPlaceholders["stickerProviderAuthority"] = "${defaultConfig.applicationId}.debug.stickercontentprovider"
+            manifestPlaceholders["stickerProviderAuthority"] = "${defaultConfig.applicationId}.stickercontentprovider"
         }
 
         androidComponents.onVariants { variant: ApplicationVariant ->
@@ -99,7 +97,7 @@ android {
             }
             variant.outputs.forEach { output ->
                 if (output is com.android.build.api.variant.impl.VariantOutputImpl) {
-                    output.outputFileName = "FrostKeys_${defaultConfig.versionName}-${variant.buildType}.apk"
+                    output.outputFileName = "FrostKeys_${defaultConfig.versionName}.apk"
                 }
             }
         }
