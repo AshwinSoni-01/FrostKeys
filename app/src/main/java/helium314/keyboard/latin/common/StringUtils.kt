@@ -144,10 +144,10 @@ fun getTouchedWordRange(before: CharSequence, after: CharSequence, script: Strin
         }
     }
 
-    // strip text before "//" (i.e. ignore http and other protocols)
+    // Strip protocol prefix before and including "//" (e.g. http://)
     val beforeConsideringStart = before.substring(startIndexInBefore, before.length)
     val protocolEnd = beforeConsideringStart.lastIndexOf("//")
-    if (protocolEnd != -1) startIndexInBefore += protocolEnd + 1
+    if (protocolEnd != -1) startIndexInBefore += protocolEnd + 2
 
     // we don't want the end characters to be word separators
     while (endIndexInAfter > 0 && spacingAndPunctuations.isWordSeparator(after[endIndexInAfter - 1].code)) {
@@ -210,7 +210,10 @@ fun String.decapitalize(locale: Locale): String {
 
 fun encodeBase36(string: String): String = BigInteger(string.toByteArray()).toString(36)
 
-fun decodeBase36(string: String) = BigInteger(string, 36).toByteArray().decodeToString()
+fun decodeBase36(string: String): String {
+    if (string.isEmpty()) return ""
+    return BigInteger(string, 36).toByteArray().decodeToString()
+}
 
 fun containsValueWhenSplit(string: String?, value: String, split: String): Boolean {
     if (string == null) return false
