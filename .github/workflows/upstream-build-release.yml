@@ -1,0 +1,87 @@
+name: Sync Upstream, Build and Release
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  sync-build-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Sync with Upstream
+        id: sync
+        run: |
+          git remote add upstream https://github.com/AshwinSoni-01/FrostKeys.git
+          git fetch upstream
+          UPSTREAM_BRANCH=$(git remote show upstream | sed -n '/HEAD branch/s/.*: //p')
+
+          LOCAL_HASH=$(git rev-parse HEAD)
+          UPSTREAM_HASH=$(git rev-parse upstream/$UPSTREAM_BRANCH)
+
+          if [ "$LOCAL_HASH" = "$UPSTREAM_HASH" ] && [ "${{ github.event_name }}" = "schedule" ]; then
+            echo "should_build=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          git merge upstream/$UPSTREAM_BRANCH -m "Sync upstream changes" || git merge upstream/$UPSTREAM_BRANCH -X theirs --no-edit
+          git push origin HEAD
+          echo "should_build=true" >> $GITHUB_OUTPUT
+          echo "tag_suffix=$(git rev-parse --short upstream/$UPSTREAM_BRANCH)" >> $GITHUB_OUTPUT
+
+      - name: Restore or initialize persistent keystore
+        if: steps.sync.outputs.should_build == 'true'
+        run: |
+          mkdir -p ~/.android
+          if [ ! -f .github/debug.keystore ]; then
+            keytool -genkey -v -keystore .github/debug.keystore -alias androiddebugkey -storepass android -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+            git add .github/debug.keystore
+            git commit -m "chore: persist debug keystore for reproducible signing"
+            git push origin HEAD
+          fi
+          cp .github/debug.keystore ~/.android/debug.keystore
+
+      - name: Set up JDK 17
+        if: steps.sync.outputs.should_build == 'true'
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Set up Gradle
+        if: steps.sync.outputs.should_build == 'true'
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Grant execute permission for gradlew
+        if: steps.sync.outputs.should_build == 'true'
+        run: chmod +x gradlew
+
+      - name: Build debug APK
+        if: steps.sync.outputs.should_build == 'true'
+        run: ./gradlew assembleDebug
+
+      - name: Publish GitHub Release
+        if: steps.sync.outputs.should_build == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="v$(date +'%Y.%m.%d')-${{ steps.sync.outputs.tag_suffix }}"
+          APK_PATH=$(ls app/build/outputs/apk/debug/*-debug*.apk | head -n 1)
+          gh release create "$TAG" "$APK_PATH" \
+            --title "FrostKeys $TAG" \
+            --notes "Automated release synced from AshwinSoni-01/FrostKeys."
