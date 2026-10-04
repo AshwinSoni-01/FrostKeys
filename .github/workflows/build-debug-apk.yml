@@ -31,7 +31,7 @@ jobs:
           set -euo pipefail
           chmod +x gradlew
 
-          EXPECTED="$(sed -n 's|.*gradle-\\([0-9.]*\\)-bin.zip.*|\\1|p' gradle/wrapper/gradle-wrapper.properties | head -n 1)"
+          EXPECTED="$(grep -oE 'gradle-[0-9.]+-bin\\.zip' gradle/wrapper/gradle-wrapper.properties | sed -E 's/^gradle-//; s/-bin\\.zip$//' | head -n 1)"
           ACTUAL="$(./gradlew --version | awk '/^Gradle / {print $2; exit}')"
 
           echo "Wrapper Gradle version: $EXPECTED"
