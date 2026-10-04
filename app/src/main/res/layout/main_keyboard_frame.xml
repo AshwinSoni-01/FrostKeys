@@ -110,7 +110,7 @@
             android:layout_gravity="start|center_vertical"
             android:layout_marginStart="12dp"
             android:background="@android:color/transparent"
-            android:contentDescription="@string/label_emoji_key"
+            android:contentDescription="@string/emoji"
             android:padding="13dp"
             android:scaleType="centerInside" />
 
