@@ -1884,28 +1884,9 @@ public class LatinIME extends InputMethodService implements
         if (KeyCode.VOICE_INPUT == event.getKeyCode()) {
             mRichImm.switchToShortcutIme(this);
         }
-        if (event.getKeyCode() == KeyCode.AI_TOOLS || event.getKeyCode() == -214) {
-            KeyboardSwitcher.getInstance().onToggleKeyboard(KeyboardSwitcher.KeyboardSwitchState.AI_TOOLS);
-            return;
-        }
-        if (event.getKeyCode() == KeyCode.GIFS) {
-            final KeyboardSwitcher switcher = KeyboardSwitcher.getInstance();
-            if (!switcher.isShowingKlipyPalettes()) {
-                switcher.onToggleKeyboard(KeyboardSwitcher.KeyboardSwitchState.KLIPY);
-            }
-            if (switcher.isShowingKlipyPalettes()) {
-                switcher.getKlipyPalettesView().selectTab("GIF");
-            }
-            return;
-        }
-        if (event.getKeyCode() == KeyCode.STICKERS) {
-            final KeyboardSwitcher switcher = KeyboardSwitcher.getInstance();
-            if (!switcher.isShowingKlipyPalettes()) {
-                switcher.onToggleKeyboard(KeyboardSwitcher.KeyboardSwitchState.KLIPY);
-            }
-            if (switcher.isShowingKlipyPalettes()) {
-                switcher.getKlipyPalettesView().selectTab("STICKER");
-            }
+        // Cloud AI, GIF and sticker commands are intentionally disabled in the offline build.
+        if (event.getKeyCode() == KeyCode.AI_TOOLS || event.getKeyCode() == -214
+                || event.getKeyCode() == KeyCode.GIFS || event.getKeyCode() == KeyCode.STICKERS) {
             return;
         }
         final InputTransaction completeInputTransaction = mInputLogic.onCodeInput(mSettings.getCurrent(), event,
