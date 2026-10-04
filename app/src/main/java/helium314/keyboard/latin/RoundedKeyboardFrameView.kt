@@ -8,6 +8,7 @@ import android.graphics.Color
 import android.graphics.Outline
 import android.graphics.Path
 import android.graphics.RectF
+import helium314.keyboard.latin.common.ColorType
 import android.os.Build
 import android.util.AttributeSet
 import android.view.View
@@ -38,12 +39,14 @@ class RoundedKeyboardFrameView @JvmOverloads constructor(
     private val prefListener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
         if (key == Settings.PREF_KEYBOARD_CORNER_RADIUS) {
             cachedRadiusPx = -1f
+            updateShellBackground()
             invalidateOutline()
             postInvalidate()
         }
     }
 
     init {
+        updateShellBackground()
         // Also clip via HWUI so hardware-layered descendants respect the rounded keyboard shape.
         // Android 13+ supports path outlines, which lets us keep only the top corners rounded.
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -60,7 +63,7 @@ class RoundedKeyboardFrameView @JvmOverloads constructor(
                         0f,
                         view.width.toFloat(),
                         view.height.toFloat(),
-                        floatArrayOf(radiusPx, radiusPx, radiusPx, radiusPx, 0f, 0f, 0f, 0f),
+                        floatArrayOf(radiusPx, radiusPx, radiusPx, radiusPx, radiusPx, radiusPx, radiusPx, radiusPx),
                         Path.Direction.CW
                     )
                     outline.setPath(outlineClipPath)
@@ -73,6 +76,7 @@ class RoundedKeyboardFrameView @JvmOverloads constructor(
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
         context.prefs().registerOnSharedPreferenceChangeListener(prefListener)
+        updateShellBackground()
         cachedRadiusPx = -1f
         invalidateOutline()
     }
@@ -123,6 +127,15 @@ class RoundedKeyboardFrameView @JvmOverloads constructor(
             staticDustOverlay.clear()
         }
         super.dispatchDraw(canvas)
+    }
+
+    private fun updateShellBackground() {
+        val colors = runCatching { Settings.getValues()?.mColors }.getOrNull()
+        if (colors?.isFrosted == true) {
+            setBackgroundColor(Color.TRANSPARENT)
+        } else {
+            setBackgroundColor(colors?.get(ColorType.MAIN_BACKGROUND) ?: Color.TRANSPARENT)
+        }
     }
 
     private fun keyboardCornerRadiusPx(): Float {

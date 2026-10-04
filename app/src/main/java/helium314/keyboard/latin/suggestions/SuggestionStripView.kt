@@ -255,6 +255,7 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
             setupKey(it, colors)
             applyAlphabetIconTint(it, colors)
             applySpecialKeyCircleBackground(it, colors)
+            it.isVisible = showToolbarEdgeKeys(Settings.getValues())
         }
         val pinnedDropListener = View.OnDragListener { target, event -> onPinnedToolbarDrag(target, event) }
         suggestionsMiddleContainer.setOnDragListener(pinnedDropListener)
@@ -884,13 +885,18 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
         }
     }
 
+    private fun showToolbarEdgeKeys(settingsValues: helium314.keyboard.latin.settings.SettingsValues) =
+        settingsValues.mToolbarMode == ToolbarMode.TOOLBAR_KEYS
+
     fun updateVoiceKey() {
-        val show = Settings.getValues().mShowsVoiceInputKey
+        val settingsValues = Settings.getValues()
+        val show = settingsValues.mShowsVoiceInputKey
+        val showEdgeKeys = showToolbarEdgeKeys(settingsValues)
         toolbar.findViewWithTag<View>(ToolbarKey.VOICE)?.isVisible = show
+        accessPointTriggerBtn.isVisible = showEdgeKeys
         activatedStateVersion.value++
-        if (persistentToolbarKey.tag == ToolbarKey.VOICE) {
-            persistentToolbarKey.isVisible = show
-        }
+        persistentToolbarKey.isVisible =
+            showEdgeKeys && (persistentToolbarKey.tag != ToolbarKey.VOICE || show)
     }
 
     private fun updateKeys() {
@@ -969,7 +975,7 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
         applyAlphabetIconTint(persistentToolbarKey, colors)
         applySpecialKeyCircleBackground(persistentToolbarKey, colors)
         updateToolbarButtonActivatedState(persistentToolbarKey)
-        persistentToolbarKey.isVisible = key != ToolbarKey.VOICE || settingsValues.mShowsVoiceInputKey
+        persistentToolbarKey.isVisible = showToolbarEdgeKeys(settingsValues) && (key != ToolbarKey.VOICE || settingsValues.mShowsVoiceInputKey)
     }
 
     fun updateThemeColors(colors: Colors) {

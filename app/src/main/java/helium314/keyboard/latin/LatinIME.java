@@ -1160,6 +1160,8 @@ public class LatinIME extends InputMethodService implements
         }
         super.setInputView(view);
         mInputView = view;
+        final KeyboardCornerActionsView cornerActions = view.findViewById(R.id.keyboard_corner_actions);
+        if (cornerActions != null) cornerActions.bindInputMethodService(this);
         mInsetsUpdater = ViewOutlineProviderUtilsKt.setInsetsOutlineProvider(view);
         FrostedGlassHelper.configureFrostedGlass(this, view, FrostedGlassHelper.isFrostedTheme(this));
         updateSuggestionStripView(view);

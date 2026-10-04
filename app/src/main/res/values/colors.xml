@@ -8,9 +8,9 @@
 <resources xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- Color resources for LXX_Light_Border/LXX_Base_Border theme.
          15%:0x26 70%:0xB3 75%:0xC0 80%:0xCC 85%:0xD9 90%:0xE6 -->
-    <color name="keyboard_background_lxx_light_border">#E8EAED</color>
+    <color name="keyboard_background_lxx_light_border">#D1D1D6</color>
     <color name="key_background_normal_lxx_light_border">#FFFFFF</color>
-    <color name="key_background_functional_lxx_light_border">#CCCED5</color>
+    <color name="key_background_functional_lxx_light_border">#B8B8BD</color>
 
     <color name="highlight_color_lxx_dark">#5E97F6</color>
     <color name="gesture_trail_color_lxx_dark">#5E97F6</color>
@@ -32,9 +32,9 @@
     <color name="key_hint_letter_color_lxx_dark">#80FFFFFF</color>
 
     <!-- Color resources for the old LXX_Dark_Border theme, now for THEME_DARKER. -->
-    <color name="keyboard_background_lxx_dark_border">#0d0d0d</color>
-    <color name="key_background_normal_lxx_dark_border">#4d4d4d</color>
-    <color name="key_background_functional_lxx_dark_border">#1f1f1f</color>
+    <color name="keyboard_background_lxx_dark_border">#1C1C1E</color>
+    <color name="key_background_normal_lxx_dark_border">#3A3A3C</color>
+    <color name="key_background_functional_lxx_dark_border">#4A4A4C</color>
     <!-- Color resources for the old LXX_Dark_Amoled theme, now for THEME_BLACK. -->
     <color name="background_amoled_black">#000000</color>
     <color name="background_amoled_dark">#1A1A1A</color>

@@ -1015,6 +1015,8 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
         // @see
         // LatinIME#onComputeInset(android.inputmethodservice.InputMethodService.Insets)
         mMainKeyboardFrame.setVisibility(visibility);
+        final View cornerActions = mCurrentInputView == null ? null : mCurrentInputView.findViewById(R.id.keyboard_corner_actions);
+        if (cornerActions != null) cornerActions.setVisibility(visibility == View.VISIBLE ? View.VISIBLE : View.GONE);
         if (!emojiSearchActive) {
             mEmojiPalettesView.setVisibility(View.GONE);
             mEmojiPalettesView.stopEmojiPalettes();
@@ -1051,6 +1053,8 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
                 updatePersistentEmojiRow();
                 mMainKeyboardFrame.setVisibility(View.VISIBLE);
                 mKeyboardView.setVisibility(View.GONE);
+                final View cornerActions = mCurrentInputView == null ? null : mCurrentInputView.findViewById(R.id.keyboard_corner_actions);
+                if (cornerActions != null) cornerActions.setVisibility(View.GONE);
 
                 // Start emoji palettes
                 mEmojiPalettesView.startEmojiPalettes(mKeyboardView.getKeyVisualAttribute(),
@@ -1089,6 +1093,8 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
                 updatePersistentEmojiRow();
                 mMainKeyboardFrame.setVisibility(View.VISIBLE);
                 mKeyboardView.setVisibility(View.GONE);
+                final View cornerActions = mCurrentInputView == null ? null : mCurrentInputView.findViewById(R.id.keyboard_corner_actions);
+                if (cornerActions != null) cornerActions.setVisibility(View.GONE);
 
                 // Start clipboard
                 mClipboardHistoryView.startClipboardHistory(mLatinIME.getClipboardHistoryManager(),
@@ -1132,6 +1138,8 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
                 updatePersistentEmojiRow();
                 mMainKeyboardFrame.setVisibility(View.VISIBLE);
                 mKeyboardView.setVisibility(View.GONE);
+                final View cornerActions = mCurrentInputView == null ? null : mCurrentInputView.findViewById(R.id.keyboard_corner_actions);
+                if (cornerActions != null) cornerActions.setVisibility(View.GONE);
                 mEmojiPalettesView.setVisibility(View.GONE);
                 mClipboardHistoryView.setVisibility(View.GONE);
                 

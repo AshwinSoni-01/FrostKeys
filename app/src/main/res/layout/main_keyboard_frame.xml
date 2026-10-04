@@ -4,7 +4,6 @@
     modified
     SPDX-License-Identifier: Apache-2.0 AND GPL-3.0-only
 -->
-
 <helium314.keyboard.latin.RoundedKeyboardFrameView
     xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/main_keyboard_frame"
@@ -13,7 +12,7 @@
     android:layout_gravity="bottom"
     android:orientation="vertical"
     android:clipChildren="false"
-    android:clipToPadding="false" >
+    android:clipToPadding="false">
 
     <HorizontalScrollView
         android:id="@+id/persistent_emoji_row_scroll"
@@ -21,7 +20,7 @@
         android:layout_height="40dp"
         android:scrollbars="none"
         android:visibility="gone"
-        android:background="@android:color/transparent" >
+        android:background="@android:color/transparent">
         <LinearLayout
             android:id="@+id/persistent_emoji_row_container"
             android:layout_width="wrap_content"
@@ -41,32 +40,34 @@
         android:id="@+id/strip_container"
         layout="@layout/strip_container" />
 
-    <!-- To ensure that key preview popup is correctly placed when the current system locale is
-         one of RTL locales, layoutDirection="ltr" is needed in the SDK version 17+. -->
     <helium314.keyboard.latin.KeyboardWrapperView
         android:id="@+id/keyboard_view_wrapper"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layoutDirection="ltr"
         android:clipChildren="false"
-        android:clipToPadding="false" >
+        android:clipToPadding="false">
 
         <helium314.keyboard.keyboard.MainKeyboardView
             android:id="@+id/keyboard_view"
             android:layoutDirection="ltr"
             android:layout_width="match_parent"
             android:layout_height="wrap_content" />
+
         <include
             android:id="@+id/emoji_palettes_view"
             layout="@layout/emoji_palettes_view" />
+
         <include
             android:id="@+id/clipboard_history_view"
             layout="@layout/clipboard_history_view" />
+
         <helium314.keyboard.keyboard.AccessPointMenuView
             android:id="@+id/access_point_menu_view"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:visibility="gone" />
+
         <ImageButton
             android:id="@+id/btn_stop_one_handed_mode"
             android:contentDescription="@string/label_stop_onehanded_mode_key"
@@ -93,7 +94,35 @@
             android:padding="8dp"
             android:scaleType="fitCenter"
             style="?attr/suggestionWordStyle" />
-
     </helium314.keyboard.latin.KeyboardWrapperView>
 
+    <helium314.keyboard.latin.KeyboardCornerActionsView
+        android:id="@+id/keyboard_corner_actions"
+        android:layout_width="match_parent"
+        android:layout_height="64dp"
+        android:clipChildren="false"
+        android:clipToPadding="false">
+
+        <ImageButton
+            android:id="@+id/keyboard_corner_emoji"
+            android:layout_width="52dp"
+            android:layout_height="52dp"
+            android:layout_gravity="start|center_vertical"
+            android:layout_marginStart="12dp"
+            android:background="@android:color/transparent"
+            android:contentDescription="@string/label_emoji_key"
+            android:padding="13dp"
+            android:scaleType="centerInside" />
+
+        <ImageButton
+            android:id="@+id/keyboard_corner_ime"
+            android:layout_width="52dp"
+            android:layout_height="52dp"
+            android:layout_gravity="end|center_vertical"
+            android:layout_marginEnd="12dp"
+            android:background="@android:color/transparent"
+            android:contentDescription="Switch input method"
+            android:padding="13dp"
+            android:scaleType="centerInside" />
+    </helium314.keyboard.latin.KeyboardCornerActionsView>
 </helium314.keyboard.latin.RoundedKeyboardFrameView>
