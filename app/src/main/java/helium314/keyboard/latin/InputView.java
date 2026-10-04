@@ -7,13 +7,19 @@
 package helium314.keyboard.latin;
 
 import android.annotation.SuppressLint;
+import android.animation.AnimatorSet;
+import android.animation.ObjectAnimator;
 import android.content.Context;
+import android.graphics.Color;
 import android.graphics.Rect;
+import android.graphics.drawable.GradientDrawable;
 import android.util.AttributeSet;
+import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
+import android.widget.ImageView;
 
 import androidx.core.view.ViewKt;
 
@@ -33,6 +39,8 @@ public final class InputView extends FrameLayout {
     private KeyboardTopPaddingForwarder mKeyboardTopPaddingForwarder;
     private MoreSuggestionsViewCanceler mMoreSuggestionsViewCanceler;
     private MotionEventForwarder<?, ?> mActiveForwarder;
+    private FrameLayout mVoiceRecognitionIndicator;
+    private AnimatorSet mVoiceRecognitionAnimator;
 
     public InputView(final Context context, final AttributeSet attrs) {
         super(context, attrs, 0);
@@ -50,7 +58,85 @@ public final class InputView extends FrameLayout {
                 mMainKeyboardView, suggestionStripView);
         mMoreSuggestionsViewCanceler = new MoreSuggestionsViewCanceler(
                 mMainKeyboardView, suggestionStripView);
+        createVoiceRecognitionIndicator();
         ViewKt.doOnNextLayout(this, this::onNextLayout);
+    }
+
+    private void createVoiceRecognitionIndicator() {
+        if (mVoiceRecognitionIndicator != null) return;
+
+        mVoiceRecognitionIndicator = new FrameLayout(getContext());
+        final GradientDrawable background = new GradientDrawable(
+                GradientDrawable.Orientation.TL_BR,
+                new int[] { Color.rgb(255, 107, 107), Color.rgb(255, 23, 68), Color.rgb(255, 61, 129) });
+        background.setShape(GradientDrawable.OVAL);
+        mVoiceRecognitionIndicator.setBackground(background);
+        mVoiceRecognitionIndicator.setAlpha(0f);
+        mVoiceRecognitionIndicator.setElevation(8f);
+        mVoiceRecognitionIndicator.setClickable(false);
+        mVoiceRecognitionIndicator.setFocusable(false);
+
+        final ImageView microphone = new ImageView(getContext());
+        microphone.setImageResource(R.drawable.sym_keyboard_voice_rounded);
+        microphone.setColorFilter(Color.WHITE);
+        microphone.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+        final int iconPadding = dp(6);
+        microphone.setPadding(iconPadding, iconPadding, iconPadding, iconPadding);
+        mVoiceRecognitionIndicator.addView(
+                microphone,
+                new FrameLayout.LayoutParams(
+                        LayoutParams.MATCH_PARENT,
+                        LayoutParams.MATCH_PARENT,
+                        Gravity.CENTER));
+
+        final FrameLayout.LayoutParams indicatorParams = new FrameLayout.LayoutParams(
+                dp(32), dp(32), Gravity.TOP | Gravity.END);
+        indicatorParams.setMargins(0, dp(6), dp(12), 0);
+        addView(mVoiceRecognitionIndicator, indicatorParams);
+    }
+
+    public void setVoiceRecognitionActive(final boolean active) {
+        if (mVoiceRecognitionIndicator == null) {
+            createVoiceRecognitionIndicator();
+        }
+        if (mVoiceRecognitionAnimator != null) {
+            mVoiceRecognitionAnimator.cancel();
+            mVoiceRecognitionAnimator = null;
+        }
+        if (!active) {
+            mVoiceRecognitionIndicator.animate().alpha(0f).scaleX(0.9f).scaleY(0.9f).setDuration(120L).start();
+            return;
+        }
+
+        mVoiceRecognitionIndicator.setAlpha(1f);
+        mVoiceRecognitionIndicator.setScaleX(0.95f);
+        mVoiceRecognitionIndicator.setScaleY(0.95f);
+
+        final ObjectAnimator alpha = ObjectAnimator.ofFloat(
+                mVoiceRecognitionIndicator, View.ALPHA, 0.55f, 1f);
+        alpha.setDuration(650L);
+        alpha.setRepeatMode(ObjectAnimator.REVERSE);
+        alpha.setRepeatCount(ObjectAnimator.INFINITE);
+
+        final ObjectAnimator scaleX = ObjectAnimator.ofFloat(
+                mVoiceRecognitionIndicator, View.SCALE_X, 0.95f, 1.08f);
+        scaleX.setDuration(650L);
+        scaleX.setRepeatMode(ObjectAnimator.REVERSE);
+        scaleX.setRepeatCount(ObjectAnimator.INFINITE);
+
+        final ObjectAnimator scaleY = ObjectAnimator.ofFloat(
+                mVoiceRecognitionIndicator, View.SCALE_Y, 0.95f, 1.08f);
+        scaleY.setDuration(650L);
+        scaleY.setRepeatMode(ObjectAnimator.REVERSE);
+        scaleY.setRepeatCount(ObjectAnimator.INFINITE);
+
+        mVoiceRecognitionAnimator = new AnimatorSet();
+        mVoiceRecognitionAnimator.playTogether(alpha, scaleX, scaleY);
+        mVoiceRecognitionAnimator.start();
+    }
+
+    private int dp(final int value) {
+        return Math.round(value * getResources().getDisplayMetrics().density);
     }
 
     public void setKeyboardTopPadding(final int keyboardTopPadding) {

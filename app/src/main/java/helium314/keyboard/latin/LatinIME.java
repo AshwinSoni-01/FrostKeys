@@ -8,6 +8,7 @@ package helium314.keyboard.latin;
 
 import android.annotation.SuppressLint;
 import android.app.AlertDialog;
+import android.Manifest;
 import android.content.BroadcastReceiver;
 import android.content.ClipDescription;
 import android.content.Context;
@@ -25,6 +26,7 @@ import android.media.AudioManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.content.pm.PackageManager;
 import android.os.Debug;
 import android.os.Message;
 import android.os.PowerManager;
@@ -44,6 +46,9 @@ import android.view.inputmethod.InlineSuggestionsResponse;
 import android.view.inputmethod.InputConnection;
 import android.view.inputmethod.InputContentInfo;
 import android.view.inputmethod.InputMethodSubtype;
+import android.speech.RecognitionListener;
+import android.speech.RecognizerIntent;
+import android.speech.SpeechRecognizer;
 
 import helium314.keyboard.accessibility.AccessibilityUtils;
 import helium314.keyboard.compat.ConfigurationCompatKt;
@@ -243,6 +248,8 @@ public class LatinIME extends InputMethodService implements
     private AlertDialog mOptionsDialog;
 
     private final boolean mIsHardwareAcceleratedDrawingEnabled;
+    private SpeechRecognizer mSpeechRecognizer;
+    private boolean mSpeechRecognitionActive;
 
     private GestureConsumer mGestureConsumer = GestureConsumer.NULL_GESTURE_CONSUMER;
 
@@ -819,6 +826,78 @@ public class LatinIME extends InputMethodService implements
 
         // Register the preference change listener
         KtxKt.prefs(this).registerOnSharedPreferenceChangeListener(mPrefsListener);
+        initializeSpeechRecognizer();
+    }
+
+    private void initializeSpeechRecognizer() {
+        if (!SpeechRecognizer.isRecognitionAvailable(this)) {
+            Log.w(TAG, "No system speech recognition service is available");
+            return;
+        }
+        try {
+            mSpeechRecognizer = SpeechRecognizer.createSpeechRecognizer(this);
+            mSpeechRecognizer.setRecognitionListener(new RecognitionListener() {
+                @Override public void onReadyForSpeech(Bundle params) { setSpeechRecognitionActive(true); }
+                @Override public void onBeginningOfSpeech() { setSpeechRecognitionActive(true); }
+                @Override public void onRmsChanged(float rmsdB) { }
+                @Override public void onBufferReceived(byte[] buffer) { }
+                @Override public void onEndOfSpeech() { }
+                @Override public void onError(int error) {
+                    setSpeechRecognitionActive(false);
+                    Log.w(TAG, "Speech recognition error: " + error);
+                }
+                @Override public void onResults(Bundle results) {
+                    final ArrayList<String> matches =
+                            results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
+                    if (matches != null && !matches.isEmpty()) {
+                        final String text = matches.get(0);
+                        if (text != null && !text.trim().isEmpty()) onTextInput(text);
+                    }
+                    setSpeechRecognitionActive(false);
+                }
+                @Override public void onPartialResults(Bundle partialResults) { }
+                @Override public void onEvent(int eventType, Bundle params) { }
+            });
+        } catch (RuntimeException e) {
+            Log.e(TAG, "Failed to initialize system speech recognizer", e);
+            mSpeechRecognizer = null;
+        }
+    }
+
+    private void setSpeechRecognitionActive(final boolean active) {
+        mSpeechRecognitionActive = active;
+        if (mInputView instanceof InputView) {
+            ((InputView) mInputView).setVoiceRecognitionActive(active);
+        }
+    }
+
+    private void startOrStopVoiceRecognition() {
+        if (mSpeechRecognizer == null) {
+            Log.w(TAG, "Speech recognizer unavailable");
+            return;
+        }
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
+                != PackageManager.PERMISSION_GRANTED) {
+            Log.w(TAG, "Microphone permission is not granted");
+            mKeyboardSwitcher.showToast("Microphone permission is required for voice input.", true);
+            return;
+        }
+        if (mSpeechRecognitionActive) {
+            try { mSpeechRecognizer.stopListening(); }
+            catch (RuntimeException e) { Log.w(TAG, "Failed to stop speech recognition", e); }
+            return;
+        }
+        final Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
+        intent.putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true);
+        intent.putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true);
+        setSpeechRecognitionActive(true);
+        try {
+            mSpeechRecognizer.startListening(intent);
+        } catch (RuntimeException e) {
+            setSpeechRecognitionActive(false);
+            Log.e(TAG, "Failed to start speech recognition", e);
+        }
     }
 
     public boolean commitKlipyContent(Uri contentUri, String description, String mimeType) {
@@ -1026,6 +1105,16 @@ public class LatinIME extends InputMethodService implements
 
     @Override
     public void onDestroy() {
+        if (mSpeechRecognizer != null) {
+            try {
+                mSpeechRecognizer.cancel();
+                mSpeechRecognizer.destroy();
+            } catch (RuntimeException e) {
+                Log.w(TAG, "Failed to destroy speech recognizer", e);
+            }
+            mSpeechRecognizer = null;
+        }
+        setSpeechRecognitionActive(false);
         mIsDestroyed = true;
         sInstance = null;
         mHandler.removeCallbacksAndMessages(null);
@@ -1882,7 +1971,8 @@ public class LatinIME extends InputMethodService implements
             }
         }
         if (KeyCode.VOICE_INPUT == event.getKeyCode()) {
-            mRichImm.switchToShortcutIme(this);
+            startOrStopVoiceRecognition();
+            return;
         }
         // Cloud AI, GIF and sticker commands are intentionally disabled in the offline build.
         if (event.getKeyCode() == KeyCode.AI_TOOLS || event.getKeyCode() == -214

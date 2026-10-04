@@ -34,7 +34,7 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.orion.frostkeys"
+        applicationId = "com.mangoloads.brrrboard"
         minSdk = 23
         targetSdk = 36
         versionCode = providers.of(GitCommitCountValueSource::class.java) {}.get()
@@ -81,8 +81,8 @@ android {
             // and for better performance in case users want to install a debug APK
             isMinifyEnabled = false
             isJniDebuggable = false
-            applicationIdSuffix = ".debug"
-            manifestPlaceholders["stickerProviderAuthority"] = "${defaultConfig.applicationId}.debug.stickercontentprovider"
+            applicationIdSuffix = ".test"
+            manifestPlaceholders["stickerProviderAuthority"] = "${defaultConfig.applicationId}.test.stickercontentprovider"
         }
         create("runTests") { // build variant for running tests on CI that skips tests known to fail
             isMinifyEnabled = false
@@ -108,7 +108,7 @@ android {
             }
             variant.outputs.forEach { output ->
                 if (output is com.android.build.api.variant.impl.VariantOutputImpl) {
-                    output.outputFileName = "FrostKeys_${defaultConfig.versionName}-${variant.buildType}.apk"
+                    output.outputFileName = "Mango_brrrBoard_${defaultConfig.versionName}-${variant.buildType}.apk"
                 }
             }
         }
