@@ -411,12 +411,6 @@ public class SettingsValues {
         return mDisplayOrientation == configuration.orientation;
     }
 
-    
-        // disable if permission not granted
-        prefs.edit().putBoolean(Settings.PREF_USE_CONTACTS, false).apply();
-        return false;
-    }
-
     private static boolean readUseContactsEnabled(final SharedPreferences prefs, final Context ctx) {
         if (prefs.getBoolean(Settings.PREF_USE_CONTACTS, false)) {
             prefs.edit().putBoolean(Settings.PREF_USE_CONTACTS, false).apply();
