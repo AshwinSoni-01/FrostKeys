@@ -88,18 +88,7 @@ open class SettingsActivity : ComponentActivity(), SharedPreferences.OnSharedPre
     @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        runCatching {
-            val packageInfo = packageManager.getPackageInfo(packageName, 0)
-            val lastUpdateTime = packageInfo.lastUpdateTime
-            val savedLastUpdateTime = prefs.getLong("pref_telegram_last_app_update_time", 0L)
-            if (lastUpdateTime > savedLastUpdateTime) {
-                prefs.edit()
-                    .putLong("pref_telegram_last_app_update_time", lastUpdateTime)
-                    .putBoolean("pref_telegram_popup_v2_dismissed", false)
-                    .putBoolean("pref_telegram_joined", false)
-                    .apply()
-            }
-        }
+        
         if (Settings.getValues() == null) {
             val inputAttributes = InputAttributes(EditorInfo(), false, packageName)
             Settings.getInstance().loadSettings(this, resources.configuration.locale(), inputAttributes)
@@ -134,7 +123,6 @@ open class SettingsActivity : ComponentActivity(), SharedPreferences.OnSharedPre
                                         BackButton { this@SettingsActivity.finish() }
                                     },
                                 )
-                                settingsContainer[Settings.PREF_USE_CONTACTS]!!.Preference()
                                 settingsContainer[Settings.PREF_USE_APPS]!!.Preference()
                                 settingsContainer[Settings.PREF_BLOCK_POTENTIALLY_OFFENSIVE]!!.Preference()
                                 settingsContainer[Settings.PREF_SPELLCHECK_SUGGEST]!!.Preference()
@@ -194,10 +182,7 @@ open class SettingsActivity : ComponentActivity(), SharedPreferences.OnSharedPre
     override fun onResume() {
         super.onResume()
         paused = false
-        if (clickedTelegramJoin) {
-            clickedTelegramJoin = false
-            prefs.edit().putBoolean("pref_telegram_joined", true).apply()
-        }
+        
     }
 
     fun setForceTheme(theme: String?, night: Boolean?) {
@@ -250,7 +235,6 @@ open class SettingsActivity : ComponentActivity(), SharedPreferences.OnSharedPre
 
         var forceNight: Boolean? = null
         var forceTheme: String? = null
-        var clickedTelegramJoin = false
         var activeOverlay by mutableStateOf<(@androidx.compose.runtime.Composable (dev.chrisbanes.haze.HazeState) -> Unit)?>(null)
         var isTopBarHidden by mutableStateOf(false)
     }
