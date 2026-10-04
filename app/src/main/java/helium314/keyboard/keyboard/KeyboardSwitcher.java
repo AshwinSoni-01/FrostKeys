@@ -1246,7 +1246,7 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
     }
 
     public void onToggleKeyboard(@NonNull final KeyboardSwitchState toggleState) {
-        KeyboardSwitchState currentState = getKeyboardSwitchState();
+        final KeyboardSwitchState currentState = getKeyboardSwitchState();
         Log.w(TAG, "onToggleKeyboard() : Current = " + currentState + " : Toggle = " + toggleState);
         if (currentState == toggleState) {
             if (toggleState == KeyboardSwitchState.ACCESS_POINT) {
@@ -1256,42 +1256,34 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
                 mLatinIME.hideWindow();
                 setAlphabetKeyboard();
             }
-        } else {
-            mLatinIME.startShowingInputView(true);
-            if (toggleState == KeyboardSwitchState.EMOJI) {
-                setEmojiKeyboard();
-            } else if (toggleState == KeyboardSwitchState.CLIPBOARD) {
-                setClipboardKeyboard();
-            } else if (toggleState == KeyboardSwitchState.ACCESS_POINT) {
-                if (currentState == KeyboardSwitchState.CLIPBOARD || currentState == KeyboardSwitchState.EMOJI
-                    Log.w(TAG, "Ignoring ACCESS_POINT toggle because current state is " + currentState);
-                    return;
-                }
-                setAccessPointKeyboard();
-            } else {
-                mMainKeyboardFrame.setVisibility(View.VISIBLE);
-                mKeyboardView.setVisibility(View.VISIBLE);
-                setKeyboard(toggleState.mKeyboardId, toggleState);
-
-                mEmojiPalettesView.stopEmojiPalettes();
-                mEmojiPalettesView.setVisibility(View.GONE);
-
-                mClipboardHistoryView.stopClipboardHistory();
-                mClipboardHistoryView.setVisibility(View.GONE);
-
-                
-
-                if (mAccessPointMenuView != null) {
-                    mAccessPointMenuView.setVisibility(View.GONE);
-                }
-
-                
-
-                if (mCurrentInputView != null) {
-                    mCurrentInputView.requestLayout();
-                }
-            }
+            return;
         }
+
+        mLatinIME.startShowingInputView(true);
+        if (toggleState == KeyboardSwitchState.EMOJI) {
+            setEmojiKeyboard();
+        } else if (toggleState == KeyboardSwitchState.CLIPBOARD) {
+            setClipboardKeyboard();
+        } else if (toggleState == KeyboardSwitchState.ACCESS_POINT) {
+            if (currentState == KeyboardSwitchState.CLIPBOARD || currentState == KeyboardSwitchState.EMOJI) {
+                Log.w(TAG, "Ignoring ACCESS_POINT toggle because current state is " + currentState);
+                return;
+            }
+            setAccessPointKeyboard();
+        } else {
+            mMainKeyboardFrame.setVisibility(View.VISIBLE);
+            mKeyboardView.setVisibility(View.VISIBLE);
+            setKeyboard(toggleState.mKeyboardId, toggleState);
+
+            mEmojiPalettesView.stopEmojiPalettes();
+            mEmojiPalettesView.setVisibility(View.GONE);
+            mClipboardHistoryView.stopClipboardHistory();
+            mClipboardHistoryView.setVisibility(View.GONE);
+            mClipboardStripScrollView.setVisibility(View.GONE);
+            mEmojiTabStripView.setVisibility(View.GONE);
+            mClipboardStripView.setVisibility(View.GONE);
+        }
+    }
     }
 
     // Future method for requesting an updating to the shift state.
