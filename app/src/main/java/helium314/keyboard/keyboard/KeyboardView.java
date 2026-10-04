@@ -506,8 +506,8 @@ public class KeyboardView extends View {
                     colorType = ColorType.KEY_BACKGROUND;
                 }
 
-                mBackgroundPaint.setColor(
-                        KeyBackgroundUtils.fillColorFor(mColors, colorType, key.isPressed() || key.isLocked()));
+                mBackgroundPaint.setColor(touchpadBackgroundColor(
+                        KeyBackgroundUtils.fillColorFor(mColors, colorType, key.isPressed() || key.isLocked())));
 
                 canvas.translate(bgX, bgY);
                 if (isCircleStyle) {

@@ -137,7 +137,7 @@ class KeyboardCornerActionsView @JvmOverloads constructor(
                     if (longPressTriggered) {
                         val index = findOptionAt(event.rawX, event.rawY)
                         if (index >= 0) popupOptions[index].action()
-                        hidePopup()
+                        hidePopupAnimated()
                     } else if (!movedBeforeLongPress) {
                         performTap(action)
                     }
@@ -287,8 +287,15 @@ class KeyboardCornerActionsView @JvmOverloads constructor(
         selectedOption = index
         popup?.let { panel ->
             for (i in 0 until panel.childCount) {
-                (panel.getChildAt(i) as? ImageButton)?.background =
-                    optionBackground(i == selectedOption)
+                (panel.getChildAt(i) as? ImageButton)?.let { button ->
+                    val selected = i == selectedOption
+                    button.background = optionBackground(selected)
+                    button.animate().cancel()
+                    button.animate().scaleX(if (selected) 1.08f else 1f)
+                        .scaleY(if (selected) 1.08f else 1f)
+                        .setDuration(80L)
+                        .start()
+                }
             }
         }
     }
@@ -305,6 +312,14 @@ class KeyboardCornerActionsView @JvmOverloads constructor(
             }
         }
         return -1
+    }
+
+    private fun hidePopupAnimated() {
+        val panel = popup ?: return
+        panel.animate().alpha(0f).scaleX(0.9f).scaleY(0.9f)
+            .setDuration(80L)
+            .withEndAction { hidePopup() }
+            .start()
     }
 
     private fun hidePopup() {
