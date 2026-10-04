@@ -6,9 +6,13 @@ on:
     branches:
       - mangoloads/privacy-cleanup-v1
 
+permissions:
+  contents: write
+
 jobs:
   build:
-
+    # Normal pushes are intentionally ignored. A release-tagged commit or manual run builds.
+    if: ${{ github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[release]') }}
     runs-on: ubuntu-latest
 
     steps:
@@ -28,11 +32,24 @@ jobs:
       - name: Build with Gradle
         run: ./gradlew assembleDebug
 
-      - name: Upload APK
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: Mango-brrrBoard-debug
           path: app/build/outputs/apk/debug/*-debug*.apk
+
+      - name: Publish GitHub prerelease
+        if: ${{ github.event_name == 'push' && contains(github.event.head_commit.message, '[release]') }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="v2026.10.04-${GITHUB_SHA::7}-mango-test"
+          gh release create "$TAG" "app/build/outputs/apk/debug/Mango_brrrBoard_2.5.7-debug.apk" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "Mango.brrrBoard 2.5.7 Test — ${GITHUB_SHA::7}" \
+            --notes "Development test build from mangoloads/privacy-cleanup-v1." \
+            --prerelease
 
       - name: Archive reports for failed job
         uses: actions/upload-artifact@v4
