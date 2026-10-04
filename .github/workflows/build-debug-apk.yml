@@ -1,13 +1,7 @@
-name: Build Mango.brrrBoard debug APK
+name: Build and Release Mango.brrrBoard APK
 
 on:
   workflow_dispatch:
-    inputs:
-      publish_release:
-        description: "Publish this APK as a GitHub prerelease"
-        required: true
-        default: false
-        type: boolean
 
 permissions:
   contents: write
@@ -19,10 +13,11 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
 
     steps:
-      - uses: actions/checkout@v6
+      - name: Checkout
+        uses: actions/checkout@v6
 
       - name: Set up JDK 17
         uses: actions/setup-java@v6
@@ -30,15 +25,31 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Use project Gradle wrapper
+      - name: Verify and use project Gradle wrapper
         shell: bash
         run: |
           set -euo pipefail
           chmod +x gradlew
-          ./gradlew --version
+
+          EXPECTED="$(sed -n 's|.*gradle-\\([0-9.]*\\)-bin.zip.*|\\1|p' gradle/wrapper/gradle-wrapper.properties | head -n 1)"
+          ACTUAL="$(./gradlew --version | awk '/^Gradle / {print $2; exit}')"
+
+          echo "Wrapper Gradle version: $EXPECTED"
+          echo "Runtime Gradle version: $ACTUAL"
+
+          test -n "$EXPECTED"
+          test "$ACTUAL" = "$EXPECTED"
 
       - name: Build debug APK
         run: ./gradlew --no-daemon assembleDebug
+
+      - name: Verify APK output
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="app/build/outputs/apk/debug/Mango_brrrBoard_2.5.7-debug.apk"
+          test -s "$APK"
+          ls -lh "$APK"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
@@ -48,25 +59,27 @@ jobs:
           if-no-files-found: error
 
       - name: Publish GitHub prerelease
-        if: ${{ inputs.publish_release }}
         env:
           GH_TOKEN: ${{ github.token }}
+        shell: bash
         run: |
           set -euo pipefail
           TAG="mango-2.5.7-test-${GITHUB_SHA::7}"
-          gh release create "$TAG" "app/build/outputs/apk/debug/Mango_brrrBoard_2.5.7-debug.apk" \
+
+          gh release create "$TAG" \
+            "app/build/outputs/apk/debug/Mango_brrrBoard_2.5.7-debug.apk" \
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
             --title "Mango.brrrBoard 2.5.7 Test — ${GITHUB_SHA::7}" \
-            --notes "Development test build from mangoloads/privacy-cleanup-v1." \
+            --notes "Controlled test build from mangoloads/privacy-cleanup-v1." \
             --prerelease
 
       - name: Archive reports for failed job
+        if: ${{ failure() }}
         uses: actions/upload-artifact@v4
         with:
           name: reports
           path: |
             app/build/reports
             build/reports
-          if: ${{ failure() }}
           if-no-files-found: warn
