@@ -42,7 +42,7 @@
             android:layout_width="0dp"
             android:layout_height="36dp"
             android:layout_weight="1"
-            android:background="@drawable/klipy_search_bar_ripple_bg"
+            android:background="@drawable/search_bar_bg"
             android:paddingHorizontal="12dp">
 
             <LinearLayout
