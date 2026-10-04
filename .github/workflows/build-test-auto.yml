@@ -1,40 +1,44 @@
 name: Test build
-# builds only for a single abi and does not produce an APK
 
 on:
-# disabled on push: when I push to non-main, I do a PR anyway
-#  push:
-    # don't run on main. I noticed I often don't push commits to avoid unnecessary workflow runs
-#    branches-ignore: [ main ]
-#    paths:
-#      - 'app/**'
   workflow_dispatch:
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v6
 
-      - name: Set up JDK
+      - name: Set up JDK 17
         uses: actions/setup-java@v6
         with:
           java-version: '17'
           distribution: 'temurin'
 
-      - uses: gradle/actions/setup-gradle@v6
+      - name: Set up Gradle 8.14.4
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: '8.14.4'
 
-      - name: Grant execute permission for gradlew
-        run: chmod +x gradlew
+      - name: Verify pinned Gradle version
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x gradlew
+          ./gradlew --version
+          ACTUAL="$(./gradlew --version | awk '/^Gradle / {print $2; exit}')"
+          test "$ACTUAL" = "8.14.4"
 
-      - name: Build with Gradle
-        run: ./gradlew testRunTestsUnitTest
+      - name: Run unit tests
+        run: ./gradlew --no-daemon testRunTestsUnitTest
 
       - name: Archive reports for failed job
         uses: actions/upload-artifact@v4
         with:
           name: reports
-          path: '*/build/reports'
-        if: ${{ failure() }}
+          path: |
+            app/build/reports
+            build/reports
+          if: ${{ failure() }}
+          if-no-files-found: warn
