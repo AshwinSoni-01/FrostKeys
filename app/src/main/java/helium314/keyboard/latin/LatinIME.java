@@ -1882,8 +1882,7 @@ public class LatinIME extends InputMethodService implements
     public void onEvent(@NonNull final Event event) {
         if (event.getKeyCode() == KeyCode.ALPHA) {
             final KeyboardSwitcher switcher = KeyboardSwitcher.getInstance();
-            if (switcher.isShowingEmojiPalettes() || switcher.isShowingKlipyPalettes()
-                    || switcher.isShowingClipboardHistory() || switcher.isShowingAiWritingTools()) {
+            if (switcher.isShowingEmojiPalettes() || switcher.isShowingClipboardHistory()) {
                 switcher.setAlphabetKeyboard();
                 return;
             }
