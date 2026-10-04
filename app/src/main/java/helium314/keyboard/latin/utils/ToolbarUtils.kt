@@ -115,9 +115,6 @@ fun getCodeForToolbarKey(key: ToolbarKey) = Settings.getInstance().getCustomTool
     PAGE_START -> KeyCode.MOVE_START_OF_PAGE
     PAGE_END -> KeyCode.MOVE_END_OF_PAGE
     SPLIT -> KeyCode.SPLIT_LAYOUT
-    AI_TOOLS -> KeyCode.AI_TOOLS
-    GIFS -> KeyCode.GIFS
-    STICKERS -> KeyCode.STICKERS
     RESIZE -> KeyCode.RESIZE_KEYBOARD
 }
 
@@ -144,7 +141,7 @@ fun getCodeForToolbarKeyLongClick(key: ToolbarKey) = Settings.getInstance().getC
 enum class ToolbarKey {
     VOICE, CLIPBOARD, NUMPAD, UNDO, REDO, SETTINGS, SELECT_ALL, SELECT_WORD, COPY, CUT, PASTE, ONE_HANDED, SPLIT,
     INCOGNITO, AUTOCORRECT, CLEAR_CLIPBOARD, CLOSE_HISTORY, EMOJI, LEFT, RIGHT, UP, DOWN, WORD_LEFT, WORD_RIGHT,
-    PAGE_UP, PAGE_DOWN, FULL_LEFT, FULL_RIGHT, PAGE_START, PAGE_END, AI_TOOLS, GIFS, STICKERS, RESIZE
+    PAGE_UP, PAGE_DOWN, FULL_LEFT, FULL_RIGHT, PAGE_START, PAGE_END, RESIZE
 }
 
 enum class ToolbarMode {
@@ -295,9 +292,9 @@ private fun getEnabledToolbarKeys(prefs: SharedPreferences, pref: String, defaul
                     null
                 }
             } else null
-        }.filterNot { it == AI_TOOLS || it == GIFS || it == STICKERS }
+        }
     }
-    return keys.filterNot { it == AI_TOOLS || it == GIFS || it == STICKERS }
+    return keys
 }
 
 fun writeCustomKeyCodes(prefs: SharedPreferences, codes: EnumMap<ToolbarKey, Pair<Int?, Int?>>) {
