@@ -875,61 +875,6 @@ fun SetupScreenView(
 
                                 SegmentedListItem(
                                     onClick = {
-                                        SettingsDestination.navigateTo(SettingsDestination.Cloud)
-                                    },
-                                    shape = RoundedCornerShape(8.dp),
-                                    headlineContent = {
-                                        Text(
-                                            text = "Setup AI Tools",
-                                            style = MaterialTheme.typography.titleMedium.copy(
-                                                fontSize = 15.sp,
-                                                fontWeight = FontWeight.SemiBold,
-                                                fontFamily = fontFamily
-                                            )
-                                        )
-                                    },
-                                    supportingContent = {
-                                        Text(
-                                            text = "Get personal API keys for smart tools & GIF searches.",
-                                            style = MaterialTheme.typography.bodyMedium.copy(
-                                                fontSize = 12.sp,
-                                                fontFamily = fontFamily
-                                            )
-                                        )
-                                    },
-                                    leadingContent = {
-                                        Surface(
-                                            shape = CircleShape,
-                                            color = MaterialTheme.colorScheme.primaryContainer,
-                                            modifier = Modifier.size(32.dp)
-                                        ) {
-                                            Box(contentAlignment = Alignment.Center) {
-                                                Text(
-                                                    text = "2",
-                                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                                    style = MaterialTheme.typography.titleMedium.copy(
-                                                        fontSize = 14.sp,
-                                                        fontWeight = FontWeight.SemiBold,
-                                                        fontFamily = fontFamily
-                                                    )
-                                                )
-                                            }
-                                        }
-                                    },
-                                    trailingContent = {
-                                        Icon(
-                                            painter = painterResource(id = R.drawable.ic_arrow_left_rounded),
-                                            contentDescription = null,
-                                            tint = MaterialTheme.colorScheme.outline,
-                                            modifier = Modifier
-                                                .size(18.dp)
-                                                .rotate(180f)
-                                        )
-                                    }
-                                )
-
-                                SegmentedListItem(
-                                    onClick = {
                                         SettingsDestination.navigateTo(SettingsDestination.Dictionaries)
                                     },
                                     shape = RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp, bottomStart = 28.dp, bottomEnd = 28.dp),
@@ -960,7 +905,7 @@ fun SetupScreenView(
                                         ) {
                                             Box(contentAlignment = Alignment.Center) {
                                                 Text(
-                                                    text = "3",
+                                                    text = "2",
                                                     color = MaterialTheme.colorScheme.onPrimaryContainer,
                                                     style = MaterialTheme.typography.titleMedium.copy(
                                                         fontSize = 14.sp,
