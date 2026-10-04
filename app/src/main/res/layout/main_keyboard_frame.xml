@@ -62,20 +62,11 @@
         <include
             android:id="@+id/clipboard_history_view"
             layout="@layout/clipboard_history_view" />
-        <include
-            android:id="@+id/klipy_palettes_view"
-            layout="@layout/klipy_palettes_view" />
         <helium314.keyboard.keyboard.AccessPointMenuView
             android:id="@+id/access_point_menu_view"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:visibility="gone" />
-        <helium314.keyboard.keyboard.internal.AiWritingToolsView
-            android:id="@+id/ai_writing_tools_view"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:visibility="gone" />
-
         <ImageButton
             android:id="@+id/btn_stop_one_handed_mode"
             android:contentDescription="@string/label_stop_onehanded_mode_key"
