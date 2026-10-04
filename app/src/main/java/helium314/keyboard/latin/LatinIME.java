@@ -2218,15 +2218,7 @@ public class LatinIME extends InputMethodService implements
             mKeyboardSwitcher.setAlphabetKeyboard();
             return true;
         }
-        if (keyCode == KeyEvent.KEYCODE_BACK && mKeyboardSwitcher.isShowingKlipyPalettes()) {
-            final KlipyPalettesView klipyView = mKeyboardSwitcher.getKlipyPalettesView();
-            if (klipyView != null) {
-                if (!klipyView.handleBackPress()) {
-                    mKeyboardSwitcher.setAlphabetKeyboard();
-                }
-                return true;
-            }
-        }
+
         if (mKeyboardActionListener.onKeyUp(keyCode, keyEvent))
             return true;
         return super.onKeyUp(keyCode, keyEvent);
