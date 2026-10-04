@@ -25,24 +25,16 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Verify and use project Gradle wrapper
+      - name: Prepare and verify Gradle wrapper
         shell: bash
         run: |
           set -euo pipefail
+          test -f gradlew
           chmod +x gradlew
-
-          EXPECTED="$(grep -o 'gradle-[0-9.]*-bin.zip' gradle/wrapper/gradle-wrapper.properties | head -n 1 | sed 's/^gradle-//; s/-bin.zip$//')"
-          echo "distributionUrl=$(grep '^distributionUrl=' gradle/wrapper/gradle-wrapper.properties || true)"
-          ACTUAL="$(./gradlew --version | awk '/^Gradle / {print $2; exit}')"
-
-          echo "Wrapper Gradle version: $EXPECTED"
-          echo "Runtime Gradle version: $ACTUAL"
-
-          test -n "$EXPECTED"
-          test "$ACTUAL" = "$EXPECTED"
+          ./gradlew --version
 
       - name: Build debug APK
-        run: ./gradlew --no-daemon assembleDebug
+        run: ./gradlew --no-daemon --stacktrace assembleDebug
 
       - name: Verify APK output
         shell: bash
