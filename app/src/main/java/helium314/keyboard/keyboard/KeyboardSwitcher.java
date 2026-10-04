@@ -1797,8 +1797,6 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
         mMainKeyboardFrame = mCurrentInputView.findViewById(R.id.main_keyboard_frame);
         mEmojiPalettesView = mCurrentInputView.findViewById(R.id.emoji_palettes_view);
         mClipboardHistoryView = mCurrentInputView.findViewById(R.id.clipboard_history_view);
-        mAiWritingToolsView = mCurrentInputView.findViewById(R.id.ai_writing_tools_view);
-        mKlipyPalettesView = mCurrentInputView.findViewById(R.id.klipy_palettes_view);
         mAccessPointMenuView = mCurrentInputView.findViewById(R.id.access_point_menu_view);
         mFakeToastView = mCurrentInputView.findViewById(R.id.fakeToast);
 
