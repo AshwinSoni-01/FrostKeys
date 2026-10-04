@@ -295,9 +295,9 @@ private fun getEnabledToolbarKeys(prefs: SharedPreferences, pref: String, defaul
                     null
                 }
             } else null
-        }
+        }.filterNot { it == AI_TOOLS || it == GIFS || it == STICKERS }
     }
-    return keys
+    return keys.filterNot { it == AI_TOOLS || it == GIFS || it == STICKERS }
 }
 
 fun writeCustomKeyCodes(prefs: SharedPreferences, codes: EnumMap<ToolbarKey, Pair<Int?, Int?>>) {
