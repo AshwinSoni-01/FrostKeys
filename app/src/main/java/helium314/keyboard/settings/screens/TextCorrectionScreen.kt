@@ -231,34 +231,6 @@ fun createCorrectionSettings(context: Context) = listOf(
     ) {
         SwitchPreference(it, Defaults.PREF_SUGGEST_CLIPBOARD_CONTENT)
     },
-        R.string.use_contacts_dict, R.string.use_contacts_dict_summary
-    ) { setting ->
-        val activity = LocalContext.current.getActivity() ?: return@Setting
-        var showDisclosureDialog by remember { mutableStateOf(false) }
-            granted = it
-            if (granted)
-                activity.prefs().edit { putBoolean(setting.key, true) }
-        }
-        SwitchPreference(setting, Defaults.PREF_USE_CONTACTS,
-            allowCheckedChange = {
-                if (it && !granted) {
-                    showDisclosureDialog = true
-                    false
-                } else true
-            }
-        )
-        if (showDisclosureDialog) {
-            ConfirmationDialog(
-                title = { Text(stringResource(R.string.contacts_permission_disclosure_title)) },
-                onDismissRequest = { showDisclosureDialog = false },
-                onConfirmed = {
-                    showDisclosureDialog = false
-                    launcher.launch(Manifest.permission.READ_CONTACTS)
-                },
-                content = { Text(stringResource(R.string.contacts_permission_disclosure_message)) }
-            )
-        }
-    },
     Setting(context, Settings.PREF_USE_APPS,
         R.string.use_apps_dict, R.string.use_apps_dict_summary
     ) { setting ->
