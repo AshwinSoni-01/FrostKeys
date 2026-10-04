@@ -381,11 +381,9 @@ fun Md3ePreference(
 private fun QuickSetupCard(
     onClickGestureTyping: () -> Unit,
     onClickDictionaries: () -> Unit,
-    onClickCloud: () -> Unit,
     onDismiss: () -> Unit,
     isGestureComplete: Boolean,
     isDictionaryComplete: Boolean,
-    isCloudComplete: Boolean,
     allStepsComplete: Boolean,
 ) {
     val ctx = LocalContext.current
