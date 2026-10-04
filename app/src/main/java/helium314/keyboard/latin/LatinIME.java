@@ -909,6 +909,78 @@ public class LatinIME extends InputMethodService implements
 
     
 
+
+    public boolean commitRichContent(Uri contentUri, String description, String mimeType) {
+        final EditorInfo editorInfo = getCurrentInputEditorInfo();
+        final InputConnection inputConnection = getCurrentInputConnection();
+        if (editorInfo == null || inputConnection == null) {
+            showContentPasteFailedToast();
+            return false;
+        }
+
+        final String[] contentMimeTypes = getRichContentMimeTypes(mimeType);
+        final String[] supportedMimeTypes = EditorInfoCompat.getContentMimeTypes(editorInfo);
+        if (!isRichContentSupported(supportedMimeTypes, contentMimeTypes)) {
+            Log.w(TAG, "Target does not advertise rich content support: package=" + editorInfo.packageName
+                    + ", sentMimeTypes=" + Arrays.toString(contentMimeTypes)
+                    + ", supportedMimeTypes=" + Arrays.toString(supportedMimeTypes));
+            showContentPasteFailedToast();
+            return false;
+        }
+
+        try {
+            final InputContentInfoCompat inputContentInfo = new InputContentInfoCompat(
+                    contentUri,
+                    new ClipDescription(description, contentMimeTypes),
+                    null
+            );
+            try {
+                grantUriPermission(editorInfo.packageName, contentUri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            } catch (Exception e) {
+                Log.e(TAG, "Failed to grant URI permission", e);
+            }
+
+            final boolean success = InputConnectionCompat.commitContent(
+                    inputConnection,
+                    editorInfo,
+                    inputContentInfo,
+                    InputConnectionCompat.INPUT_CONTENT_GRANT_READ_URI_PERMISSION,
+                    null
+            );
+            if (success) return true;
+
+            Log.w(TAG, "Target rejected rich content: package=" + editorInfo.packageName
+                    + ", sentMimeTypes=" + Arrays.toString(contentMimeTypes)
+                    + ", supportedMimeTypes=" + Arrays.toString(supportedMimeTypes));
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to commit rich content", e);
+        }
+
+        showContentPasteFailedToast();
+        return false;
+    }
+
+    private String[] getRichContentMimeTypes(final String mimeType) {
+        if ("image/webp.wasticker".equals(mimeType)) {
+            return new String[]{"image/webp.wasticker", "image/webp"};
+        }
+        return new String[]{mimeType};
+    }
+
+    private boolean isRichContentSupported(final String[] supportedMimeTypes, final String[] contentMimeTypes) {
+        if (supportedMimeTypes == null) return false;
+        for (String contentMimeType : contentMimeTypes) {
+            for (String supportedMimeType : supportedMimeTypes) {
+                if (ClipDescription.compareMimeTypes(contentMimeType, supportedMimeType)) return true;
+            }
+        }
+        return false;
+    }
+
+    private void showContentPasteFailedToast() {
+        mKeyboardSwitcher.showToast(getString(R.string.toast_msg_content_paste_failed), true);
+    }
+
     private void loadSettings() {
         final Locale locale = mRichImm.getCurrentSubtypeLocale();
         final EditorInfo editorInfo = getCurrentInputEditorInfo();

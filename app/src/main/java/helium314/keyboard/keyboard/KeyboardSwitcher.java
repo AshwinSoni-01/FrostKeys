@@ -1380,6 +1380,96 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
         reloadMainKeyboard();
     }
 
+
+    public int getKeyboardShiftMode() {
+        final Keyboard keyboard = getKeyboard();
+        if (keyboard == null) return WordComposer.CAPS_MODE_OFF;
+        return keyboard.mId.getKeyboardCapsMode();
+    }
+
+    public String getCurrentKeyboardScript() {
+        if (mKeyboardLayoutSet == null) return ScriptUtils.SCRIPT_UNKNOWN;
+        return mKeyboardLayoutSet.getScript();
+    }
+
+    public View getVisibleKeyboardView() {
+        if (isShowingEmojiPalettes()) return mEmojiPalettesView;
+        if (isShowingClipboardHistory()) return mClipboardHistoryView;
+        if (isShowingAccessPointMenu()) return mAccessPointMenuView;
+        return mKeyboardView;
+    }
+
+    public MainKeyboardView getMainKeyboardView() { return mKeyboardView; }
+    public MainKeyboardView getKeyboardView() { return mKeyboardView; }
+    public View getWrapperView() { return mKeyboardViewWrapper; }
+    public View getEmojiTabStrip() { return mEmojiTabStripView; }
+    public LinearLayout getClipboardStrip() { return mClipboardStripView; }
+    public EmojiPalettesView getEmojiPalettesView() { return mEmojiPalettesView; }
+    public AccessPointMenuView getAccessPointMenuView() { return mAccessPointMenuView; }
+
+    public boolean isShowingKeyboardId(@NonNull final int... keyboardIds) {
+        if (mKeyboardView == null || !mKeyboardView.isShown()) return false;
+        final Keyboard keyboard = mKeyboardView.getKeyboard();
+        if (keyboard == null) return false;
+        final int activeKeyboardId = keyboard.mId.mElementId;
+        for (final int keyboardId : keyboardIds) {
+            if (activeKeyboardId == keyboardId) return true;
+        }
+        return false;
+    }
+
+    public boolean isShowingEmojiPalettes() {
+        return mEmojiPalettesView != null && mEmojiPalettesView.getVisibility() == View.VISIBLE;
+    }
+
+    public boolean isShowingClipboardHistory() {
+        return mClipboardHistoryView != null && mClipboardHistoryView.getVisibility() == View.VISIBLE;
+    }
+
+    public boolean isShowingAccessPointMenu() {
+        return mAccessPointMenuView != null && mAccessPointMenuView.getVisibility() == View.VISIBLE;
+    }
+
+    public boolean isShowingPopupKeysPanel() {
+        if (isShowingEmojiPalettes() || isShowingClipboardHistory() || isShowingAccessPointMenu()) return false;
+        return mKeyboardView != null && mKeyboardView.isShowingPopupKeysPanel();
+    }
+
+    public boolean isShowingStripContainer() {
+        return mStripContainer != null && mStripContainer.isShown();
+    }
+
+    public void onEvent(final Event event, final int currentAutoCapsState,
+            @Nullable final RecapitalizeMode currentRecapitalizeState) {
+        if (isShowingEmojiPalettes() || isShowingClipboardHistory()) return;
+        mState.onEvent(event, currentAutoCapsState, currentRecapitalizeState);
+    }
+
+    @Override
+    public boolean isInDoubleTapShiftKeyTimeout() {
+        final MainKeyboardView keyboardView = getMainKeyboardView();
+        return keyboardView != null && keyboardView.isInDoubleTapShiftKeyTimeout();
+    }
+
+    public void showToast(final String text, final boolean briefToast) {
+        Toast.makeText(mLatinIME, text, briefToast ? Toast.LENGTH_SHORT : Toast.LENGTH_LONG).show();
+    }
+
+    public void setThemeNeedsReload() {
+        mThemeNeedsReload = true;
+        if (mLatinIME == null || !mLatinIME.isInputViewShown()) return;
+        mLatinIME.hideWindow();
+        try {
+            mLatinIME.showWindow(true);
+        } catch (IllegalStateException e) {
+            Log.w(TAG, "Unable to reload keyboard window immediately", e);
+        }
+    }
+
+    public void switchToSubtype(@Nullable final InputMethodSubtype subtype) {
+        mLatinIME.switchToSubtype(subtype);
+    }
+
     public void reloadMainKeyboard() {
         loadKeyboard(mLatinIME.getCurrentInputEditorInfo(), Settings.getValues(),
                 mLatinIME.getCurrentAutoCapsState(), mLatinIME.getCurrentRecapitalizeState(), null);

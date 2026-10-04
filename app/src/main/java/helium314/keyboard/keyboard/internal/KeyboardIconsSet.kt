@@ -154,9 +154,6 @@ class KeyboardIconsSet private constructor() {
                     ToolbarKey.PAGE_START -> R.drawable.ic_page_start
                     ToolbarKey.PAGE_END -> R.drawable.ic_page_end
                     ToolbarKey.SPLIT -> R.drawable.ic_ime_switcher
-                    ToolbarKey.AI_TOOLS -> R.drawable.ic_ai_tools
-                    ToolbarKey.GIFS -> R.drawable.ic_klipy_gifs
-                    ToolbarKey.STICKERS -> R.drawable.ic_klipy_stickers
                     ToolbarKey.RESIZE -> R.drawable.ic_resize_vertical_rounded
                 })
             }
@@ -219,9 +216,6 @@ class KeyboardIconsSet private constructor() {
                     ToolbarKey.PAGE_START -> R.drawable.ic_page_start
                     ToolbarKey.PAGE_END -> R.drawable.ic_page_end
                     ToolbarKey.SPLIT -> R.drawable.ic_ime_switcher
-                    ToolbarKey.AI_TOOLS -> R.drawable.ic_ai_tools
-                    ToolbarKey.GIFS -> R.drawable.ic_klipy_gifs
-                    ToolbarKey.STICKERS -> R.drawable.ic_klipy_stickers
                     ToolbarKey.RESIZE -> R.drawable.ic_resize_vertical_rounded
                 })
             }
@@ -284,9 +278,6 @@ class KeyboardIconsSet private constructor() {
                     ToolbarKey.PAGE_START -> R.drawable.ic_page_start_rounded
                     ToolbarKey.PAGE_END -> R.drawable.ic_page_end_rounded
                     ToolbarKey.SPLIT -> R.drawable.ic_ime_switcher
-                    ToolbarKey.AI_TOOLS -> R.drawable.ic_ai_tools
-                    ToolbarKey.GIFS -> R.drawable.ic_klipy_gifs
-                    ToolbarKey.STICKERS -> R.drawable.ic_klipy_stickers
                     ToolbarKey.RESIZE -> R.drawable.ic_resize_vertical_rounded
                 })
             }

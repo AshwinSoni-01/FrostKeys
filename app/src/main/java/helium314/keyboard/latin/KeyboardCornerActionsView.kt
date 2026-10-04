@@ -336,13 +336,14 @@ class KeyboardCornerActionsView @JvmOverloads constructor(
         val clipboard = KeyboardIconsSet.instance.getNewDrawable(ToolbarKey.CLIPBOARD.name, context)
         val toolbar = context.getDrawable(R.drawable.ic_access_point_grid)
             ?: return emptyList()
-        clipboard.setTint(colors.get(ColorType.KEY_TEXT))
+        clipboard?.setTint(colors.get(ColorType.KEY_TEXT))
         toolbar.setTint(colors.get(ColorType.KEY_TEXT))
 
+        val clipboardIcon = clipboard ?: return emptyList()
         return listOf(
             Option(
                 action = { KeyboardSwitcher.getInstance().setClipboardKeyboard() },
-                icon = clipboard,
+                icon = clipboardIcon,
                 description = "Clipboard",
                 tintIcon = false
             ),
