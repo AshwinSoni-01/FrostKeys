@@ -1,11 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 package helium314.keyboard.settings.screens
 
-import android.Manifest
 import android.content.Context
 import android.os.Build
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -20,7 +17,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import helium314.keyboard.keyboard.KeyboardSwitcher
 import helium314.keyboard.latin.R
-import helium314.keyboard.latin.permissions.PermissionsUtil
 import helium314.keyboard.latin.settings.Defaults
 import helium314.keyboard.latin.settings.Settings
 import helium314.keyboard.latin.utils.JniUtils
@@ -90,7 +86,6 @@ fun TextCorrectionScreen(
         if (prefs.getBoolean(Settings.PREF_SUGGEST_PUNCTUATION, Defaults.PREF_SUGGEST_PUNCTUATION))
             Settings.PREF_PUNCTUATION_SUGGESTIONS else null,
         Settings.PREF_SUGGEST_CLIPBOARD_CONTENT,
-        Settings.PREF_USE_CONTACTS,
         Settings.PREF_USE_APPS,
         if (prefs.getBoolean(Settings.PREF_KEY_USE_PERSONALIZED_DICTS, Defaults.PREF_KEY_USE_PERSONALIZED_DICTS))
             Settings.PREF_ADD_TO_PERSONAL_DICTIONARY else null,
@@ -236,13 +231,10 @@ fun createCorrectionSettings(context: Context) = listOf(
     ) {
         SwitchPreference(it, Defaults.PREF_SUGGEST_CLIPBOARD_CONTENT)
     },
-    Setting(context, Settings.PREF_USE_CONTACTS,
         R.string.use_contacts_dict, R.string.use_contacts_dict_summary
     ) { setting ->
         val activity = LocalContext.current.getActivity() ?: return@Setting
-        var granted by remember { mutableStateOf(PermissionsUtil.checkAllPermissionsGranted(activity, Manifest.permission.READ_CONTACTS)) }
         var showDisclosureDialog by remember { mutableStateOf(false) }
-        val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
             granted = it
             if (granted)
                 activity.prefs().edit { putBoolean(setting.key, true) }
