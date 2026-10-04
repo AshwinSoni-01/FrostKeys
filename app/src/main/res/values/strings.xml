@@ -439,6 +439,12 @@
     <string name="prefs_side_padding_scale">Side padding scale</string>
     <!-- Title of the setting for rounding the top corners of the keyboard surface -->
     <string name="prefs_keyboard_corner_radius">Keyboard corner roundness</string>
+    <string name="prefs_key_corner_radius">Key corner radius</string>
+    <string name="prefs_key_horizontal_gap_scale">Horizontal key spacing</string>
+    <string name="prefs_key_vertical_gap_scale">Vertical key spacing</string>
+    <string name="prefs_key_icon_scale">Key icon size</string>
+    <string name="prefs_footer_height">Keyboard footer height</string>
+    <string name="prefs_footer_icon_size">Footer icon size</string>
     <!-- Title of the setting for adjusting font size on the keyboard -->
     <string name="prefs_font_scale">Keyboard font scale</string>
     <!-- Title of the setting for adjusting font size in emoji view -->

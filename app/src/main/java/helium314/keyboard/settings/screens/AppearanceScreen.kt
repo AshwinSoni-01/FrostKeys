@@ -74,6 +74,12 @@ fun AppearanceScreen(
         SettingsWithoutKey.BACKGROUND_IMAGE,
         SettingsWithoutKey.BACKGROUND_IMAGE_LANDSCAPE,
         Settings.PREF_KEYBOARD_CORNER_RADIUS,
+        Settings.PREF_KEY_CORNER_RADIUS,
+        Settings.PREF_KEY_HORIZONTAL_GAP_SCALE,
+        Settings.PREF_KEY_VERTICAL_GAP_SCALE,
+        Settings.PREF_KEY_ICON_SCALE,
+        Settings.PREF_FOOTER_HEIGHT_DP,
+        Settings.PREF_FOOTER_ICON_SIZE_DP,
         R.string.settings_category_miscellaneous,
         Settings.PREF_ENABLE_SPLIT_KEYBOARD,
         if (prefs.getBoolean(Settings.PREF_ENABLE_SPLIT_KEYBOARD_LANDSCAPE, Defaults.PREF_ENABLE_SPLIT_KEYBOARD)
@@ -230,6 +236,63 @@ fun createAppearanceSettings(context: Context) = listOf(
             range = Settings.KEYBOARD_CORNER_RADIUS_MIN_DP.toFloat()..Settings.KEYBOARD_CORNER_RADIUS_MAX_DP.toFloat(),
             stepSize = 1,
             description = { "$it dp" }
+        ) { KeyboardSwitcher.getInstance().setThemeNeedsReload() }
+    },
+    Setting(context, Settings.PREF_KEY_CORNER_RADIUS, R.string.prefs_key_corner_radius) { setting ->
+        SliderPreference(
+            name = setting.title,
+            key = setting.key,
+            default = Defaults.PREF_KEY_CORNER_RADIUS,
+            range = Settings.KEY_CORNER_RADIUS_MIN_DP.toFloat()..Settings.KEY_CORNER_RADIUS_MAX_DP.toFloat(),
+            stepSize = 1,
+            description = { "$it dp" }
+        ) { KeyboardSwitcher.getInstance().setThemeNeedsReload() }
+    },
+    Setting(context, Settings.PREF_KEY_HORIZONTAL_GAP_SCALE, R.string.prefs_key_horizontal_gap_scale) { setting ->
+        SliderPreference(
+            name = setting.title,
+            key = setting.key,
+            default = Defaults.PREF_KEY_HORIZONTAL_GAP_SCALE,
+            range = 0.5f..1.5f,
+            description = { (it * 100).toInt().toString() + "%" }
+        ) { KeyboardSwitcher.getInstance().setThemeNeedsReload() }
+    },
+    Setting(context, Settings.PREF_KEY_VERTICAL_GAP_SCALE, R.string.prefs_key_vertical_gap_scale) { setting ->
+        SliderPreference(
+            name = setting.title,
+            key = setting.key,
+            default = Defaults.PREF_KEY_VERTICAL_GAP_SCALE,
+            range = 0.5f..1.5f,
+            description = { (it * 100).toInt().toString() + "%" }
+        ) { KeyboardSwitcher.getInstance().setThemeNeedsReload() }
+    },
+    Setting(context, Settings.PREF_KEY_ICON_SCALE, R.string.prefs_key_icon_scale) { setting ->
+        SliderPreference(
+            name = setting.title,
+            key = setting.key,
+            default = Defaults.PREF_KEY_ICON_SCALE,
+            range = 0.7f..1.3f,
+            description = { (it * 100).toInt().toString() + "%" }
+        ) { KeyboardSwitcher.getInstance().setThemeNeedsReload() }
+    },
+    Setting(context, Settings.PREF_FOOTER_HEIGHT_DP, R.string.prefs_footer_height) { setting ->
+        SliderPreference(
+            name = setting.title,
+            key = setting.key,
+            default = Defaults.PREF_FOOTER_HEIGHT_DP,
+            range = 56f..84f,
+            stepSize = 1,
+            description = { it.toInt().toString() + " dp" }
+        ) { KeyboardSwitcher.getInstance().setThemeNeedsReload() }
+    },
+    Setting(context, Settings.PREF_FOOTER_ICON_SIZE_DP, R.string.prefs_footer_icon_size) { setting ->
+        SliderPreference(
+            name = setting.title,
+            key = setting.key,
+            default = Defaults.PREF_FOOTER_ICON_SIZE_DP,
+            range = 20f..36f,
+            stepSize = 1,
+            description = { it.toInt().toString() + " dp" }
         ) { KeyboardSwitcher.getInstance().setThemeNeedsReload() }
     },
     Setting(context, Settings.PREF_ENABLE_SPLIT_KEYBOARD, R.string.enable_split_keyboard) {

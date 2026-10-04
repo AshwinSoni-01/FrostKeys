@@ -92,13 +92,19 @@ object Defaults {
     val PREF_BOTTOM_PADDING_SCALE = arrayOf(DEFAULT_SIZE_SCALE, 0f, DEFAULT_SIZE_SCALE, 0f)
     @JvmField
     val PREF_SIDE_PADDING_SCALE = Array(8) { 0f }
-    const val PREF_KEYBOARD_CORNER_RADIUS = 24
+    const val PREF_KEYBOARD_CORNER_RADIUS = 28
+    const val PREF_KEY_CORNER_RADIUS = 12
+    const val PREF_KEY_HORIZONTAL_GAP_SCALE = 1.0f
+    const val PREF_KEY_VERTICAL_GAP_SCALE = 1.0f
+    const val PREF_KEY_ICON_SCALE = 0.92f
+    const val PREF_FOOTER_HEIGHT_DP = 68
+    const val PREF_FOOTER_ICON_SIZE_DP = 28
     const val PREF_FONT_SCALE = DEFAULT_SIZE_SCALE
     const val PREF_EMOJI_FONT_SCALE = DEFAULT_SIZE_SCALE
     const val PREF_EMOJI_KEY_FIT = true
     const val PREF_EMOJI_SKIN_TONE = ""
     @JvmField
-    val PREF_SPACE_HORIZONTAL_SWIPE = KeyboardActionListener.SwipeAction.MOVE_CURSOR.name
+    val PREF_SPACE_HORIZONTAL_SWIPE = KeyboardActionListener.SwipeAction.NONE.name
     @JvmField
     val PREF_SPACE_VERTICAL_SWIPE = KeyboardActionListener.SwipeAction.NONE.name
     const val PREF_DELETE_SWIPE = true
@@ -143,7 +149,7 @@ object Defaults {
     const val PREF_SHOW_POPUP_HINTS = false
     const val PREF_SHOW_TLD_POPUP_KEYS = true
     const val PREF_MORE_POPUP_KEYS = "main"
-    const val PREF_SPACE_TO_CHANGE_LANG = true
+    const val PREF_SPACE_TO_CHANGE_LANG = false
     const val PREF_LANGUAGE_SWIPE_DISTANCE = 5
     const val PREF_TOUCHPAD_SENSITIVITY = 50
     const val PREF_TOUCHPAD_EDGE_SCROLL = true

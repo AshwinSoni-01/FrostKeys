@@ -185,6 +185,10 @@ public class Key implements Comparable<Key> {
 
     /** The current pressed state of this key */
     private boolean mPressed;
+    private long mPressAnimationStartTime;
+    private float mPressAnimationFrom;
+    private float mPressAnimationTarget;
+    private static final long PRESS_ANIMATION_DURATION_MS = 90L;
     /** Key is enabled and responds on press */
     private boolean mEnabled;
     /** Key is locked (appears permanently pressed) */
@@ -537,7 +541,7 @@ public class Key implements Comparable<Key> {
     }
 
     public final boolean isLongPressEnabled() {
-        // We need not start long press timer on the key which has activated shifted letter.
+        if (mCode == Constants.CODE_SPACE) return true;
         return (mActionFlags & ACTION_FLAGS_ENABLE_LONG_PRESS) != 0
                 && (mLabelFlags & LABEL_FLAGS_SHIFTED_LETTER_ACTIVATED) == 0;
     }
@@ -813,6 +817,7 @@ public class Key implements Comparable<Key> {
      */
     public void onPressed() {
         mPressed = true;
+        startPressAnimation(1f);
     }
 
     /**
@@ -822,10 +827,36 @@ public class Key implements Comparable<Key> {
      */
     public void onReleased() {
         mPressed = false;
+        startPressAnimation(0f);
     }
 
     public boolean isPressed() {
         return mPressed;
+    }
+
+    public float getPressAnimationScale() {
+        final float progress = getPressAnimationProgress(android.os.SystemClock.uptimeMillis());
+        return 1f - 0.035f * progress;
+    }
+
+    public boolean isPressAnimationRunning() {
+        return mPressAnimationStartTime > 0
+                && android.os.SystemClock.uptimeMillis() - mPressAnimationStartTime < PRESS_ANIMATION_DURATION_MS;
+    }
+
+    private void startPressAnimation(final float target) {
+        final long now = android.os.SystemClock.uptimeMillis();
+        mPressAnimationFrom = getPressAnimationProgress(now);
+        mPressAnimationTarget = target;
+        mPressAnimationStartTime = now;
+    }
+
+    private float getPressAnimationProgress(final long now) {
+        if (mPressAnimationStartTime <= 0) return mPressed ? 1f : 0f;
+        final float linear = Math.min(1f,
+                (now - mPressAnimationStartTime) / (float) PRESS_ANIMATION_DURATION_MS);
+        final float eased = 1f - (float)Math.pow(1f - linear, 3f);
+        return mPressAnimationFrom + (mPressAnimationTarget - mPressAnimationFrom) * eased;
     }
 
     public boolean isLocked() {

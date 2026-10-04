@@ -124,6 +124,9 @@ public class SettingsValues {
     public final boolean mCustomNavBarColor;
     public final float mKeyboardHeightScale;
     public final float mBottomRowScale;
+    public final float mKeyHorizontalGapScale;
+    public final float mKeyVerticalGapScale;
+    public final float mKeyIconScale;
     public final boolean mUrlDetectionEnabled;
     public final float mBottomPaddingScale;
     public final float mSidePaddingScale;
@@ -144,6 +147,9 @@ public class SettingsValues {
     public final float mFontSizeMultiplierEmoji;
     public final boolean mEmojiKeyFit;
     public final int mKeyboardCornerRadiusDp;
+    public final int mKeyCornerRadiusDp;
+    public final int mFooterHeightDp;
+    public final int mFooterIconSizeDp;
     public final PunctuationSuggestions mPunctuationSuggestions;
 
     // From the input box
@@ -270,6 +276,12 @@ public class SettingsValues {
                 || mInputAttributes.mIsPasswordField;
         mKeyboardHeightScale = Settings.readHeightScale(prefs, isLandscape, isFolded);
         mBottomRowScale = Settings.readBottomRowScale(prefs, isLandscape, isFolded);
+        mKeyHorizontalGapScale = Math.max(0.5f, Math.min(1.5f,
+                prefs.getFloat(Settings.PREF_KEY_HORIZONTAL_GAP_SCALE, Defaults.PREF_KEY_HORIZONTAL_GAP_SCALE)));
+        mKeyVerticalGapScale = Math.max(0.5f, Math.min(1.5f,
+                prefs.getFloat(Settings.PREF_KEY_VERTICAL_GAP_SCALE, Defaults.PREF_KEY_VERTICAL_GAP_SCALE)));
+        mKeyIconScale = Math.max(0.7f, Math.min(1.3f,
+                prefs.getFloat(Settings.PREF_KEY_ICON_SCALE, Defaults.PREF_KEY_ICON_SCALE)));
         mSpaceSwipeHorizontal = Settings.readHorizontalSpaceSwipe(prefs);
         mSpaceSwipeVertical = Settings.readVerticalSpaceSwipe(prefs);
         mLanguageSwipeDistance = prefs.getInt(Settings.PREF_LANGUAGE_SWIPE_DISTANCE, Defaults.PREF_LANGUAGE_SWIPE_DISTANCE);
@@ -329,6 +341,13 @@ public class SettingsValues {
         mFontSizeMultiplierEmoji = prefs.getFloat(Settings.PREF_EMOJI_FONT_SCALE, Defaults.PREF_EMOJI_FONT_SCALE);
         mEmojiKeyFit = prefs.getBoolean(Settings.PREF_EMOJI_KEY_FIT, Defaults.PREF_EMOJI_KEY_FIT);
         mKeyboardCornerRadiusDp = Settings.readKeyboardCornerRadius(prefs);
+        mKeyCornerRadiusDp = Math.max(Settings.KEY_CORNER_RADIUS_MIN_DP,
+                Math.min(Settings.KEY_CORNER_RADIUS_MAX_DP,
+                        prefs.getInt(Settings.PREF_KEY_CORNER_RADIUS, Defaults.PREF_KEY_CORNER_RADIUS)));
+        mFooterHeightDp = Math.max(56, Math.min(84,
+                prefs.getInt(Settings.PREF_FOOTER_HEIGHT_DP, Defaults.PREF_FOOTER_HEIGHT_DP)));
+        mFooterIconSizeDp = Math.max(20, Math.min(36,
+                prefs.getInt(Settings.PREF_FOOTER_ICON_SIZE_DP, Defaults.PREF_FOOTER_ICON_SIZE_DP)));
         mPunctuationSuggestions = Settings.readPunctuationSuggestions(context);
     }
 

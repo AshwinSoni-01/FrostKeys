@@ -28,6 +28,7 @@ import android.view.View;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.core.graphics.ColorUtils;
 
 import helium314.keyboard.keyboard.emoji.EmojiPageKeyboardView;
 import helium314.keyboard.keyboard.internal.KeyDrawParams;
@@ -70,6 +71,7 @@ public class KeyboardView extends View {
     private Colors mColors;
     private float mKeyScaleForText;
     protected float mFontSizeMultiplier;
+    private boolean mTouchpadMode;
 
     // The maximum key label width in the proportion to the key width.
     private static final float MAX_LABEL_RATIO = 0.90f;
@@ -321,7 +323,7 @@ public class KeyboardView extends View {
 
             mShowsHints = Settings.getValues().mShowsHints;
             final float scale = Settings.getValues().mKeyboardHeightScale;
-            mIconScaleFactor = scale < 0.8f ? scale + 0.2f : 1f;
+            mIconScaleFactor = (scale < 0.8f ? scale + 0.2f : 1f) * Settings.getValues().mKeyIconScale;
             final Paint paint = mPaint;
             final Drawable background = getBackground();
             // Calculate clip region and set.
@@ -377,6 +379,12 @@ public class KeyboardView extends View {
 
         final KeyVisualAttributes attr = key.getVisualAttributes();
         // don't use the raw key height, linear font scaling with height is too extreme
+        canvas.save();
+        final float keyScale = key.getPressAnimationScale();
+        if (keyScale != 1f) {
+            canvas.scale(keyScale, keyScale, key.getDrawWidth() * 0.5f, key.getHeight() * 0.5f);
+        }
+
         final KeyDrawParams params = mKeyDrawParams.mayCloneAndUpdateParams((int) (key.getHeight() * mKeyScaleForText),
                 attr);
         params.mAnimAlpha = Constants.Color.ALPHA_OPAQUE;
@@ -386,9 +394,13 @@ public class KeyboardView extends View {
                     mKeyBackground, mFunctionalKeyBackground, mSpacebarBackground, mActionKeyBackground);
             onDrawKeyBackground(key, canvas, background);
         }
-        onDrawKeyTopVisuals(key, canvas, paint, params);
+        if (!mTouchpadMode) {
+            onDrawKeyTopVisuals(key, canvas, paint, params);
+        }
 
+        canvas.restore();
         canvas.translate(-keyDrawX, -keyDrawY);
+        if (key.isPressAnimationRunning()) postInvalidateOnAnimation();
     }
 
     // Draw key background.
@@ -456,8 +468,8 @@ public class KeyboardView extends View {
                     colorType = ColorType.KEY_BACKGROUND;
                 }
 
-                mBackgroundPaint.setColor(
-                        KeyBackgroundUtils.fillColorFor(mColors, colorType, key.isPressed() || key.isLocked()));
+                mBackgroundPaint.setColor(touchpadBackgroundColor(
+                        KeyBackgroundUtils.fillColorFor(mColors, colorType, key.isPressed() || key.isLocked())));
 
                 canvas.translate(bgX, bgY);
                 if (isPillShaped) {
@@ -478,8 +490,7 @@ public class KeyboardView extends View {
             final boolean isCircleStyle = KeyboardTheme.STYLE_CIRCLE.equals(themeStyle);
             final boolean isRoundableKey = isCircleStyle
                     ? (!key.isSpacer() && !isSpaceBar)
-                    : (!key.isSpacer() && !key.hasFunctionalBackground()
-                            && (key.getCode() > 0 || key.getCode() == KeyCode.MULTIPLE_CODE_POINTS) && !isSpaceBar);
+                    : (!key.isSpacer() && !isSpaceBar);
 
             if (isSpaceBar || isRoundableKey) {
                 ColorType colorType;
@@ -520,7 +531,10 @@ public class KeyboardView extends View {
                     final float spaceRadius = bgHeight * 0.5f;
                     canvas.drawRoundRect(0f, 0f, bgWidth, bgHeight, spaceRadius, spaceRadius, mBackgroundPaint);
                 } else {
-                    canvas.drawRoundRect(0f, 0f, bgWidth, bgHeight, bgWidth * 0.5f, bgWidth * 0.5f, mBackgroundPaint);
+                    final float radius = Math.min(
+                            Settings.getValues().mKeyCornerRadiusDp * getResources().getDisplayMetrics().density,
+                            Math.min(bgWidth, bgHeight) * 0.32f);
+                    canvas.drawRoundRect(0f, 0f, bgWidth, bgHeight, radius, radius, mBackgroundPaint);
                 }
                 canvas.translate(-bgX, -bgY);
                 return;
@@ -605,6 +619,21 @@ public class KeyboardView extends View {
     }
 
     // Draw key top visuals.
+    private int touchpadBackgroundColor(final int color) {
+        if (!mTouchpadMode) return color;
+        return ColorUtils.blendARGB(color, Color.GRAY, 0.22f);
+    }
+
+    public void setTouchpadMode(final boolean active) {
+        if (mTouchpadMode == active) return;
+        mTouchpadMode = active;
+        invalidateAllKeys();
+    }
+
+    public boolean isTouchpadMode() {
+        return mTouchpadMode;
+    }
+
     protected void onDrawKeyTopVisuals(@NonNull final Key key, @NonNull final Canvas canvas,
             @NonNull final Paint paint, @NonNull final KeyDrawParams params) {
         final int keyWidth = key.getDrawWidth();

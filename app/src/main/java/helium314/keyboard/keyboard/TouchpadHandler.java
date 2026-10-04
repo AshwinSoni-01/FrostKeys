@@ -13,9 +13,13 @@ public class TouchpadHandler {
     private final android.os.Handler mHandler = new android.os.Handler(android.os.Looper.getMainLooper());
 
     private static boolean sTouchpadModeActive = false;
+    private static TouchpadHandler sActiveHandler;
+    private static int sActivePointerId = -1;
     private boolean mInTouchpadMode = false;
     private boolean mHasVibrated = false;
     private boolean mIsScrolling = false;
+    private boolean mSelecting = false;
+    private int mSelectionPointerId = -1;
 
     private static final float EDGE_THRESHOLD_PERCENTAGE = 0.1f;        // Screen edge threshold percentage
     private static final float TOUCHPAD_ACCELERATION_FACTOR = 50.0f;    // Lower = more acceleration
@@ -38,50 +42,96 @@ public class TouchpadHandler {
 
     public static void setTouchpadModeActive(boolean active) {
         sTouchpadModeActive = active;
+        if (!active) {
+            sActiveHandler = null;
+            sActivePointerId = -1;
+        }
+    }
+
+    public static boolean isTouchpadModeActive() {
+        return sActiveHandler != null && sActiveHandler.mInTouchpadMode;
+    }
+
+    public static boolean onSecondaryPointerDown(int pointerId) {
+        if (!isTouchpadModeActive() || pointerId == sActivePointerId) return false;
+        sActiveHandler.beginSelection(pointerId);
+        return true;
+    }
+
+    public static boolean isSecondaryPointer(int pointerId) {
+        return isTouchpadModeActive() && sActiveHandler.mSelectionPointerId == pointerId;
+    }
+
+    public static boolean onPointerUp(int pointerId) {
+        if (!isTouchpadModeActive()) return false;
+        if (pointerId == sActiveHandler.mSelectionPointerId) {
+            sActiveHandler.endSelection();
+            return true;
+        }
+        return false;
+    }
+
+    public void activateTouchpad(final int pointerId, final int x, final int y,
+            final KeyboardActionListener listener) {
+        if (mInTouchpadMode) return;
+        sTouchpadModeActive = true;
+        sActiveHandler = this;
+        sActivePointerId = pointerId;
+        mListener = listener;
+        mInTouchpadMode = true;
+        mHasVibrated = true;
+        mTouchpadLastX = x;
+        mTouchpadLastY = y;
+        mTouchpadAccX = 0;
+        mTouchpadAccY = 0;
+        mListener.onCustomRequest(Constants.CODE_TOUCHPAD_ON);
+        stopHapticRunnable();
     }
 
     public void disableTouchpadMode() {
         if (!mInTouchpadMode) return;
         stopEdgeScrolling();
         stopHapticRunnable();
+        if (mSelecting) endSelection();
         mInTouchpadMode = false;
-        sTouchpadModeActive = false;
-        mListener.onCustomRequest(Constants.CODE_TOUCHPAD_OFF);
+        if (sActiveHandler == this) {
+            sTouchpadModeActive = false;
+            sActiveHandler = null;
+            sActivePointerId = -1;
+        }
+        if (mListener != null) mListener.onCustomRequest(Constants.CODE_TOUCHPAD_OFF);
         mListener = null;
     }
 
-    public void enableTouchpadMove(int x, int y, KeyboardActionListener listener) {
-        if (!sTouchpadModeActive) return;
+    private void beginSelection(final int pointerId) {
+        if (mSelecting || mListener == null) return;
+        mSelecting = true;
+        mSelectionPointerId = pointerId;
+        mListener.onTouchpadSelectionStart();
+        mListener.onCustomRequest(Constants.CODE_PERFORM_HAPTIC);
+    }
 
-        // Initialize
+    private void endSelection() {
+        if (!mSelecting) return;
+        mSelecting = false;
+        mSelectionPointerId = -1;
+        if (mListener != null) mListener.onTouchpadSelectionEnd();
+    }
+
+    public void enableTouchpadMove(int pointerId, int x, int y, KeyboardActionListener listener) {
+        if (!sTouchpadModeActive) return;
         if (!mInTouchpadMode) {
-            mListener = listener;
-            mInTouchpadMode = true;
-            mHasVibrated = false;
-            mTouchpadLastX = x;
-            mTouchpadLastY = y;
-            mTouchpadActivationTime = SystemClock.elapsedRealtime();
-            mListener.onCustomRequest(Constants.CODE_TOUCHPAD_ON);
-            SettingsValues sv = Settings.getValues();
-            mHandler.postDelayed(mHapticRunnable, sv.mKeyLongpressTimeout);
+            activateTouchpad(pointerId, x, y, listener);
             return;
         }
-
         onMove(x, y);
     }
 
     private void onMove(int x, int y) {
         SettingsValues sv = Settings.getValues();
 
-        // Debounce
-        if (SystemClock.elapsedRealtime() - mTouchpadActivationTime < sv.mKeyLongpressTimeout) {
-            mTouchpadLastX = x;
-            mTouchpadLastY = y;
-            return;
-        }
-
-        // Edge Scrolling
-        if (sv.mTouchpadEdgeScroll && handleEdgeScrolling(x, y)) {
+        // Edge scrolling should not interrupt text selection movement.
+        if (!mSelecting && sv.mTouchpadEdgeScroll && handleEdgeScrolling(x, y)) {
             return;
         }
 
@@ -92,17 +142,10 @@ public class TouchpadHandler {
         mTouchpadLastX = x;
         mTouchpadLastY = y;
 
-        if (Math.abs(deltaX) > Math.abs(deltaY)) {
-            // Horizontal move, X only
-            float accFactorX = 1.0f + (Math.abs(deltaX) / TOUCHPAD_ACCELERATION_FACTOR);
-            mTouchpadAccX += (int) (deltaX * accFactorX);
-            mTouchpadAccY = 0;
-        } else {
-            // Vertical move, Y only
-            float accFactorY = 1.0f + (Math.abs(deltaY) / TOUCHPAD_ACCELERATION_FACTOR);
-            mTouchpadAccY += (int) (deltaY * accFactorY);
-            mTouchpadAccX = 0;
-        }
+        float accFactorX = 1.0f + (Math.abs(deltaX) / TOUCHPAD_ACCELERATION_FACTOR);
+        float accFactorY = 1.0f + (Math.abs(deltaY) / TOUCHPAD_ACCELERATION_FACTOR);
+        mTouchpadAccX += (int) (deltaX * accFactorX);
+        mTouchpadAccY += (int) (deltaY * accFactorY);
 
         // Calculate dynamic threshold based on sensitivity setting (0-100)
         // Higher sensitivity = Lower threshold (faster cursor)
@@ -116,7 +159,11 @@ public class TouchpadHandler {
         while (Math.abs(mTouchpadAccX) >= moveThreshold) {
             boolean positive = mTouchpadAccX > 0;
             int direction = positive ? KeyCode.ARROW_RIGHT : KeyCode.ARROW_LEFT;
-            mListener.onCodeInput(direction, Constants.NOT_A_COORDINATE, Constants.NOT_A_COORDINATE, false);
+            if (mSelecting) {
+                mListener.onTouchpadSelectionMove(positive ? 1 : -1, 0);
+            } else {
+                mListener.onCodeInput(direction, Constants.NOT_A_COORDINATE, Constants.NOT_A_COORDINATE, false);
+            }
             mTouchpadAccX -= (positive ? moveThreshold : -moveThreshold);
         }
 
@@ -124,7 +171,11 @@ public class TouchpadHandler {
         while (Math.abs(mTouchpadAccY) >= moveThreshold) {
             boolean positive = mTouchpadAccY > 0;
             int direction = positive ? KeyCode.ARROW_DOWN : KeyCode.ARROW_UP;
-            mListener.onCodeInput(direction, Constants.NOT_A_COORDINATE, Constants.NOT_A_COORDINATE, false);
+            if (mSelecting) {
+                mListener.onTouchpadSelectionMove(0, positive ? 1 : -1);
+            } else {
+                mListener.onCodeInput(direction, Constants.NOT_A_COORDINATE, Constants.NOT_A_COORDINATE, false);
+            }
             mTouchpadAccY -= (positive ? moveThreshold : -moveThreshold);
         }
     }

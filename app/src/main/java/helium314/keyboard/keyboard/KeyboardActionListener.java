@@ -114,6 +114,9 @@ public interface KeyboardActionListener {
 
     void onMoveDeletePointer(int steps);
     void onUpWithDeletePointerActive();
+    void onTouchpadSelectionStart();
+    void onTouchpadSelectionMove(int stepsX, int stepsY);
+    void onTouchpadSelectionEnd();
     void resetMetaState();
 
     KeyboardActionListener EMPTY_LISTENER = new Adapter();
@@ -169,6 +172,12 @@ public interface KeyboardActionListener {
         public void onMoveDeletePointer(int steps) {}
         @Override
         public void onUpWithDeletePointerActive() {}
+        @Override
+        public void onTouchpadSelectionStart() {}
+        @Override
+        public void onTouchpadSelectionMove(int stepsX, int stepsY) {}
+        @Override
+        public void onTouchpadSelectionEnd() {}
         @Override
         public void resetMetaState() {}
     }

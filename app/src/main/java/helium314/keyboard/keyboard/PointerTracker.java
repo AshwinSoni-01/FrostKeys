@@ -630,6 +630,9 @@ public final class PointerTracker implements PointerTrackerQueue.Element,
             final int pointerCount = me.getPointerCount();
             for (int index = 0; index < pointerCount; index++) {
                 final int id = me.getPointerId(index);
+                if (TouchpadHandler.isSecondaryPointer(id)) {
+                    continue;
+                }
                 if (shouldIgnoreOtherPointers && id != mPointerId) {
                     continue;
                 }
@@ -641,8 +644,17 @@ public final class PointerTracker implements PointerTrackerQueue.Element,
             return;
         }
         final int index = me.getActionIndex();
+        final int pointerId = me.getPointerId(index);
         final int x = (int)me.getX(index);
         final int y = (int)me.getY(index);
+        if (action == MotionEvent.ACTION_POINTER_DOWN
+                && TouchpadHandler.onSecondaryPointerDown(pointerId)) {
+            return;
+        }
+        if (action == MotionEvent.ACTION_POINTER_UP
+                && TouchpadHandler.onPointerUp(pointerId)) {
+            return;
+        }
         switch (action) {
             case MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> onDownEvent(x, y, eventTime, keyDetector);
             case MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP -> onUpEvent(x, y, eventTime);
@@ -955,7 +967,7 @@ public final class PointerTracker implements PointerTrackerQueue.Element,
             int dY = y - mStartY;
 
             // Touchpad mode
-            mTouchpadHandler.enableTouchpadMove(x, y, sListener);
+            mTouchpadHandler.enableTouchpadMove(mPointerId, x, y, sListener);
 
             // Vertical movement
             int stepsY = dY / sPointerStep;
@@ -1099,11 +1111,10 @@ public final class PointerTracker implements PointerTrackerQueue.Element,
         if (mKeySwipeAllowed) {
             mKeySwipeAllowed = false;
             sInKeySwipe = false;
-
-            // Touchpad mode
+            final boolean touchpadWasActive = TouchpadHandler.isTouchpadModeActive();
             mTouchpadHandler.disableTouchpadMode();
 
-            if (mInHorizontalSwipe || mInVerticalSwipe) {
+            if (touchpadWasActive || mInHorizontalSwipe || mInVerticalSwipe) {
                 mInHorizontalSwipe = false;
                 mInVerticalSwipe = false;
                 sListener.onEndSpaceSwipe();
@@ -1167,10 +1178,16 @@ public final class PointerTracker implements PointerTrackerQueue.Element,
             return;
         }
         final int code = key.getCode();
+        if (code == Constants.CODE_SPACE && !Settings.getValues().mSpaceForLangChange) {
+            mTouchpadHandler.activateTouchpad(mPointerId, mLastX, mLastY, sListener);
+            mKeySwipeAllowed = true;
+            sInKeySwipe = true;
+            setReleasedKeyGraphics(key, false);
+            return;
+        }
         if (code == KeyCode.LANGUAGE_SWITCH
                 || (code == Constants.CODE_SPACE && key.getPopupKeys() == null && Settings.getValues().mSpaceForLangChange)
         ) {
-            // Long pressing the space key invokes IME switcher dialog.
             if (sListener.onCustomRequest(Constants.CUSTOM_CODE_SHOW_INPUT_METHOD_PICKER)) {
                 cancelKeyTracking();
                 sListener.onReleaseKey(code, false);

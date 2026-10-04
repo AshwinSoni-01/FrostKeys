@@ -3,6 +3,7 @@ package helium314.keyboard.keyboard
 
 import android.text.InputType
 import android.util.SparseArray
+import android.os.SystemClock
 import android.view.KeyEvent
 import android.view.inputmethod.InputMethodSubtype
 import androidx.core.util.forEach
@@ -141,11 +142,11 @@ class KeyboardActionListenerImpl(private val latinIME: LatinIME, private val inp
             return latinIME.showInputPickerDialog()
         }
         if (requestCode == Constants.CODE_TOUCHPAD_ON) {
-            keyboardSwitcher.mainKeyboardView?.alpha = 0.5f
+            keyboardSwitcher.mainKeyboardView?.setTouchpadMode(true)
             return true
         }
         if (requestCode == Constants.CODE_TOUCHPAD_OFF) {
-            keyboardSwitcher.mainKeyboardView?.alpha = 1.0f
+            keyboardSwitcher.mainKeyboardView?.setTouchpadMode(false)
             return true
         }
         if (requestCode == Constants.CODE_PERFORM_HAPTIC) {
@@ -216,6 +217,32 @@ class KeyboardActionListenerImpl(private val latinIME: LatinIME, private val inp
         if (!connection.hasSelection()) return
         inputLogic.finishInput()
         onCodeInput(KeyCode.DELETE, Constants.NOT_A_COORDINATE, Constants.NOT_A_COORDINATE, false)
+    }
+
+    override fun onTouchpadSelectionStart() {
+        inputLogic.finishInput()
+    }
+
+    override fun onTouchpadSelectionMove(stepsX: Int, stepsY: Int) {
+        repeat(kotlin.math.abs(stepsX)) {
+            sendShiftArrow(if (stepsX > 0) KeyEvent.KEYCODE_DPAD_RIGHT else KeyEvent.KEYCODE_DPAD_LEFT)
+        }
+        repeat(kotlin.math.abs(stepsY)) {
+            sendShiftArrow(if (stepsY > 0) KeyEvent.KEYCODE_DPAD_DOWN else KeyEvent.KEYCODE_DPAD_UP)
+        }
+    }
+
+    override fun onTouchpadSelectionEnd() = Unit
+
+    private fun sendShiftArrow(keyCode: Int) {
+        val down = SystemClock.uptimeMillis()
+        connection.sendKeyEvent(
+            KeyEvent(down, down, KeyEvent.ACTION_DOWN, keyCode, 0, KeyEvent.META_SHIFT_ON)
+        )
+        val up = SystemClock.uptimeMillis()
+        connection.sendKeyEvent(
+            KeyEvent(down, up, KeyEvent.ACTION_UP, keyCode, 0, KeyEvent.META_SHIFT_ON)
+        )
     }
 
     override fun resetMetaState() {

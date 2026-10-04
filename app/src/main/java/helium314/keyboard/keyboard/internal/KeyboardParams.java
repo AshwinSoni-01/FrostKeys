@@ -16,6 +16,7 @@ import androidx.annotation.Nullable;
 
 import helium314.keyboard.keyboard.Key;
 import helium314.keyboard.keyboard.KeyboardId;
+import helium314.keyboard.keyboard.KeyboardTheme;
 import helium314.keyboard.keyboard.internal.keyboard_parser.LocaleKeyboardInfos;
 import helium314.keyboard.keyboard.internal.keyboard_parser.floris.KeyCode;
 import helium314.keyboard.latin.R;
@@ -240,7 +241,8 @@ public class KeyboardParams {
             mDefaultAbsoluteKeyWidth = (int) (mDefaultKeyWidth * mBaseWidth);
             mAbsolutePopupKeyWidth = (int) (alphaSymbolKeyWidth * mBaseWidth);
 
-            if (Settings.getValues().mNarrowKeyGaps) {
+            final SettingsValues geometry = Settings.getValues();
+            if (geometry.mNarrowKeyGaps) {
                 mRelativeHorizontalGap = keyboardAttr.getFraction(
                         R.styleable.Keyboard_horizontalGapNarrow, 1, 1, 0);
                 mRelativeVerticalGap = keyboardAttr.getFraction(
@@ -250,10 +252,16 @@ public class KeyboardParams {
                         R.styleable.Keyboard_horizontalGap, 1, 1, 0);
                 mRelativeVerticalGap = keyboardAttr.getFraction(
                         R.styleable.Keyboard_verticalGap, 1, 1, 0);
-                // TODO: Fix keyboard geometry calculation clearer. Historically vertical gap between
-                //  rows are determined based on the entire keyboard height including top and bottom
-                //  paddings.
             }
+            if (geometry.mColors != null
+                    && KeyboardTheme.STYLE_ROUNDED.equals(geometry.mColors.getThemeStyle())
+                    && !mId.isEmojiKeyboard()) {
+                // Responsive baseline tuned for 1080px-class portrait phones.
+                mRelativeHorizontalGap = 0.0085f;
+                mRelativeVerticalGap = 0.018f;
+            }
+            mRelativeHorizontalGap *= geometry.mKeyHorizontalGapScale;
+            mRelativeVerticalGap *= geometry.mKeyVerticalGapScale;
             mHorizontalGap = (int) (mRelativeHorizontalGap * width);
             mVerticalGap = (int) (mRelativeVerticalGap * height);
 

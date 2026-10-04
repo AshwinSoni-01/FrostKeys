@@ -53,7 +53,6 @@ class KeyboardCornerActionsView @JvmOverloads constructor(
 
     private val handler = Handler(Looper.getMainLooper())
     private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
-    private val longPressTimeout = 320L
 
     private var inputMethodService: InputMethodService? = null
     private var activeAction: Action? = null
@@ -76,6 +75,13 @@ class KeyboardCornerActionsView @JvmOverloads constructor(
 
     fun bindInputMethodService(service: InputMethodService) {
         inputMethodService = service
+    }
+
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        val lp = layoutParams
+        lp?.height = Settings.getValues().mFooterHeightDp.dpToPx(resources)
+        if (lp != null) layoutParams = lp
     }
 
     override fun onFinishInflate() {
@@ -105,9 +111,9 @@ class KeyboardCornerActionsView @JvmOverloads constructor(
                     movedBeforeLongPress = false
                     downRawX = event.rawX
                     downRawY = event.rawY
-                    button.alpha = 0.65f
+                    pressButton(button)
                     handler.removeCallbacks(longPressRunnable)
-                    handler.postDelayed(longPressRunnable, longPressTimeout)
+                    handler.postDelayed(longPressRunnable, Settings.getValues().mKeyLongpressTimeout.toLong())
                     true
                 }
 
@@ -120,13 +126,14 @@ class KeyboardCornerActionsView @JvmOverloads constructor(
                         movedBeforeLongPress = true
                         handler.removeCallbacks(longPressRunnable)
                     }
+                    updateButtonStretch(button, event.rawX - downRawX, event.rawY - downRawY)
                     if (longPressTriggered) updateSelection(event.rawX, event.rawY)
                     true
                 }
 
                 MotionEvent.ACTION_UP -> {
                     handler.removeCallbacks(longPressRunnable)
-                    button.alpha = 1f
+                    releaseButton(button)
                     if (longPressTriggered) {
                         val index = findOptionAt(event.rawX, event.rawY)
                         if (index >= 0) popupOptions[index].action()
@@ -149,6 +156,31 @@ class KeyboardCornerActionsView @JvmOverloads constructor(
                 else -> false
             }
         }
+    }
+
+    private fun pressButton(button: ImageButton) {
+        button.animate().cancel()
+        button.animate().alpha(0.72f).scaleX(1.045f).scaleY(1.045f)
+            .setDuration(70L)
+            .setInterpolator(android.view.animation.DecelerateInterpolator())
+            .start()
+    }
+
+    private fun releaseButton(button: ImageButton) {
+        button.animate().cancel()
+        button.animate().alpha(1f).scaleX(1f).scaleY(1f).translationX(0f).translationY(0f)
+            .setDuration(120L)
+            .setInterpolator(android.view.animation.OvershootInterpolator(1.1f))
+            .start()
+    }
+
+    private fun updateButtonStretch(button: ImageButton, dx: Float, dy: Float) {
+        if (!longPressTriggered) return
+        val travel = 56.dpToPx(resources).toFloat()
+        button.scaleX = 1f + (kotlin.math.abs(dx) / travel).coerceIn(0f, 0.12f)
+        button.scaleY = 1f + (kotlin.math.abs(dy) / travel).coerceIn(0f, 0.12f)
+        button.translationX = dx.coerceIn(-12.dpToPx(resources).toFloat(), 12.dpToPx(resources).toFloat()) * 0.18f
+        button.translationY = dy.coerceIn(-12.dpToPx(resources).toFloat(), 12.dpToPx(resources).toFloat()) * 0.12f
     }
 
     private fun performTap(action: Action) {
@@ -199,12 +231,9 @@ class KeyboardCornerActionsView @JvmOverloads constructor(
                 }
                 contentDescription = option.description
                 scaleType = ImageView.ScaleType.CENTER_INSIDE
-                setPadding(
-                    9.dpToPx(resources),
-                    9.dpToPx(resources),
-                    9.dpToPx(resources),
-                    9.dpToPx(resources)
-                )
+                val iconSize = Settings.getValues().mFooterIconSizeDp.coerceIn(20, 36)
+                val pad = ((48 - iconSize) / 2).dpToPx(resources)
+                setPadding(pad, pad, pad, pad)
             }
             panel.addView(button)
         }
@@ -219,6 +248,14 @@ class KeyboardCornerActionsView @JvmOverloads constructor(
             }
         }
         addView(panel, lp)
+        panel.alpha = 0f
+        panel.scaleX = 0.86f
+        panel.scaleY = 0.86f
+        panel.translationY = 5.dpToPx(resources).toFloat()
+        panel.animate().alpha(1f).scaleX(1f).scaleY(1f).translationY(0f)
+            .setDuration(180L)
+            .setInterpolator(android.view.animation.OvershootInterpolator(1.05f))
+            .start()
     }
 
     private fun popupBackground(): GradientDrawable {

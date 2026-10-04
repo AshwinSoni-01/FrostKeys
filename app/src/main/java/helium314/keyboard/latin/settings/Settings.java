@@ -124,7 +124,15 @@ public final class Settings implements SharedPreferences.OnSharedPreferenceChang
     public static final String PREF_ENABLE_SPLIT_KEYBOARD_FOLDED_LANDSCAPE = "split_keyboard_folded_landscape";
     public static final String PREF_KEYBOARD_CORNER_RADIUS = "keyboard_corner_radius";
     public static final int KEYBOARD_CORNER_RADIUS_MIN_DP = 0;
-    public static final int KEYBOARD_CORNER_RADIUS_MAX_DP = 32;
+    public static final int KEYBOARD_CORNER_RADIUS_MAX_DP = 40;
+    public static final String PREF_KEY_CORNER_RADIUS = "key_corner_radius";
+    public static final int KEY_CORNER_RADIUS_MIN_DP = 6;
+    public static final int KEY_CORNER_RADIUS_MAX_DP = 24;
+    public static final String PREF_KEY_HORIZONTAL_GAP_SCALE = "key_horizontal_gap_scale";
+    public static final String PREF_KEY_VERTICAL_GAP_SCALE = "key_vertical_gap_scale";
+    public static final String PREF_KEY_ICON_SCALE = "key_icon_scale";
+    public static final String PREF_FOOTER_HEIGHT_DP = "footer_height_dp";
+    public static final String PREF_FOOTER_ICON_SIZE_DP = "footer_icon_size_dp";
     public static final String PREF_SPLIT_SPACER_SCALE_PREFIX = "split_spacer_scale";
     public static final String PREF_KEYBOARD_HEIGHT_SCALE_PREFIX = "keyboard_height_scale";
     public static final float KEYBOARD_HEIGHT_SCALE_MIN = 0.3f;
