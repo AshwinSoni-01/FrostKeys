@@ -115,7 +115,6 @@ fun MainSettingsScreen(
     onClickLanguage: () -> Unit,
     onClickLayouts: () -> Unit,
     onClickDictionaries: () -> Unit,
-    onClickCloud: () -> Unit,
     onClickWelcomeWizard: () -> Unit,
     onClickBack: () -> Unit,
 ) {
@@ -152,12 +151,7 @@ fun MainSettingsScreen(
             val isDictionaryComplete = remember(b?.value) {
                 ctx.prefs().getBoolean("pref_enable_next_word_suggestions", true)
             }
-            val isCloudComplete = remember(b?.value) {
-                val gem = ctx.prefs().getString("pref_gemini_api_key", "")
-                val kli = ctx.prefs().getString("pref_klipy_api_key", "")
-                !gem.isNullOrBlank() || !kli.isNullOrBlank()
-            }
-            val allStepsComplete = isGestureComplete && isDictionaryComplete && isCloudComplete
+            val allStepsComplete = isGestureComplete && isDictionaryComplete
             val isDismissed = remember(b?.value) {
                 ctx.prefs().getBoolean("pref_quick_setup_dismissed", false)
             }
@@ -182,13 +176,11 @@ fun MainSettingsScreen(
                             QuickSetupCard(
                                 onClickGestureTyping = onClickGestureTyping,
                                 onClickDictionaries = onClickDictionaries,
-                                onClickCloud = onClickCloud,
                                 onDismiss = {
                                     ctx.prefs().edit().putBoolean("pref_quick_setup_dismissed", true).apply()
                                 },
                                 isGestureComplete = isGestureComplete,
                                 isDictionaryComplete = isDictionaryComplete,
-                                isCloudComplete = isCloudComplete,
                                 allStepsComplete = allStepsComplete
                             )
                         }
@@ -220,13 +212,6 @@ fun MainSettingsScreen(
                                 title = stringResource(R.string.settings_screen_toolbar),
                                 description = "Customize the toolbar layout and pinned buttons",
                                 onClick = onClickToolbar
-                            )
-                            Md3ePreference(
-                                icon = "cloud",
-                                title = stringResource(R.string.cloud_features),
-                                description = "Gemini assistant, smart tools, and GIF searches",
-                                onClick = onClickCloud,
-                                isLast = true
                             )
                         }
                     }
@@ -568,11 +553,11 @@ private fun QuickSetupCard(
                             isComplete = isDictionaryComplete,
                         )
                         QuickSetupStep(
-                            icon = "cloud",
-                            title = stringResource(R.string.quick_setup_cloud_title),
-                            description = stringResource(R.string.quick_setup_cloud_desc),
-                            onClick = onClickCloud,
-                            isComplete = isCloudComplete,
+                            icon = "check_circle",
+                            title = "Offline mode",
+                            description = "Cloud and AI features are disabled",
+                            onClick = { },
+                            isComplete = true,
                             isLast = true
                         )
                     }
