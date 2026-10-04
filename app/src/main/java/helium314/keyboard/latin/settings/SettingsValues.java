@@ -6,7 +6,6 @@
 
 package helium314.keyboard.latin.settings;
 
-import android.Manifest;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.content.res.Configuration;
@@ -28,7 +27,6 @@ import helium314.keyboard.latin.PunctuationSuggestions;
 import helium314.keyboard.latin.R;
 import helium314.keyboard.latin.RichInputMethodManager;
 import helium314.keyboard.latin.common.Colors;
-import helium314.keyboard.latin.permissions.PermissionsUtil;
 import helium314.keyboard.latin.utils.FoldableUtils;
 import helium314.keyboard.latin.utils.InputTypeUtils;
 import helium314.keyboard.latin.utils.JniUtils;
@@ -394,14 +392,16 @@ public class SettingsValues {
         return mDisplayOrientation == configuration.orientation;
     }
 
-    private static boolean readUseContactsEnabled(final SharedPreferences prefs, final Context ctx) {
-        final boolean setting = prefs.getBoolean(Settings.PREF_USE_CONTACTS, Defaults.PREF_USE_CONTACTS);
-        if (!setting) return false;
-        if (PermissionsUtil.checkAllPermissionsGranted(ctx, Manifest.permission.READ_CONTACTS)) {
-            return true;
-        }
+    
         // disable if permission not granted
         prefs.edit().putBoolean(Settings.PREF_USE_CONTACTS, false).apply();
+        return false;
+    }
+
+    private static boolean readUseContactsEnabled(final SharedPreferences prefs, final Context ctx) {
+        if (prefs.getBoolean(Settings.PREF_USE_CONTACTS, false)) {
+            prefs.edit().putBoolean(Settings.PREF_USE_CONTACTS, false).apply();
+        }
         return false;
     }
 
