@@ -68,7 +68,6 @@ import helium314.keyboard.keyboard.Keyboard;
 import helium314.keyboard.keyboard.KeyboardId;
 import helium314.keyboard.keyboard.KeyboardLayoutSet;
 import helium314.keyboard.keyboard.KeyboardSwitcher;
-import helium314.keyboard.keyboard.KlipyPalettesView;
 import helium314.keyboard.keyboard.MainKeyboardView;
 import helium314.keyboard.latin.SuggestedWords.SuggestedWordInfo;
 import helium314.keyboard.latin.common.ColorType;
@@ -900,96 +899,15 @@ public class LatinIME extends InputMethodService implements
         }
     }
 
-    public boolean commitKlipyContent(Uri contentUri, String description, String mimeType) {
-        final EditorInfo editorInfo = getCurrentInputEditorInfo();
-        final InputConnection inputConnection = getCurrentInputConnection();
-        if (editorInfo == null || inputConnection == null) {
-            showContentPasteFailedToast();
-            return false;
-        }
+    
 
-        final String[] contentMimeTypes = getKlipyContentMimeTypes(mimeType);
-        final String[] supportedMimeTypes = EditorInfoCompat.getContentMimeTypes(editorInfo);
-        if (!isKlipyContentSupported(supportedMimeTypes, contentMimeTypes)) {
-            Log.w(TAG, "Target does not advertise rich content support: package=" + editorInfo.packageName
-                    + ", sentMimeTypes=" + Arrays.toString(contentMimeTypes)
-                    + ", supportedMimeTypes=" + Arrays.toString(supportedMimeTypes)
-                    + ", " + describeRichContentForLog(contentUri));
-            showContentPasteFailedToast();
-            return false;
-        }
+    
 
-        try {
-            final InputContentInfoCompat inputContentInfo = new InputContentInfoCompat(
-                    contentUri,
-                    new ClipDescription(description, contentMimeTypes),
-                    null
-            );
+    
 
-            try {
-                grantUriPermission(editorInfo.packageName, contentUri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
-            } catch (Exception e) {
-                Log.e(TAG, "Failed to grant URI permission", e);
-            }
+    
 
-            final boolean success = InputConnectionCompat.commitContent(inputConnection, editorInfo, inputContentInfo,
-                    InputConnectionCompat.INPUT_CONTENT_GRANT_READ_URI_PERMISSION, null);
-            if (success) return true;
-            Log.w(TAG, "Target rejected rich content: package=" + editorInfo.packageName
-                    + ", sentMimeTypes=" + Arrays.toString(contentMimeTypes)
-                    + ", supportedMimeTypes=" + Arrays.toString(supportedMimeTypes)
-                    + ", " + describeRichContentForLog(contentUri));
-        } catch (Exception e) {
-            Log.e(TAG, "Failed to commit rich content: package=" + editorInfo.packageName
-                    + ", sentMimeTypes=" + Arrays.toString(contentMimeTypes)
-                    + ", supportedMimeTypes=" + Arrays.toString(supportedMimeTypes)
-                    + ", " + describeRichContentForLog(contentUri), e);
-        }
-
-        showContentPasteFailedToast();
-        return false;
-    }
-
-    private String[] getKlipyContentMimeTypes(final String mimeType) {
-        if ("image/webp.wasticker".equals(mimeType)) {
-            return new String[]{"image/webp.wasticker", "image/webp"};
-        }
-        return new String[]{mimeType};
-    }
-
-    private boolean isKlipyContentSupported(final String[] supportedMimeTypes, final String[] contentMimeTypes) {
-        if (supportedMimeTypes == null) return false;
-        for (String contentMimeType : contentMimeTypes) {
-            for (String supportedMimeType : supportedMimeTypes) {
-                if (ClipDescription.compareMimeTypes(contentMimeType, supportedMimeType)) {
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-
-    private String describeRichContentForLog(final Uri contentUri) {
-        String providerType = null;
-        long contentLength = -1L;
-        try {
-            providerType = getContentResolver().getType(contentUri);
-        } catch (Exception e) {
-            Log.w(TAG, "Failed to read rich content provider type for " + contentUri, e);
-        }
-        try (AssetFileDescriptor descriptor = getContentResolver().openAssetFileDescriptor(contentUri, "r")) {
-            if (descriptor != null) {
-                contentLength = descriptor.getLength();
-            }
-        } catch (Exception e) {
-            Log.w(TAG, "Failed to read rich content length for " + contentUri, e);
-        }
-        return "uri=" + contentUri + ", providerType=" + providerType + ", length=" + contentLength;
-    }
-
-    private void showContentPasteFailedToast() {
-        mKeyboardSwitcher.showToast(getString(R.string.toast_msg_content_paste_failed), true);
-    }
+    
 
     private void loadSettings() {
         final Locale locale = mRichImm.getCurrentSubtypeLocale();
@@ -1567,7 +1485,7 @@ public class LatinIME extends InputMethodService implements
         deallocateMemory();
 
         // Reset to the main alphabet keyboard so that reopening always shows the ABC view
-        // instead of whatever panel (emoji, clipboard, AI tools, klipy) was active.
+
         mKeyboardSwitcher.setAlphabetKeyboard();
     }
 
@@ -2016,10 +1934,7 @@ public class LatinIME extends InputMethodService implements
         mGestureConsumer.onGestureCanceled();
     }
 
-    public void getKlipySearchGestureSuggestion(final InputPointers batchPointers,
-            final Keyboard keyboard, final Suggest.OnGetSuggestedWordsCallback callback) {
-        mInputLogic.getGestureSuggestedWordsForExternalInput(batchPointers, keyboard, callback);
-    }
+    
 
     /**
      * To be called after the InputLogic has gotten a chance to act on the suggested
@@ -2283,7 +2198,7 @@ public class LatinIME extends InputMethodService implements
             return true;
         }
         if (keyCode == KeyEvent.KEYCODE_BACK
-                && (mKeyboardSwitcher.isShowingKlipyPalettes() || mKeyboardSwitcher.isShowingEmojiPalettes())) {
+                && (mKeyboardSwitcher.isShowingEmojiPalettes())) {
             return true;
         }
         if (mKeyboardActionListener.onKeyDown(keyCode, keyEvent))
