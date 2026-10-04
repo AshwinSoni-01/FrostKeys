@@ -3,9 +3,14 @@ name: Test build
 on:
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     steps:
       - uses: actions/checkout@v6
@@ -16,19 +21,12 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Set up Gradle 8.14.4
-        uses: gradle/actions/setup-gradle@v6
-        with:
-          gradle-version: '8.14.4'
-
-      - name: Verify pinned Gradle version
+      - name: Use project Gradle wrapper
         shell: bash
         run: |
           set -euo pipefail
           chmod +x gradlew
           ./gradlew --version
-          ACTUAL="$(./gradlew --version | awk '/^Gradle / {print $2; exit}')"
-          test "$ACTUAL" = "8.14.4"
 
       - name: Run unit tests
         run: ./gradlew --no-daemon testRunTestsUnitTest
