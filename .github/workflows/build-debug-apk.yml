@@ -20,9 +20,6 @@ concurrency:
 
 jobs:
   build:
-    # Manual runs always build. PR synchronization only builds/publishes
-    # when the new head commit explicitly starts with "release:".
-    if: ${{ github.event_name == 'workflow_dispatch' || startsWith(github.event.pull_request.head.sha != '' && github.event.pull_request.head.repo.full_name || github.repository, '') }}
     runs-on: ubuntu-latest
     timeout-minutes: 25
     env:
@@ -34,27 +31,38 @@ jobs:
         with:
           ref: ${{ env.TARGET_SHA }}
 
-      - name: Check whether this PR synchronization is an explicit release
-        if: ${{ github.event_name == 'pull_request' }}
+      - name: Determine whether this is an explicit release
+        id: gate
         shell: bash
         run: |
           set -euo pipefail
-          MESSAGE="${{ github.event.pull_request.head.label }}"
-          COMMIT_MESSAGE="$(git log -1 --format=%s "$TARGET_SHA")"
-          echo "Head label: $MESSAGE"
-          echo "Head commit message: $COMMIT_MESSAGE"
-          if [[ "$COMMIT_MESSAGE" != release:* ]]; then
-            echo "This is a normal development commit; skipping release."
+
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "should_release=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
+          COMMIT_MESSAGE="$(git log -1 --format=%s "$TARGET_SHA")"
+          echo "Head commit: $TARGET_SHA"
+          echo "Commit message: $COMMIT_MESSAGE"
+
+          if [[ "$COMMIT_MESSAGE" == release:* ]]; then
+            echo "Explicit milestone release requested."
+            echo "should_release=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Normal development commit; no APK release."
+            echo "should_release=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Set up JDK 17
+        if: steps.gate.outputs.should_release == 'true'
         uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
 
       - name: Prepare and verify Gradle wrapper
+        if: steps.gate.outputs.should_release == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -63,9 +71,11 @@ jobs:
           ./gradlew --version
 
       - name: Build debug APK
+        if: steps.gate.outputs.should_release == 'true'
         run: ./gradlew --no-daemon --stacktrace assembleDebug
 
       - name: Verify APK output
+        if: steps.gate.outputs.should_release == 'true'
         id: verify-apk
         shell: bash
         run: |
@@ -81,6 +91,7 @@ jobs:
           echo "apk_path=$APK_PATH" >> "$GITHUB_OUTPUT"
 
       - name: Publish GitHub prerelease
+        if: steps.gate.outputs.should_release == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
