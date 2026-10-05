@@ -8,7 +8,7 @@
 <FrameLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="@dimen/config_suggestions_strip_height"
+    android:layout_height="wrap_content"
     android:clipChildren="false"
     android:clipToPadding="false">
     <!-- To ensure that key preview popup is correctly placed when the current system locale is
@@ -17,7 +17,7 @@
         android:id="@+id/suggestion_strip_view"
         android:layoutDirection="ltr"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
+        android:layout_height="wrap_content"
         android:gravity="center_vertical"
         android:clipChildren="false"
         android:clipToPadding="false"
@@ -26,7 +26,7 @@
         android:id="@+id/emoji_tab_strip_container"
         android:orientation="horizontal"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
+        android:layout_height="wrap_content"
         android:gravity="center_vertical"
         style="?attr/suggestionStripViewStyle">
 
@@ -46,7 +46,7 @@
             android:id="@+id/emoji_tab_strip"
             android:orientation="horizontal"
             android:layout_width="0dp"
-            android:layout_height="match_parent"
+            android:layout_height="wrap_content"
             android:layout_weight="1"
             android:paddingTop="6dp"
             android:paddingBottom="6dp" />
@@ -56,14 +56,14 @@
     <HorizontalScrollView
         android:id="@+id/clipboard_strip_scroll_view"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
+        android:layout_height="wrap_content"
         style="?attr/suggestionStripViewStyle"
         android:scrollbarThumbHorizontal="@color/toolbar_scrollbar">
 
         <LinearLayout
             android:id="@+id/clipboard_strip"
             android:layout_width="wrap_content"
-            android:layout_height="match_parent"
+            android:layout_height="wrap_content"
             android:layout_gravity="end">
             <!-- empty view to move buttons to the right -->
             <View

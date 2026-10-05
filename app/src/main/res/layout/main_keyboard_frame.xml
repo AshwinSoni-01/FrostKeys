@@ -99,7 +99,7 @@
     <helium314.keyboard.latin.KeyboardCornerActionsView
         android:id="@+id/keyboard_corner_actions"
         android:layout_width="match_parent"
-        android:layout_height="64dp"
+        android:layout_height="wrap_content"
         android:clipChildren="false"
         android:clipToPadding="false">
 
