@@ -3,9 +3,6 @@ package helium314.keyboard.settings.screens
 
 import android.content.Context
 import android.content.Intent
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
@@ -20,12 +17,10 @@ import helium314.keyboard.latin.define.DebugFlags
 import helium314.keyboard.latin.settings.DebugSettings
 import helium314.keyboard.latin.settings.Defaults
 import helium314.keyboard.latin.utils.prefs
-import helium314.keyboard.settings.LocalSearchInnerPadding
-import helium314.keyboard.settings.LocalSearchState
 import helium314.keyboard.settings.Setting
 import helium314.keyboard.settings.preferences.Preference
 import helium314.keyboard.settings.SearchSettingsScreen
-import helium314.keyboard.settings.preferences.ListPreference
+import helium314.keyboard.settings.SettingsActivity
 import helium314.keyboard.settings.preferences.SwitchPreference
 import helium314.keyboard.latin.utils.Theme
 import helium314.keyboard.settings.initPreview
@@ -58,23 +53,19 @@ fun DebugScreen(
             onClickBack()
         },
         title = stringResource(R.string.debug_settings_title),
-        settings = emptyList()
+        settings = emptyList(),
+        filteredItems = { term ->
+            val query = term.lowercase()
+            settings.filter { setting ->
+                setting.title.lowercase().contains(query) ||
+                setting.description?.lowercase()?.contains(query) == true
+            } + SettingsActivity.settingsContainer.filter(term)
+        }
     ) {
-        val topPadding = LocalSearchInnerPadding.current
-        // the preferences are not in SettingsContainer, so set content instead
-        LazyColumn(
-            contentPadding = PaddingValues(top = topPadding.calculateTopPadding())
-        ) {
-            item("search_bar") {
-                val searchState = LocalSearchState.current
-                if (searchState != null) {
-                    searchState.searchField()
-                }
-            }
-            items(items, key = { it }) { item ->
-                if (item is Int) PreferenceCategory(stringResource(item))
-                else settings.first { it.key == item }.Preference()
-            }
+        // the preferences are not in SettingsContainer, so render directly in ColumnScope
+        items.forEach { item ->
+            if (item is Int) PreferenceCategory(stringResource(item))
+            else settings.firstOrNull { it.key == item }?.Preference()
         }
     }
 }

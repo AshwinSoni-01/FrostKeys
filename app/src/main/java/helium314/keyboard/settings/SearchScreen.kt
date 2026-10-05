@@ -117,6 +117,7 @@ fun SearchSettingsScreen(
     settings: List<Any?>,
     hideTopSearchBar: Boolean = false,
     showBackButton: Boolean = true,
+    filteredItems: ((String) -> List<Setting>)? = null,
     content: @Composable (ColumnScope.() -> Unit)? = null // overrides settings if not null
 ) {
     SearchScreen(
@@ -136,7 +137,7 @@ fun SearchSettingsScreen(
                 }
             }
         },
-        filteredItems = { SettingsActivity.settingsContainer.filter(it) },
+        filteredItems = filteredItems ?: { SettingsActivity.settingsContainer.filter(it) },
         itemContent = { it.Preference() }
     )
 }
