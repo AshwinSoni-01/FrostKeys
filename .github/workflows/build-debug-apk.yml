@@ -1,6 +1,9 @@
 name: Build and Release Mango.brrrBoard APK
 
 on:
+  push:
+    branches:
+      - "real-*"
   workflow_dispatch:
     inputs:
       description:
@@ -17,11 +20,14 @@ concurrency:
 
 jobs:
   build:
+    # Manual runs always build. Push runs build only for an explicit
+    # milestone commit whose message starts with "release:".
+    if: ${{ github.event_name == 'workflow_dispatch' || startsWith(github.event.head_commit.message, 'release:') }}
     runs-on: ubuntu-latest
     timeout-minutes: 25
 
     steps:
-      - name: Checkout
+      - name: Checkout exact source revision
         uses: actions/checkout@v4
 
       - name: Set up JDK 17
@@ -46,17 +52,15 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # Find the built APK dynamically
-          APK_PATH=$(find app/build/outputs/apk/debug/ -name "*.apk" | head -n 1)
+          APK_PATH="$(find app/build/outputs/apk/debug/ -type f -name '*.apk' | head -n 1)"
           if [ -z "$APK_PATH" ]; then
             echo "Error: No APK found in expected directory"
-            return 1
+            exit 1
           fi
           test -s "$APK_PATH"
           echo "Found APK at: $APK_PATH"
           ls -lh "$APK_PATH"
-
-          echo "apk_path=$APK_PATH" >> $GITHUB_OUTPUT
+          echo "apk_path=$APK_PATH" >> "$GITHUB_OUTPUT"
 
       - name: Publish GitHub prerelease
         env:
@@ -65,33 +69,25 @@ jobs:
         run: |
           set -euo pipefail
 
-          # Generate deterministic release identity
-          DATE_STR=$(date +'%Y%m%d-%H%M%S')
           SHORT_SHA="${GITHUB_SHA::7}"
-          TAG="build-${DATE_STR}-${SHORT_SHA}"
+          TAG="build-${SHORT_SHA}"
 
           DESC="${{ inputs.description }}"
           if [ -z "$DESC" ]; then
-            TITLE="brrrBoard Release — ${SHORT_SHA}"
+            TITLE="brrrBoard Milestone — ${SHORT_SHA}"
             NOTES="Automated milestone release from commit ${GITHUB_SHA}."
           else
-            TITLE="brrrBoard Release — ${DESC}"
-            NOTES="Milestone: ${DESC}\nCommit: ${GITHUB_SHA}"
+            TITLE="brrrBoard Milestone — $DESC"
+            NOTES="Milestone: $DESC
+Commit: ${GITHUB_SHA}"
           fi
 
           APK_PATH="${{ steps.verify-apk.outputs.apk_path }}"
 
-          # Check if tag exists to avoid duplicates
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-             echo "Release $TAG already exists, skipping creation."
+            echo "Release $TAG already exists; nothing to create."
           else
-             gh release create "$TAG" \
-              "$APK_PATH" \
-              --repo "$GITHUB_REPOSITORY" \
-              --target "$GITHUB_SHA" \
-              --title "$TITLE" \
-              --notes "$NOTES" \
-              --prerelease
+            gh release create "$TAG"               "$APK_PATH"               --repo "$GITHUB_REPOSITORY"               --target "$GITHUB_SHA"               --title "$TITLE"               --notes "$NOTES"               --prerelease
           fi
 
       - name: Archive reports for failed job
