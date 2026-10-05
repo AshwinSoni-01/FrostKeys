@@ -3,6 +3,7 @@ package helium314.keyboard.latin.database
 
 import android.content.ContentValues
 import android.content.Context
+import android.database.sqlite.SQLiteDatabase
 import android.net.Uri
 import android.os.SystemClock
 import helium314.keyboard.latin.ClipboardImageHistoryClip
@@ -120,11 +121,25 @@ class ClipboardDao private constructor(private val db: Database, context: Contex
     }
 
     // RecyclerView initiates this, so we don't call listener (or we'll get an IndexOutOfRangeException from RecyclerView)
-    fun deleteClipAt(index: Int) {
+    fun deleteClipAt(index: Int): ClipboardHistoryEntry {
         val entry = cache[index]
         cache.remove(entry)
         db.writableDatabase.delete(TABLE, "$COLUMN_ID = ${entry.id}", null)
-        deleteCachedImageFiles(listOf(entry))
+        return entry
+    }
+
+    fun restoreClip(entry: ClipboardHistoryEntry, targetIndex: Int): Int {
+        val cv = ContentValues(4)
+        cv.put(COLUMN_ID, entry.id)
+        cv.put(COLUMN_TIMESTAMP, entry.timeStamp)
+        cv.put(COLUMN_PINNED, entry.isPinned)
+        cv.put(COLUMN_TEXT, entry.text)
+        db.writableDatabase.insertWithOnConflict(TABLE, null, cv, SQLiteDatabase.CONFLICT_REPLACE)
+
+        val insertIndex = targetIndex.coerceIn(0, cache.size)
+        cache.add(insertIndex, entry)
+        cache.sort()
+        return cache.indexOf(entry)
     }
 
     fun clearOldClips(now: Boolean = false) {

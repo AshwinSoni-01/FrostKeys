@@ -6,12 +6,15 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.content.SharedPreferences
 import android.content.res.ColorStateList
+import android.graphics.Color
+import android.graphics.Outline
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.InsetDrawable
 import android.graphics.drawable.RippleDrawable
 import android.util.AttributeSet
 import android.util.TypedValue
 import android.view.View
+import android.view.ViewOutlineProvider
 import android.view.inputmethod.EditorInfo
 import android.widget.ImageButton
 import android.widget.ImageView
@@ -23,6 +26,7 @@ import helium314.keyboard.event.HapticEvent
 import helium314.keyboard.keyboard.KeyboardActionListener
 import helium314.keyboard.keyboard.KeyboardId
 import helium314.keyboard.keyboard.KeyboardLayoutSet
+import helium314.keyboard.keyboard.KeyboardTheme
 import helium314.keyboard.keyboard.KeyboardTypeface
 import helium314.keyboard.keyboard.MainKeyboardView
 import helium314.keyboard.keyboard.PointerTracker
@@ -31,7 +35,9 @@ import helium314.keyboard.keyboard.internal.KeyVisualAttributes
 import helium314.keyboard.keyboard.internal.KeyboardIconsSet
 import helium314.keyboard.keyboard.internal.keyboard_parser.floris.KeyCode
 import helium314.keyboard.latin.AudioAndHapticFeedbackManager
+import helium314.keyboard.latin.ClipboardHistoryEntry
 import helium314.keyboard.latin.ClipboardHistoryManager
+import helium314.keyboard.latin.FrostedGlassHelper
 import helium314.keyboard.latin.R
 import helium314.keyboard.latin.common.Colors
 import helium314.keyboard.latin.common.ColorType
@@ -41,6 +47,7 @@ import helium314.keyboard.latin.settings.Settings
 import helium314.keyboard.latin.utils.ResourceUtils
 import helium314.keyboard.latin.utils.ToolbarKey
 import helium314.keyboard.latin.utils.dpToPx
+import helium314.keyboard.latin.utils.isDarkColor
 import helium314.keyboard.latin.utils.prefs
 
 @SuppressLint("CustomViewStyleable")
@@ -50,6 +57,7 @@ class ClipboardHistoryView @JvmOverloads constructor(
         defStyle: Int = R.attr.clipboardHistoryViewStyle
 ) : LinearLayout(context, attrs, defStyle), View.OnClickListener,
     ClipboardDao.Listener, OnKeyEventListener,
+    ClipboardHistoryRecyclerView.OnClipDismissListener,
     SharedPreferences.OnSharedPreferenceChangeListener {
 
     private val clipboardLayoutParams = ClipboardLayoutParams(context)
@@ -62,6 +70,12 @@ class ClipboardHistoryView @JvmOverloads constructor(
     private lateinit var clearButton: ImageButton
     private lateinit var titleView: TextView
     private lateinit var clipboardAdapter: ClipboardAdapter
+    private var undoBar: View? = null
+    private var undoText: TextView? = null
+    private var undoButton: TextView? = null
+    private var lastDismissedEntry: ClipboardHistoryEntry? = null
+    private var lastDismissedPosition: Int = -1
+    private val hideUndoBarRunnable = Runnable { hideUndoBar() }
 
     lateinit var keyboardActionListener: KeyboardActionListener
     private lateinit var clipboardHistoryManager: ClipboardHistoryManager
@@ -104,10 +118,75 @@ class ClipboardHistoryView @JvmOverloads constructor(
             persistentDrawingCache = PERSISTENT_NO_CACHE
             clipboardLayoutParams.setListProperties(this)
             placeholderView = this@ClipboardHistoryView.placeholderView
+            clipDismissListener = this@ClipboardHistoryView
         }
         backButton = findViewById(R.id.clipboard_back_button)
         clearButton = findViewById(R.id.clipboard_clear_button)
         titleView = findViewById(R.id.clipboard_title)
+        undoBar = findViewById(R.id.clipboard_undo_bar)
+        undoText = findViewById(R.id.clipboard_undo_text)
+        undoButton = findViewById(R.id.clipboard_undo_button)
+    }
+
+    private fun setupUndoBar(colors: Colors) {
+        val bar = undoBar ?: return
+        val text = undoText
+        val button = undoButton
+
+        val isDark = KeyboardTheme.isDarkThemeActive(context)
+        val pillRadius = 24.dpToPx(resources).toFloat()
+
+        // Clip strictly to pill shape outline
+        bar.outlineProvider = object : ViewOutlineProvider() {
+            override fun getOutline(view: View, outline: Outline) {
+                outline.setRoundRect(0, 0, view.width, view.height, view.height / 2f)
+            }
+        }
+        bar.clipToOutline = true
+
+        // Consume touches inside the pill bounds so clicks never fall through to clipboard items beneath
+        bar.setOnClickListener { /* Consume click */ }
+
+        // Solid pill-shaped toast background without outline stroke
+        val toastBgColor = if (isDark) {
+            val funcBg = colors.get(ColorType.FUNCTIONAL_KEY_BACKGROUND)
+            if (isDarkColor(funcBg)) ColorUtils.blendARGB(funcBg, Color.WHITE, 0.12f) else 0xFF2C2D30.toInt()
+        } else {
+            val funcBg = colors.get(ColorType.FUNCTIONAL_KEY_BACKGROUND)
+            if (!isDarkColor(funcBg)) ColorUtils.blendARGB(funcBg, Color.BLACK, 0.08f) else 0xFFE9EAEC.toInt()
+        }
+        val bgDrawable = GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            cornerRadius = pillRadius
+            setColor(toastBgColor)
+        }
+        bar.background = bgDrawable
+
+        // Text styling: pure white in dark mode, pure black in light mode
+        text?.setTextColor(if (isDark) Color.WHITE else Color.BLACK)
+
+        // Solid accent pill button matching keyboard special keys
+        val accentColor = colors.get(ColorType.SPECIAL_KEY_BACKGROUND)
+        val buttonPill = GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            cornerRadius = 1000f
+            setColor(accentColor)
+        }
+        val rippleColor = ColorStateList.valueOf(
+            ColorUtils.setAlphaComponent(if (isDark) Color.WHITE else Color.BLACK, 0x40)
+        )
+        val mask = GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            cornerRadius = 1000f
+            setColor(Color.BLACK)
+        }
+        button?.background = RippleDrawable(rippleColor, buttonPill, mask)
+
+        // Pure white text in dark mode, pure black in light mode
+        button?.setTextColor(if (isDark) Color.WHITE else Color.BLACK)
+
+        if (text != null) KeyboardTypeface.applyToTextView(text)
+        if (button != null) KeyboardTypeface.applyToTextView(button)
     }
 
     private fun setupHeader(colors: Colors) {
@@ -200,6 +279,7 @@ class ClipboardHistoryView @JvmOverloads constructor(
         initialize()
         val settings = Settings.getInstance()
         setupHeader(settings.current.mColors)
+        setupUndoBar(settings.current.mColors)
         historyManager.prepareClipboardHistory()
         historyManager.setHistoryChangeListener(this)
         clipboardAdapter.clipboardHistoryManager = historyManager
@@ -237,10 +317,62 @@ class ClipboardHistoryView @JvmOverloads constructor(
     }
 
     fun stopClipboardHistory() {
+        hideUndoBar()
+        removeCallbacks(hideUndoBarRunnable)
+        undoBar?.removeCallbacks(hideUndoBarRunnable)
         if (!this::clipboardAdapter.isInitialized) return
         clipboardRecyclerView.adapter = null
         clipboardHistoryManager.setHistoryChangeListener(null)
         clipboardAdapter.clipboardHistoryManager = null
+    }
+
+    override fun onClipDismissed(entry: ClipboardHistoryEntry, originalPosition: Int) {
+        showUndoBar(entry, originalPosition)
+    }
+
+    private fun showUndoBar(entry: ClipboardHistoryEntry, position: Int) {
+        lastDismissedEntry = entry
+        lastDismissedPosition = position
+
+        val bar = undoBar ?: return
+        val text = undoText
+        val button = undoButton
+
+        removeCallbacks(hideUndoBarRunnable)
+        bar.removeCallbacks(hideUndoBarRunnable)
+
+        text?.text = context.getString(R.string.clipboard_clip_deleted)
+        button?.setOnClickListener {
+            AudioAndHapticFeedbackManager.getInstance().performHapticAndAudioFeedback(KeyCode.NOT_SPECIFIED, it, HapticEvent.KEY_PRESS)
+            val clipToRestore = lastDismissedEntry
+            val targetPos = lastDismissedPosition
+            if (clipToRestore != null) {
+                val restoredPos = clipboardHistoryManager.restoreEntry(clipToRestore, targetPos)
+                if (restoredPos >= 0) {
+                    clipboardAdapter.notifyItemInserted(restoredPos)
+                    clipboardRecyclerView.smoothScrollToPosition(restoredPos)
+                }
+                lastDismissedEntry = null
+                lastDismissedPosition = -1
+            }
+            hideUndoBar()
+        }
+
+        if (bar.visibility != View.VISIBLE) {
+            bar.alpha = 0f
+            bar.visibility = View.VISIBLE
+            bar.animate().alpha(1f).setDuration(180).start()
+        }
+        bar.postDelayed(hideUndoBarRunnable, 10000)
+    }
+
+    private fun hideUndoBar() {
+        val bar = undoBar ?: return
+        if (bar.visibility == View.VISIBLE) {
+            bar.animate().alpha(0f).setDuration(180).withEndAction {
+                bar.visibility = View.GONE
+            }.start()
+        }
     }
 
     override fun onClick(view: View) {

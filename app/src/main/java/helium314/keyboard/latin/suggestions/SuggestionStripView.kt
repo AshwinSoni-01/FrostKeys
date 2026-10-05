@@ -537,6 +537,8 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
 
     fun setToolbarVisibility(toolbarVisible: Boolean) {
         toolbarContainer.isVisible = false
+        val isMenuOpen = isAccessPointMenuShowing()
+        setAccessPointIcon(isMenuOpen = isMenuOpen)
         updateSuggestionContainersVisibility(true)
 
         if (DEBUG_SUGGESTIONS) {
@@ -546,17 +548,11 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
         }
 
         toolbarExpandKey?.scaleX = direction.toFloat()
-        // Restore access point icon when returning to normal state
-        setAccessPointIcon(isMenuOpen = false)
     }
 
     fun showPinnedToolbarKeys() {
         toolbarContainer.isVisible = false
         populatePinnedKeys()
-        suggestionsStrip.isVisible = false
-        suggestionsChipScroll.isVisible = false
-        pinnedKeys.isVisible = slotsState.value.isNotEmpty()
-        // Swap access point icon to back arrow while menu is open
         setAccessPointMenuOpen(true)
     }
 
@@ -588,6 +584,11 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
 
     fun setExternalSuggestionView(view: View?, addCloseButton: Boolean) {
         clear()
+        if (view == null) {
+            isExternalSuggestionVisible = false
+            updateSuggestionContainersVisibility(true)
+            return
+        }
         isExternalSuggestionVisible = true
         updateSuggestionContainersVisibility(true)
 
@@ -607,6 +608,12 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
             }
             suggestionsStrip.addView(closeButton)
         } else {
+            suggestionsStrip.doOnNextLayout {
+                val maxPillWidth = suggestionsStrip.width
+                if (maxPillWidth > 0 && view.width > maxPillWidth) {
+                    view.layoutParams = LinearLayout.LayoutParams(maxPillWidth, LayoutParams.MATCH_PARENT)
+                }
+            }
             suggestionsStrip.addView(view)
         }
 
@@ -676,6 +683,7 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
 
     override fun onDetachedFromWindow() {
         super.onDetachedFromWindow()
+        isAccessPointMenuOpen = false
         composeLifecycleOwner?.stop()
         dismissMoreSuggestionsPanel()
     }
@@ -893,6 +901,10 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
         }
     }
 
+    private fun isAccessPointMenuShowing(): Boolean {
+        return runCatching { KeyboardSwitcher.getInstance().isShowingAccessPointMenu }.getOrDefault(false)
+    }
+
     private fun updateKeys() {
         val settingsValues = Settings.getValues()
         toolbarContainer.isVisible = false
@@ -901,9 +913,9 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
         updatePersistentToolbarKey()
         populatePinnedKeys()
         updateVoiceKey()
-        updateSuggestionContainersVisibility(true)
-        // Restore access point icon to default grid when menu is closed
-        setAccessPointIcon(isMenuOpen = false)
+        val isMenuOpen = isAccessPointMenuShowing()
+        setAccessPointIcon(isMenuOpen = isMenuOpen)
+        updateSuggestionContainersVisibility(!toolbarContainer.isVisible)
     }
 
     private fun shouldUseChipSuggestions(words: SuggestedWords = suggestedWords): Boolean {
@@ -926,7 +938,7 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
             return
         }
         val hasPinnedKeys = slotsState.value.isNotEmpty()
-        if (isAccessPointMenuOpen) {
+        if (isAccessPointMenuShowing()) {
             suggestionsStrip.isVisible = false
             suggestionsChipScroll.isVisible = false
             pinnedKeys.isVisible = hasPinnedKeys
@@ -955,7 +967,6 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
         val persistentKey = Settings.getValues().mPersistentToolbarKey
         val slots = previewSlots ?: getPinnedToolbarKeys(context.prefs(), persistentKey)
         slotsState.value = slots
-        pinnedKeys.isVisible = slots.isNotEmpty()
     }
 
     private fun updatePersistentToolbarKey() {

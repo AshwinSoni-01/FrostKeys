@@ -159,7 +159,7 @@ fun GestureDataScreen(
     var showEndDialog by rememberSaveable { mutableStateOf(true) }
     val focusRequester = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
-    val words = rememberSaveable { mutableListOf<Pair<String, Long>>() }
+    val words = remember { mutableListOf<Pair<String, Long>>() }
     val scope = rememberCoroutineScope { Dispatchers.IO }
     var activeGathering by rememberSaveable { mutableStateOf(false) }
     var showActiveInfoDialog by remember { mutableStateOf(false) }
@@ -387,16 +387,12 @@ fun GestureDataScreen(
             Box(modifier = Modifier.fillMaxSize().haze(state = hazeState)) {
                 Column(
                     modifier = Modifier
-                        .verticalScroll(scrollState)
+                        .fillMaxSize()
                         .padding(
                             top = topPadding.calculateTopPadding(),
                             bottom = innerPadding.calculateBottomPadding()
                         ),
                 ) {
-                    val searchState = LocalSearchState.current
-                    if (searchState != null) {
-                        searchState.searchField()
-                    }
                     Column(modifier = Modifier.padding(horizontal = 12.dp)) {
                         var showInfoDialog by remember { mutableStateOf(false) }
                     var showPrivacyDialog by remember { mutableStateOf(false) }

@@ -30,12 +30,6 @@ import android.net.Uri
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.WindowInsetsSides
-import androidx.compose.foundation.layout.only
-import androidx.compose.foundation.layout.safeDrawing
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -62,13 +56,6 @@ import helium314.keyboard.settings.initPreview
 import helium314.keyboard.latin.utils.previewDark
 import java.io.File
 import java.util.Locale
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import dev.chrisbanes.haze.haze
-import helium314.keyboard.settings.LocalHazeState
-import androidx.compose.foundation.layout.PaddingValues
-import helium314.keyboard.settings.LocalSearchInnerPadding
-import helium314.keyboard.settings.LocalSearchState
 
 @Composable
 fun DictionaryScreen(
@@ -135,76 +122,53 @@ fun DictionaryScreen(
         itemContent = { locale -> DictionaryItem(locale) }
     ) {
         val context = LocalContext.current
-        val hazeState = LocalHazeState.current
-        val topPadding = LocalSearchInnerPadding.current
-        androidx.compose.material3.Scaffold(
-            contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom)
-        ) { innerPadding ->
-            Box(modifier = Modifier.fillMaxSize().haze(state = hazeState)) {
-                LazyColumn(
-                    contentPadding = PaddingValues(
-                        top = topPadding.calculateTopPadding(),
-                        bottom = innerPadding.calculateBottomPadding()
-                    )
+        Card(
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+            ),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    item("search_bar") {
-                        val searchState = LocalSearchState.current
-                        if (searchState != null) {
-                            searchState.searchField()
-                        }
-                    }
-                    item {
-                        Card(
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                        ),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp)
-                    ) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Icon(
-                                    painter = painterResource(R.drawable.ic_settings_about_wiki),
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(24.dp)
-                                )
-                                Text(
-                                    text = stringResource(R.string.dict_guide_title),
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                            }
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = stringResource(R.string.dict_guide_desc),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Spacer(modifier = Modifier.height(12.dp))
-                            Button(
-                                onClick = {
-                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(Links.DICTIONARY_URL))
-                                    context.startActivity(intent)
-                                },
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text(text = stringResource(R.string.dict_download_btn))
-                            }
-                        }
-                    }
+                    Icon(
+                        painter = painterResource(R.drawable.ic_settings_about_wiki),
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Text(
+                        text = stringResource(R.string.dict_guide_title),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
                 }
-                items(dictionaryLocales) { locale ->
-                    DictionaryItem(locale)
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = stringResource(R.string.dict_guide_desc),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Button(
+                    onClick = {
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(Links.DICTIONARY_URL))
+                        context.startActivity(intent)
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(text = stringResource(R.string.dict_download_btn))
                 }
             }
         }
-    }
+        dictionaryLocales.forEach { locale ->
+            DictionaryItem(locale)
+        }
     }
     if (showAddDictDialog) {
         ConfirmationDialog(

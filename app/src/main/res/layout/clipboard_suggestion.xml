@@ -3,38 +3,48 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:orientation="horizontal"
     android:background="@drawable/clipboard_suggestion_background"
-    android:gravity="center"
-    android:paddingEnd="12dp"
+    android:gravity="center_vertical"
     android:layout_width="wrap_content"
     android:layout_height="match_parent"
     tools:ignore="RtlSymmetry">
+
     <ImageView
         android:id="@+id/clipboard_suggestion_preview"
-        android:layout_width="24dp"
-        android:layout_height="24dp"
-        android:layout_marginStart="8dp"
+        android:layout_width="27dp"
+        android:layout_height="27dp"
+        android:layout_marginStart="12dp"
         android:contentDescription="@string/spoken_clipboard_suggestion"
         android:scaleType="centerCrop"
         android:visibility="gone" />
+
     <TextView
         android:id="@+id/clipboard_suggestion_text"
         android:layout_width="wrap_content"
         android:layout_height="match_parent"
-        android:drawablePadding="3dp"
-        android:paddingHorizontal="12dp"
+        android:layout_weight="1"
+        android:drawablePadding="4dp"
+        android:paddingStart="14dp"
+        android:paddingEnd="6dp"
         android:hapticFeedbackEnabled="false"
         android:soundEffectsEnabled="false"
         android:singleLine="true"
-        android:gravity="center"
+        android:maxLines="1"
+        android:gravity="center_vertical"
         android:ellipsize="end"
         android:textStyle="bold"
         style="?android:attr/textAppearanceSmall" />
-    <ImageView
+
+    <ImageButton
         android:id="@+id/clipboard_suggestion_close"
         android:contentDescription="@string/spoken_clipboard_suggestion"
-        android:src="@drawable/ic_close"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:gravity="center" />
+        android:layout_width="27dp"
+        android:layout_height="27dp"
+        android:layout_gravity="center_vertical"
+        android:layout_marginStart="4dp"
+        android:layout_marginEnd="12dp"
+        android:padding="0dp"
+        android:scaleType="fitCenter"
+        android:minWidth="0dp"
+        android:minHeight="0dp" />
 
 </LinearLayout>

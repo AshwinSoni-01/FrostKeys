@@ -524,12 +524,17 @@ public final class EmojiPalettesView extends LinearLayout
         if (tabStripView != null) {
             tabStripView.setVisibility(View.GONE);
         }
+        mSearchBarContainer.setAlpha(0f);
         mSearchBarContainer.setVisibility(View.VISIBLE);
+        mSearchBarContainer.animate().alpha(1f).setDuration(350).start();
         if (mSearchResultsScrollView != null) {
+            mSearchResultsScrollView.setAlpha(0f);
             mSearchResultsScrollView.setVisibility(View.VISIBLE);
+            mSearchResultsScrollView.animate().alpha(1f).setDuration(350).start();
         }
         mSearchResultsView.setVisibility(View.VISIBLE);
 
+        KeyboardSwitcher.getInstance().notifyEnteringSearchMode();
         swapKeyboardToEmojiSearch(true, false);
         updateSearchKeyboard();
         focusSearchField(true);
@@ -566,13 +571,17 @@ public final class EmojiPalettesView extends LinearLayout
             mSearchResultsView.setVisibility(View.GONE);
         }
         if (mPager != null) {
+            mPager.setAlpha(0f);
             mPager.setVisibility(View.VISIBLE);
+            mPager.animate().alpha(1f).setDuration(350).start();
         }
         if (mEmojiCategoryPageIndicatorView != null) {
             mEmojiCategoryPageIndicatorView.setVisibility(View.GONE);
         }
         if (mBottomRowKeyboard != null) {
+            mBottomRowKeyboard.setAlpha(0f);
             mBottomRowKeyboard.setVisibility(View.VISIBLE);
+            mBottomRowKeyboard.animate().alpha(1f).setDuration(350).start();
         }
         swapKeyboardToEmojiSearch(false, restoreViews);
         if (restoreViews) {
@@ -605,10 +614,14 @@ public final class EmojiPalettesView extends LinearLayout
         final View tabStripView = switcher.getEmojiTabStrip();
         if (Settings.getValues().mSecondaryStripVisible) {
             if (stripContainer != null) {
+                stripContainer.setAlpha(0f);
                 stripContainer.setVisibility(View.VISIBLE);
+                stripContainer.animate().alpha(1f).setDuration(350).start();
             }
             if (tabStripView != null) {
+                tabStripView.setAlpha(0f);
                 tabStripView.setVisibility(View.VISIBLE);
+                tabStripView.animate().alpha(1f).setDuration(350).start();
             }
         }
     }
@@ -625,6 +638,7 @@ public final class EmojiPalettesView extends LinearLayout
         final ViewGroup wrapper = (ViewGroup) wrapperView;
         final ViewParent currentParent = keyboardView.getParent();
         if (enter) {
+            keyboardView.setAlpha(0f);
             if (currentParent != this) {
                 if (currentParent instanceof ViewGroup) {
                     ((ViewGroup) currentParent).removeView(keyboardView);

@@ -229,6 +229,9 @@ class KlipyPalettesView @JvmOverloads constructor(
     }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+        if (composeLifecycleOwner == null) {
+            setupComposeButtonGroup()
+        }
         val requestedHeight = TypedValue.applyDimension(
             TypedValue.COMPLEX_UNIT_DIP,
             INLINE_PANEL_HEIGHT_DP,
@@ -257,14 +260,16 @@ class KlipyPalettesView @JvmOverloads constructor(
             setViewTreeViewModelStoreOwner(latinIME)
         }
         super.onAttachedToWindow()
-        composeLifecycleOwner?.start()
+        if (composeLifecycleOwner == null) {
+            setupComposeButtonGroup()
+        } else {
+            composeLifecycleOwner?.start()
+        }
     }
 
     override fun onDetachedFromWindow() {
-        composeLifecycleOwner?.stop()
-        composeLifecycleOwner?.destroy()
-        composeLifecycleOwner = null
         super.onDetachedFromWindow()
+        composeLifecycleOwner?.stop()
         stopKlipyPalettes()
         viewScope.cancel()
         viewScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
@@ -1736,6 +1741,7 @@ class KlipyPalettesView @JvmOverloads constructor(
 
         val currentParent = keyboardView.parent as? ViewGroup
         if (enter) {
+            keyboardView.alpha = 0f
             if (currentParent != this) {
                 currentParent?.removeView(keyboardView)
                 val index = indexOfChild(placeholder)
@@ -1771,16 +1777,26 @@ class KlipyPalettesView @JvmOverloads constructor(
         gifsAdapter.setAnimationsRunning(false)
         stickersAdapter.setAnimationsRunning(false)
         findViewById<View>(R.id.klipyHeader)?.visibility = View.GONE
-        findViewById<View>(R.id.klipySearchBackButton)?.visibility = View.VISIBLE
+        val searchBackButton = findViewById<View>(R.id.klipySearchBackButton)
+        if (searchBackButton != null) {
+            searchBackButton.alpha = 0f
+            searchBackButton.visibility = View.VISIBLE
+            searchBackButton.animate().alpha(1f).setDuration(350).start()
+        }
         viewPager.visibility = View.GONE
         emptyState.visibility = View.GONE
         hideClearHistoryConfirmation()
         clearHistoryButton.visibility = View.GONE
 
+        KeyboardSwitcher.getInstance().notifyEnteringSearchMode()
         swapKeyboardToKlipy(enter = true)
         focusSearchEditText(moveCursorToEnd)
         updateSearchQueryUI()
         updateRecentSearchesUI()
+        if (::recentSearchesContainer.isInitialized && recentSearchesContainer.visibility == View.VISIBLE) {
+            recentSearchesContainer.alpha = 0f
+            recentSearchesContainer.animate().alpha(1f).setDuration(350).start()
+        }
         currentSearchKeyboardElementId = KeyboardId.ELEMENT_ALPHABET
         updateSearchKeyboard()
     }
@@ -1792,14 +1808,32 @@ class KlipyPalettesView @JvmOverloads constructor(
             searchEditText.isCursorVisible = false
             searchEditText.clearFocus()
         }
-        findViewById<View>(R.id.klipyHeader)?.visibility = View.VISIBLE
         findViewById<View>(R.id.klipySearchBackButton)?.visibility = View.GONE
+        if (::recentSearchesContainer.isInitialized) {
+            recentSearchesContainer.visibility = View.GONE
+        }
+
+        val header = findViewById<View>(R.id.klipyHeader)
+        if (header != null) {
+            header.alpha = 0f
+            header.visibility = View.VISIBLE
+            header.animate().alpha(1f).setDuration(350).start()
+        }
+        viewPager.alpha = 0f
         viewPager.visibility = View.VISIBLE
+        viewPager.animate().alpha(1f).setDuration(350).start()
+
         pinnedGifsAdapter.setAnimationsRunning(true)
         pinnedStickersAdapter.setAnimationsRunning(true)
         gifsAdapter.setAnimationsRunning(true)
         stickersAdapter.setAnimationsRunning(true)
+
         showClearHistoryButton()
+        if (::clearHistoryButton.isInitialized && clearHistoryButton.visibility == View.VISIBLE) {
+            clearHistoryButton.alpha = 0f
+            clearHistoryButton.animate().alpha(1f).setDuration(350).start()
+        }
+
         updateSearchQueryUI()
         updateRecentSearchesUI()
 
@@ -1827,6 +1861,8 @@ class KlipyPalettesView @JvmOverloads constructor(
             KeyboardId.ELEMENT_SYMBOLS_SHIFTED -> switcher.setSymbolsShiftedKeyboard()
             else -> switcher.setAlphabetKeyboard()
         }
+        keyboardView.setKeyboardActionListener(searchKeyboardListener)
+        PointerTracker.switchTo(keyboardView)
     }
 
     private fun updateSearchQueryUI() {
@@ -2268,12 +2304,19 @@ class KlipyPalettesView @JvmOverloads constructor(
 
     private fun setupComposeButtonGroup() {
         val composeView = findViewById<ComposeView>(R.id.compose_klipy_tabs) ?: return
-        val owner = ComposeLifecycleOwner()
-        composeLifecycleOwner = owner
-        composeView.setViewTreeLifecycleOwner(owner)
-        composeView.setViewTreeSavedStateRegistryOwner(owner)
-        composeView.setViewTreeViewModelStoreOwner(owner)
-        composeView.setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
+        val latinIME = getLatinIME()
+        val owner = composeLifecycleOwner ?: ComposeLifecycleOwner().also { composeLifecycleOwner = it }
+        if (latinIME != null) {
+            composeView.setViewTreeLifecycleOwner(latinIME)
+            composeView.setViewTreeSavedStateRegistryOwner(latinIME)
+            composeView.setViewTreeViewModelStoreOwner(latinIME)
+        } else {
+            composeView.setViewTreeLifecycleOwner(owner)
+            composeView.setViewTreeSavedStateRegistryOwner(owner)
+            composeView.setViewTreeViewModelStoreOwner(owner)
+        }
+        owner.start()
+        composeView.setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindowOrReleasedFromPool)
         composeView.setContent {
             val selectedTab by selectedTabState
             val keyboardColors = colorsState.value ?: Settings.getValues().mColors

@@ -154,21 +154,12 @@ fun GestureLibrarySetupGuide() {
         }
     }
 
-    val topPadding = LocalSearchInnerPadding.current
     Column(
         modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(
-                top = topPadding.calculateTopPadding(),
-                bottom = 16.dp
-            ),
+            .fillMaxWidth()
+            .padding(bottom = 16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        val searchState = LocalSearchState.current
-        if (searchState != null) {
-            searchState.searchField()
-        }
 
         Card(
             colors = CardDefaults.cardColors(

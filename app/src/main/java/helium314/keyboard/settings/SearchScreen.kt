@@ -124,38 +124,14 @@ fun SearchSettingsScreen(
         hideTopSearchBar = hideTopSearchBar,
         showBackButton = showBackButton,
         title = { Text(title, maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis) },
-        content = {
-            if (content != null) content()
-            else {
-                val hazeState = LocalHazeState.current
-                val topPadding = LocalSearchInnerPadding.current
-                Scaffold(
-                    contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom)
-                ) { innerPadding ->
-                    Box(modifier = Modifier.fillMaxSize()) {
-                        Column(
-                            Modifier
-                                .verticalScroll(rememberScrollState())
-                                .padding(
-                                    top = topPadding.calculateTopPadding(),
-                                    bottom = innerPadding.calculateBottomPadding()
-                                )
-                        ) {
-                            val searchState = LocalSearchState.current
-                            if (searchState != null) {
-                                searchState.searchField()
-                            }
-                            settings.forEach {
-                                if (it is Int) {
-                                    PreferenceCategory(stringResource(it))
-                                } else {
-                                    AnimatedVisibility(visible = it != null) {
-                                        if (it != null)
-                                            SettingsActivity.settingsContainer[it]?.Preference()
-                                    }
-                                }
-                            }
-                        }
+        content = content ?: {
+            settings.forEach {
+                if (it is Int) {
+                    PreferenceCategory(stringResource(it))
+                } else {
+                    AnimatedVisibility(visible = it != null) {
+                        if (it != null)
+                            SettingsActivity.settingsContainer[it]?.Preference()
                     }
                 }
             }
@@ -205,6 +181,7 @@ fun <T: Any?> SearchScreen(
             StaticSearchField(
                 search = searchText,
                 onSearchChange = { searchText = it },
+                onClearClick = { setShowSearch(false) },
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 8.dp),
@@ -355,64 +332,49 @@ fun <T: Any?> SearchScreen(
                 }
             }
         ) { innerPadding ->
-            CompositionLocalProvider(LocalTextStyle provides MaterialTheme.typography.bodyLarge) {
-                val contentModifier = Modifier.fillMaxSize()
+            val bottomPadding = WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom).asPaddingValues().calculateBottomPadding() + 16.dp
 
-                if (searchText.text.isBlank() && content != null) {
-                    CompositionLocalProvider(LocalSearchInnerPadding provides innerPadding) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .then(
-                                    if (isBlurSupported) {
-                                        Modifier
-                                            .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
-                                            .haze(state = hazeState)
-                                    } else Modifier
-                                )
-                        ) {
-                            Column(modifier = contentModifier) {
-                                content()
+            CompositionLocalProvider(
+                LocalTextStyle provides MaterialTheme.typography.bodyLarge,
+                LocalSearchInnerPadding provides innerPadding
+            ) {
+                val isSearching = searchText.text.isNotBlank()
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .then(
+                            if (isBlurSupported) {
+                                Modifier
+                                    .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+                                    .haze(state = hazeState)
+                            } else Modifier
+                        )
+                ) {
+                    LazyColumn(
+                        contentPadding = PaddingValues(
+                            top = innerPadding.calculateTopPadding(),
+                            bottom = bottomPadding
+                        ),
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        if (!hideTopSearchBar) {
+                            item(key = "search_field_item") {
+                                searchFieldContent()
                             }
                         }
-                    }
-                } else {
-                    val items = filteredItems(searchText.text)
-                    Scaffold(
-                        modifier = contentModifier,
-                        contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom)
-                    ) { innerPadding2 ->
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .then(
-                                    if (isBlurSupported) {
-                                        Modifier
-                                            .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
-                                            .haze(state = hazeState)
-                                    } else Modifier
-                                )
-                        ) {
-                            LazyColumn(
-                                contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                                    top = innerPadding.calculateTopPadding(),
-                                    bottom = innerPadding2.calculateBottomPadding()
-                                )
-                            ) {
-                                item {
-                                    val searchState = LocalSearchState.current
-                                    if (searchState != null) {
-                                        searchState.searchField()
-                                    }
-                                }
-                                if (itemKey == null) {
-                                    items(items) {
-                                        itemContent(it)
-                                    }
-                                } else {
-                                    items(items, key = itemKey) {
-                                        itemContent(it)
-                                    }
+
+                        if (isSearching || content == null) {
+                            val items = filteredItems(searchText.text)
+                            if (itemKey == null) {
+                                items(items) { itemContent(it) }
+                            } else {
+                                items(items, key = itemKey) { itemContent(it) }
+                            }
+                        } else {
+                            item(key = "screen_content_body") {
+                                Column(modifier = Modifier.fillMaxWidth()) {
+                                    content()
                                 }
                             }
                         }
@@ -433,13 +395,49 @@ fun StaticSearchField(
     onSearchChange: (TextFieldValue) -> Unit,
     modifier: Modifier = Modifier,
     colors: TextFieldColors = TextFieldDefaults.colors(),
+    onClearClick: (() -> Unit)? = null
 ) {
     TextField(
         value = search,
         onValueChange = onSearchChange,
-        shape = androidx.compose.foundation.shape.CircleShape,
+        shape = CircleShape,
         modifier = modifier,
-        leadingIcon = { Text("search", fontFamily = materialSymbols, fontSize = 24.sp, color = MaterialTheme.colorScheme.onSurface) },
+        leadingIcon = {
+            Text(
+                "search",
+                fontFamily = materialSymbols,
+                fontSize = 24.sp,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+        },
+        trailingIcon = {
+            if (search.text.isNotEmpty()) {
+                IconButton(
+                    onClick = {
+                        onSearchChange(TextFieldValue(""))
+                        onClearClick?.invoke()
+                    },
+                    modifier = Modifier.padding(end = 4.dp)
+                ) {
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier
+                            .size(24.dp)
+                            .background(
+                                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f),
+                                CircleShape
+                            )
+                    ) {
+                        Text(
+                            "close",
+                            fontFamily = materialSymbols,
+                            fontSize = 16.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+        },
         placeholder = { Text("Search Settings") },
         singleLine = true,
         colors = colors,

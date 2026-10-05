@@ -3,12 +3,13 @@
 package helium314.keyboard.latin
 
 import android.Manifest
-import android.content.ContentUris
 import android.content.ClipDescription
 import android.content.ClipboardManager
+import android.content.ContentUris
 import android.content.Context
 import android.database.ContentObserver
 import android.graphics.Outline
+import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
@@ -24,13 +25,14 @@ import android.view.ViewOutlineProvider
 import android.view.inputmethod.EditorInfo
 import android.webkit.MimeTypeMap
 import android.widget.ImageView
-import androidx.core.content.edit
 import androidx.core.content.FileProvider
+import androidx.core.content.edit
 import androidx.core.view.isGone
 import coil.load
-import helium314.keyboard.keyboard.KeyboardTypeface
 import helium314.keyboard.compat.ClipboardManagerCompat
 import helium314.keyboard.event.HapticEvent
+import helium314.keyboard.keyboard.KeyboardTypeface
+import helium314.keyboard.keyboard.internal.KeyboardIconsSet
 import helium314.keyboard.keyboard.internal.keyboard_parser.floris.KeyCode
 import helium314.keyboard.latin.common.ColorType
 import helium314.keyboard.latin.common.isValidNumber
@@ -45,9 +47,9 @@ import java.io.File
 import java.security.MessageDigest
 import java.util.ArrayDeque
 import java.util.Locale
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.Dispatchers
 
 class ClipboardHistoryManager(
         private val latinIME: LatinIME
@@ -68,6 +70,8 @@ class ClipboardHistoryManager(
         clipboardManager.addPrimaryClipChangedListener(this)
         clipboardDao = ClipboardDao.getInstance(latinIME)
         restoreProcessedScreenshotUris()
+        dismissedClipTimestamp = latinIME.prefs().getLong(PREF_DISMISSED_CLIP_TIMESTAMP, 0L)
+        dismissedClipContent = latinIME.prefs().getString(PREF_DISMISSED_CLIP_CONTENT, null)
         if (latinIME.mSettings.current.mClipboardHistoryEnabled)
             fetchPrimaryClip()
         syncScreenshotObserver()
@@ -447,9 +451,14 @@ class ClipboardHistoryManager(
 
     fun canRemove(index: Int) = clipboardDao?.isPinned(index) == false
 
-    fun removeEntry(index: Int) {
-        if (canRemove(index))
+    fun removeEntry(index: Int): ClipboardHistoryEntry? {
+        return if (canRemove(index))
             clipboardDao?.deleteClipAt(index)
+        else null
+    }
+
+    fun restoreEntry(entry: ClipboardHistoryEntry, index: Int): Int {
+        return clipboardDao?.restoreClip(entry, index) ?: -1
     }
 
     fun sortHistoryEntries() {
@@ -489,6 +498,31 @@ class ClipboardHistoryManager(
             val label: String,
             override val timeStamp: Long
         ) : RecentClip(timeStamp)
+    }
+
+    private fun isClipDismissed(clip: RecentClip): Boolean {
+        if (dismissedClipTimestamp != 0L && clip.timeStamp <= dismissedClipTimestamp) {
+            val dismissedContent = dismissedClipContent ?: return true
+            return when (clip) {
+                is RecentClip.Text -> clip.content.toString() == dismissedContent
+                is RecentClip.Image -> clip.uri.toString() == dismissedContent
+            }
+        }
+        return false
+    }
+
+    private fun markClipDismissed(clip: RecentClip) {
+        dontShowCurrentSuggestion = true
+        dismissedClipTimestamp = clip.timeStamp
+        dismissedClipContent = when (clip) {
+            is RecentClip.Text -> clip.content.toString()
+            is RecentClip.Image -> clip.uri.toString()
+        }
+        latinIME.prefs().edit().apply {
+            putLong(PREF_DISMISSED_CLIP_TIMESTAMP, dismissedClipTimestamp)
+            putString(PREF_DISMISSED_CLIP_CONTENT, dismissedClipContent)
+            apply()
+        }
     }
 
     private fun ClipDescription.imageMimeType(): String? {
@@ -559,7 +593,9 @@ class ClipboardHistoryManager(
 
     private fun recentClip(editorInfo: EditorInfo?): RecentClip? {
         val inputType = editorInfo?.inputType ?: InputType.TYPE_NULL
-        latestRecentImageSuggestion(inputType)?.let { return it }
+        latestRecentImageSuggestion(inputType)?.let { imageClip ->
+            if (!isClipDismissed(imageClip)) return imageClip
+        }
         val clipData = clipboardManager.primaryClip ?: return null
         if (clipData.itemCount == 0) return null
         val description = clipData.description ?: return null
@@ -570,14 +606,17 @@ class ClipboardHistoryManager(
             if (InputTypeUtils.isPasswordInputType(inputType) || InputTypeUtils.isNumberInputType(inputType)) {
                 return null
             }
-            return imageClip
+            if (!isClipDismissed(imageClip)) return imageClip
+            return null
         }
 
         if (!description.hasMimeType("text/*")) return null
         val content = clipData.getItemAt(0)?.coerceToText(latinIME) ?: return null
         if (TextUtils.isEmpty(content)) return null
         if (InputTypeUtils.isNumberInputType(inputType) && !content.isValidNumber()) return null
-        return RecentClip.Text(content, timeStamp)
+        val textClip = RecentClip.Text(content, timeStamp)
+        if (isClipDismissed(textClip)) return null
+        return textClip
     }
 
     fun getClipboardSuggestionView(editorInfo: EditorInfo?, parent: ViewGroup?): View? {
@@ -590,6 +629,7 @@ class ClipboardHistoryManager(
         if (dontShowCurrentSuggestion) return null
         if (parent == null) return null
         val clip = recentClip(editorInfo) ?: return null
+        if (isClipDismissed(clip)) return null
         val inputType = editorInfo?.inputType ?: InputType.TYPE_NULL
 
         // Check if the keyboard is initialized before trying to access its icons set
@@ -605,35 +645,52 @@ class ClipboardHistoryManager(
         when (clip) {
             is RecentClip.Text -> {
                 preview.isGone = true
-                textView.text = (if (isClipSensitive(inputType)) "*".repeat(clip.content.length) else clip.content)
-                    .take(200) // truncate displayed text for performance reasons
+                val rawText = if (isClipSensitive(inputType)) "*".repeat(clip.content.length) else clip.content
+                textView.text = rawText.take(40) // Limit display characters for clean pill sizing
                 textView.setCompoundDrawablesRelativeWithIntrinsicBounds(clipIcon, null, null, null)
                 textView.setOnClickListener {
-                    dontShowCurrentSuggestion = true
+                    markClipDismissed(clip)
                     latinIME.onTextInput(clip.content.toString())
                     AudioAndHapticFeedbackManager.getInstance().performHapticAndAudioFeedback(KeyCode.NOT_SPECIFIED, it, HapticEvent.KEY_PRESS)
                     binding.root.isGone = true
                 }
             }
             is RecentClip.Image -> {
-                textView.text = clip.label
+                textView.text = clip.label.take(40)
                 textView.setCompoundDrawablesRelativeWithIntrinsicBounds(null, null, null, null)
                 preview.isGone = false
                 preview.configureCircularPreview()
                 preview.load(clip.uri)
-                binding.root.setOnClickListener { pasteImageClip(clip, binding.root, it) }
-                textView.setOnClickListener { pasteImageClip(clip, binding.root, it) }
-                preview.setOnClickListener { pasteImageClip(clip, binding.root, it) }
+                val pasteClick = View.OnClickListener {
+                    markClipDismissed(clip)
+                    pasteImageClip(clip, binding.root, it)
+                }
+                binding.root.setOnClickListener(pasteClick)
+                textView.setOnClickListener(pasteClick)
+                preview.setOnClickListener(pasteClick)
             }
         }
         val closeButton = binding.clipboardSuggestionClose
-        closeButton.setImageDrawable(keyboard.mIconsSet.getIconDrawable(ToolbarKey.CLOSE_HISTORY.name.lowercase()))
-        closeButton.setOnClickListener { removeClipboardSuggestion() }
-
         val colors = latinIME.mSettings.current.mColors
+
+        // Circular background with accent color matching keyboard special keys
+        val circleBg = GradientDrawable().apply {
+            shape = GradientDrawable.OVAL
+            setColor(colors.get(ColorType.SPECIAL_KEY_BACKGROUND))
+        }
+        closeButton.background = circleBg
+        val closeIcon = KeyboardIconsSet.instance.getNewDrawable("ic_close", latinIME)
+            ?: keyboard.mIconsSet.getIconDrawable(ToolbarKey.CLOSE_HISTORY.name.lowercase())
+        closeButton.setImageDrawable(closeIcon)
+        colors.setColor(closeButton, ColorType.KEY_TEXT)
+        closeButton.setOnClickListener {
+            AudioAndHapticFeedbackManager.getInstance().performHapticAndAudioFeedback(KeyCode.NOT_SPECIFIED, it, HapticEvent.KEY_PRESS)
+            markClipDismissed(clip)
+            removeClipboardSuggestion()
+        }
+
         textView.setTextColor(colors.get(ColorType.KEY_TEXT))
         if (clip is RecentClip.Text) clipIcon?.let { colors.setColor(it, ColorType.KEY_ICON) }
-        colors.setColor(closeButton, ColorType.REMOVE_SUGGESTION_ICON)
         colors.setBackground(binding.root, ColorType.CLIPBOARD_SUGGESTION_BACKGROUND)
 
         clipboardSuggestionView = binding.root
@@ -706,7 +763,12 @@ class ClipboardHistoryManager(
     }
 
     private fun removeClipboardSuggestion() {
-        dontShowCurrentSuggestion = true
+        val clip = recentClip(latinIME.currentInputEditorInfo)
+        if (clip != null) {
+            markClipDismissed(clip)
+        } else {
+            dontShowCurrentSuggestion = true
+        }
         val csv = clipboardSuggestionView ?: return
         if (csv.parent != null && !csv.isGone) {
             // clipboard view is shown ->
@@ -722,6 +784,8 @@ class ClipboardHistoryManager(
         private const val PREF_PROCESSED_SCREENSHOT_MEDIA_URIS = "clipboard_processed_screenshot_media_uris"
         private const val PREF_LAST_SCREENSHOT_MEDIA_URI = "clipboard_last_screenshot_media_uri"
         private const val PREF_LAST_SCREENSHOT_DATE_ADDED = "clipboard_last_screenshot_date_added"
+        private const val PREF_DISMISSED_CLIP_TIMESTAMP = "clipboard_dismissed_clip_timestamp"
+        private const val PREF_DISMISSED_CLIP_CONTENT = "clipboard_dismissed_clip_content"
         private const val SCREENSHOT_RECENT_WINDOW_SECONDS = 30L
         private const val MAX_SCREENSHOT_ROWS_TO_CHECK = 10
         private const val MAX_PROCESSED_SCREENSHOT_URIS = 20
@@ -731,6 +795,8 @@ class ClipboardHistoryManager(
             "Screenshots/"
         )
         private var dontShowCurrentSuggestion: Boolean = false
+        private var dismissedClipTimestamp: Long = 0L
+        private var dismissedClipContent: String? = null
         const val RECENT_TIME_MILLIS = 3 * 60 * 1000L // 3 minutes (for clipboard suggestions)
 
         fun decodeImageHistoryClip(text: String) = ClipboardImageHistoryClip.decode(text)

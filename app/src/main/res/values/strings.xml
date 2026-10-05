@@ -402,6 +402,7 @@
     <string name="page_up" tools:keep="@string/page_up">Page up</string>
     <string name="page_down" tools:keep="@string/page_down">Page down</string>
     <string name="undo" tools:keep="@string/undo">Undo</string>
+    <string name="clipboard_clip_deleted">Item deleted</string>
     <string name="redo" tools:keep="@string/redo">Redo</string>
     <string name="close_history" tools:keep="@string/close_history">Close clipboard history</string>
     <string name="emoji" tools:keep="@string/emoji">Emoji</string>

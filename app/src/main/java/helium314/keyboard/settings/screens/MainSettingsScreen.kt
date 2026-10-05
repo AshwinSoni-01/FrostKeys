@@ -128,13 +128,11 @@ fun MainSettingsScreen(
         onClickBack = onClickBack,
         title = stringResource(R.string.ime_settings),
         settings = emptyList(),
-        hideTopSearchBar = true,
         showBackButton = false,
     ) {
         val ctx = LocalContext.current
         val b = (ctx.getActivity() as? SettingsActivity)?.prefChanged?.collectAsState()
 
-        val hazeState = LocalHazeState.current
         val enabledSubtypes = remember(b?.value) { SubtypeSettings.getEnabledSubtypes(true) }
         val enabledSubtypeNames = remember(enabledSubtypes) {
             enabledSubtypes.joinToString(", ") { it.displayName() }
@@ -145,182 +143,144 @@ fun MainSettingsScreen(
         val telegramJoined = remember(b?.value) {
             ctx.prefs().getBoolean("pref_telegram_joined", false)
         }
-        val isDark = isSystemInDarkTheme()
-        val scaffoldBg = if (isDark) MaterialTheme.colorScheme.background else MaterialTheme.colorScheme.surfaceContainer
-        Scaffold(
-            containerColor = scaffoldBg,
-            contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom)
-        ) { innerPadding ->
-            val topPadding = LocalSearchInnerPadding.current
-            
-            val isGestureComplete = remember(b?.value) {
-                val gesturePrefs = listOf("pref_gesture_input", "pref_gesture_space_after")
-                gesturePrefs.any { ctx.prefs().getBoolean(it, true) }
-            }
-            val isDictionaryComplete = remember(b?.value) {
-                ctx.prefs().getBoolean("pref_enable_next_word_suggestions", true)
-            }
-            val isCloudComplete = remember(b?.value) {
-                val gem = ctx.prefs().getString("pref_gemini_api_key", "")
-                val kli = ctx.prefs().getString("pref_klipy_api_key", "")
-                !gem.isNullOrBlank() || !kli.isNullOrBlank()
-            }
-            val allStepsComplete = isGestureComplete && isDictionaryComplete && isCloudComplete
-            val isDismissed = remember(b?.value) {
-                ctx.prefs().getBoolean("pref_quick_setup_dismissed", false)
-            }
-
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .then(
-                        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) Modifier.haze(state = hazeState)
-                        else Modifier
-                    )
-            ) {
-                LazyColumn(contentPadding = PaddingValues(top = topPadding.calculateTopPadding(), bottom = innerPadding.calculateBottomPadding())) {
-                    item("search_bar") {
-                        val searchState = LocalSearchState.current
-                        if (searchState != null) {
-                            searchState.searchField()
-                            }
-                        }
-                    if (!telegramJoined) {
-                        item("telegram_invite") {
-                            TelegramInviteCard(
-                                onJoinClick = {
-                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/FrostKeys"))
-                                    ctx.startActivity(intent)
-                                    SettingsActivity.clickedTelegramJoin = true
-                                }
-                            )
-                        }
-                    }
-
-                    if (!isDismissed || !allStepsComplete) {
-                        item("quick_setup") {
-                            QuickSetupCard(
-                                onClickGestureTyping = onClickGestureTyping,
-                                onClickDictionaries = onClickDictionaries,
-                                onClickCloud = onClickCloud,
-                                onDismiss = {
-                                    ctx.prefs().edit().putBoolean("pref_quick_setup_dismissed", true).apply()
-                                },
-                                isGestureComplete = isGestureComplete,
-                                isDictionaryComplete = isDictionaryComplete,
-                                isCloudComplete = isCloudComplete,
-                                allStepsComplete = allStepsComplete
-                            )
-                        }
-                    }
-
-                    item("md3e_general") {
-                        Md3ePreferenceGroup("General") {
-                            Md3ePreference(
-                                icon = "language",
-                                title = stringResource(R.string.language_and_layouts_title),
-                                description = enabledSubtypeNames,
-                                onClick = onClickLanguage,
-                                isFirst = true
-                            )
-                            Md3ePreference(
-                                icon = "tune",
-                                title = stringResource(R.string.settings_screen_preferences),
-                                description = "Keypress sound, vibration, and general behavior",
-                                onClick = onClickPreferences
-                            )
-                            Md3ePreference(
-                                icon = "palette",
-                                title = stringResource(R.string.settings_screen_appearance),
-                                description = "Theme, keyboard height, and visual styles",
-                                onClick = onClickAppearance
-                            )
-                            Md3ePreference(
-                                icon = R.drawable.ic_access_point_grid,
-                                title = stringResource(R.string.settings_screen_toolbar),
-                                description = "Customize the toolbar layout and pinned buttons",
-                                onClick = onClickToolbar
-                            )
-                            Md3ePreference(
-                                icon = "cloud",
-                                title = stringResource(R.string.cloud_features),
-                                description = "Gemini assistant, smart tools, and GIF searches",
-                                onClick = onClickCloud,
-                                isLast = true
-                            )
-                        }
-                    }
-                    
-                    item("md3e_typing") {
-                        Md3ePreferenceGroup("Typing & input") {
-                            Md3ePreference(
-                                icon = "gesture",
-                                title = stringResource(R.string.settings_screen_gesture),
-                                description = if (JniUtils.sHaveGestureLib) "Swipe typing, trail colors, and gesture actions" else stringResource(R.string.gesture_not_loaded_summary),
-                                onClick = onClickGestureTyping,
-                                isFirst = true
-                            )
-                            if (showDataGathering) {
-                                Md3ePreference(
-                                    icon = "gesture",
-                                    title = stringResource(R.string.gesture_data_screen),
-                                      description = "Manage data collection for gestures",
-                                    onClick = onClickDataGathering
-                                )
-                            }
-                            Md3ePreference(
-                                icon = "spellcheck",
-                                title = stringResource(R.string.settings_screen_correction),
-                                description = "Autocorrect, block offensive words, and spacing",
-                                onClick = onClickTextCorrection
-                            )
-                            Md3ePreference(
-                                icon = "keyboard",
-                                title = stringResource(R.string.settings_screen_secondary_layouts),
-                                description = "Number row, symbols, and alternative characters",
-                                onClick = onClickLayouts
-                            )
-                            Md3ePreference(
-                                icon = "dictionary",
-                                title = stringResource(R.string.dictionary_settings_category),
-                                description = "Word suggestions, emoji prediction, and personal dictionary",
-                                onClick = onClickDictionaries,
-                                isLast = true
-                            )
-                        }
-                    }
-                    
-                    item("md3e_more") {
-                        Md3ePreferenceGroup("More") {
-                            Md3ePreference(
-                                icon = "discover_tune",
-                                title = stringResource(R.string.settings_screen_advanced),
-                                description = "Debug settings, clipboard, and experimental features",
-                                onClick = onClickAdvanced,
-                                isFirst = true
-                            )
-                            Md3ePreference(
-                                icon = "flag",
-                                title = stringResource(R.string.settings_screen_setup_wizard),
-                                description = stringResource(R.string.settings_screen_setup_wizard_summary),
-                                onClick = onClickWelcomeWizard
-                            )
-                            Md3ePreference(
-                                icon = "info",
-                                title = stringResource(R.string.settings_screen_about),
-                                description = "App version, licenses, and privacy policy",
-                                onClick = onClickAbout,
-                                isLast = true
-                            )
-                        }
-                    }
-                    
-                    item("spacer") {
-                        Spacer(modifier = Modifier.height(24.dp))
-                    }
-                }
-            }
+        val isGestureComplete = remember(b?.value) {
+            val gesturePrefs = listOf("pref_gesture_input", "pref_gesture_space_after")
+            gesturePrefs.any { ctx.prefs().getBoolean(it, true) }
         }
+        val isDictionaryComplete = remember(b?.value) {
+            ctx.prefs().getBoolean("pref_enable_next_word_suggestions", true)
+        }
+        val isCloudComplete = remember(b?.value) {
+            val gem = ctx.prefs().getString("pref_gemini_api_key", "")
+            val kli = ctx.prefs().getString("pref_klipy_api_key", "")
+            !gem.isNullOrBlank() || !kli.isNullOrBlank()
+        }
+        val allStepsComplete = isGestureComplete && isDictionaryComplete && isCloudComplete
+        val isDismissed = remember(b?.value) {
+            ctx.prefs().getBoolean("pref_quick_setup_dismissed", false)
+        }
+
+        if (!telegramJoined) {
+            TelegramInviteCard(
+                onJoinClick = {
+                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/FrostKeys"))
+                    ctx.startActivity(intent)
+                    SettingsActivity.clickedTelegramJoin = true
+                }
+            )
+        }
+
+        if (!isDismissed || !allStepsComplete) {
+            QuickSetupCard(
+                onClickGestureTyping = onClickGestureTyping,
+                onClickDictionaries = onClickDictionaries,
+                onClickCloud = onClickCloud,
+                onDismiss = {
+                    ctx.prefs().edit().putBoolean("pref_quick_setup_dismissed", true).apply()
+                },
+                isGestureComplete = isGestureComplete,
+                isDictionaryComplete = isDictionaryComplete,
+                isCloudComplete = isCloudComplete,
+                allStepsComplete = allStepsComplete
+            )
+        }
+
+        Md3ePreferenceGroup("General") {
+            Md3ePreference(
+                icon = "language",
+                title = stringResource(R.string.language_and_layouts_title),
+                description = enabledSubtypeNames,
+                onClick = onClickLanguage,
+                isFirst = true
+            )
+            Md3ePreference(
+                icon = "tune",
+                title = stringResource(R.string.settings_screen_preferences),
+                description = "Keypress sound, vibration, and general behavior",
+                onClick = onClickPreferences
+            )
+            Md3ePreference(
+                icon = "palette",
+                title = stringResource(R.string.settings_screen_appearance),
+                description = "Theme, keyboard height, and visual styles",
+                onClick = onClickAppearance
+            )
+            Md3ePreference(
+                icon = R.drawable.ic_access_point_grid,
+                title = stringResource(R.string.settings_screen_toolbar),
+                description = "Customize the toolbar layout and pinned buttons",
+                onClick = onClickToolbar
+            )
+            Md3ePreference(
+                icon = "cloud",
+                title = stringResource(R.string.cloud_features),
+                description = "Gemini assistant, smart tools, and GIF searches",
+                onClick = onClickCloud,
+                isLast = true
+            )
+        }
+        
+        Md3ePreferenceGroup("Typing & input") {
+            Md3ePreference(
+                icon = "gesture",
+                title = stringResource(R.string.settings_screen_gesture),
+                description = if (JniUtils.sHaveGestureLib) "Swipe typing, trail colors, and gesture actions" else stringResource(R.string.gesture_not_loaded_summary),
+                onClick = onClickGestureTyping,
+                isFirst = true
+            )
+            if (showDataGathering) {
+                Md3ePreference(
+                    icon = "gesture",
+                    title = stringResource(R.string.gesture_data_screen),
+                    description = "Manage data collection for gestures",
+                    onClick = onClickDataGathering
+                )
+            }
+            Md3ePreference(
+                icon = "spellcheck",
+                title = stringResource(R.string.settings_screen_correction),
+                description = "Autocorrect, block offensive words, and spacing",
+                onClick = onClickTextCorrection
+            )
+            Md3ePreference(
+                icon = "keyboard",
+                title = stringResource(R.string.settings_screen_secondary_layouts),
+                description = "Number row, symbols, and alternative characters",
+                onClick = onClickLayouts
+            )
+            Md3ePreference(
+                icon = "dictionary",
+                title = stringResource(R.string.dictionary_settings_category),
+                description = "Word suggestions, emoji prediction, and personal dictionary",
+                onClick = onClickDictionaries,
+                isLast = true
+            )
+        }
+        
+        Md3ePreferenceGroup("More") {
+            Md3ePreference(
+                icon = "discover_tune",
+                title = stringResource(R.string.settings_screen_advanced),
+                description = "Debug settings, clipboard, and experimental features",
+                onClick = onClickAdvanced,
+                isFirst = true
+            )
+            Md3ePreference(
+                icon = "flag",
+                title = stringResource(R.string.settings_screen_setup_wizard),
+                description = stringResource(R.string.settings_screen_setup_wizard_summary),
+                onClick = onClickWelcomeWizard
+            )
+            Md3ePreference(
+                icon = "info",
+                title = stringResource(R.string.settings_screen_about),
+                description = "App version, licenses, and privacy policy",
+                onClick = onClickAbout,
+                isLast = true
+            )
+        }
+        
+        Spacer(modifier = Modifier.height(24.dp))
     }
 }
 

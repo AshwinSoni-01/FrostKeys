@@ -7,6 +7,7 @@ import android.util.AttributeSet
 import android.view.View
 import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.RecyclerView
+import helium314.keyboard.latin.ClipboardHistoryEntry
 import helium314.keyboard.latin.ClipboardHistoryManager
 import androidx.core.view.isVisible
 import androidx.core.view.isInvisible
@@ -17,10 +18,15 @@ class ClipboardHistoryRecyclerView @JvmOverloads constructor(
         defStyleAttr: Int = 0
 ) : RecyclerView(context, attrs, defStyleAttr) {
 
+    interface OnClipDismissListener {
+        fun onClipDismissed(entry: ClipboardHistoryEntry, originalPosition: Int)
+    }
+
+    var clipDismissListener: OnClipDismissListener? = null
     var placeholderView: View? = null
     val historyManager: ClipboardHistoryManager? get() = (adapter as? ClipboardAdapter?)?.clipboardHistoryManager
     @Suppress("unused")
-    private val touchHelper = ItemTouchHelper(object : ItemTouchHelper.SimpleCallback(0, ItemTouchHelper.LEFT) {
+    private val touchHelper = ItemTouchHelper(object : ItemTouchHelper.SimpleCallback(0, ItemTouchHelper.LEFT or ItemTouchHelper.RIGHT) {
         override fun onMove(recyclerView: RecyclerView, viewHolder: ViewHolder, target: ViewHolder) = false
         override fun getSwipeDirs(recyclerView: RecyclerView, viewHolder: ViewHolder): Int {
             if (historyManager?.canRemove(viewHolder.absoluteAdapterPosition) == false)
@@ -28,8 +34,13 @@ class ClipboardHistoryRecyclerView @JvmOverloads constructor(
             return super.getSwipeDirs(recyclerView, viewHolder)
         }
         override fun onSwiped(viewHolder: ViewHolder, dir: Int) {
-            historyManager?.removeEntry(viewHolder.absoluteAdapterPosition)
-            adapter?.notifyItemRemoved(viewHolder.absoluteAdapterPosition)
+            val position = viewHolder.absoluteAdapterPosition
+            val entry = historyManager?.getHistoryEntry(position)
+            if (entry != null) {
+                historyManager?.removeEntry(position)
+                adapter?.notifyItemRemoved(position)
+                clipDismissListener?.onClipDismissed(entry, position)
+            }
         }
     }).attachToRecyclerView(this)
 

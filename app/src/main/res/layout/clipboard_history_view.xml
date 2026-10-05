@@ -69,6 +69,42 @@
             android:layout_height="match_parent"
             android:orientation="vertical"/>
 
+        <LinearLayout
+            android:id="@+id/clipboard_undo_bar"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom|center_horizontal"
+            android:layout_marginBottom="12dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:clickable="true"
+            android:focusable="true"
+            android:paddingStart="16dp"
+            android:paddingEnd="6dp"
+            android:paddingVertical="5dp"
+            android:elevation="6dp"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/clipboard_undo_text"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/clipboard_clip_deleted"
+                android:textSize="14sp" />
+
+            <TextView
+                android:id="@+id/clipboard_undo_button"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="14dp"
+                android:paddingHorizontal="14dp"
+                android:paddingVertical="7dp"
+                android:gravity="center"
+                android:text="@string/undo"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
     </FrameLayout>
 
     <helium314.keyboard.keyboard.MainKeyboardView

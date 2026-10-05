@@ -303,6 +303,7 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
             mCurrentAnimatingPanel.setAlpha(1f);
             mCurrentAnimatingPanel = null;
         }
+        targetPanel.setAlpha(0f);
         action.run();
         targetPanel.setAlpha(0f);
         mCurrentAnimatingPanel = targetPanel;
@@ -320,6 +321,12 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
         mRunningAnimator.start();
     }
 
+    private boolean mSearchModeTransitionPending = false;
+
+    public void notifyEnteringSearchMode() {
+        mSearchModeTransitionPending = true;
+    }
+
     private void setKeyboard(final int keyboardId, @NonNull final KeyboardSwitchState toggleState) {
         // with a hardware keyboard we might get here without ever calling
         // onCreateInputView, so don't crash
@@ -327,7 +334,11 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
             return;
 
         final View currentPanel = getVisibleKeyboardView();
-        final boolean animate = currentPanel != mKeyboardView;
+        final boolean searchPanelActive = (mKlipyPalettesView != null && mKlipyPalettesView.isSearchMode())
+                || (mEmojiPalettesView != null && mEmojiPalettesView.isSearchMode());
+        final boolean isEnteringSearch = mSearchModeTransitionPending;
+        mSearchModeTransitionPending = false;
+        final boolean animate = (currentPanel != mKeyboardView && !searchPanelActive) || isEnteringSearch;
 
         final Runnable action = new Runnable() {
             @Override
@@ -1061,9 +1072,9 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
         // @see
         // LatinIME#onComputeInset(android.inputmethodservice.InputMethodService.Insets)
         mMainKeyboardFrame.setVisibility(visibility);
-        if (!emojiSearchActive) {
-            mEmojiPalettesView.setVisibility(View.GONE);
+        if (!emojiSearchActive && mEmojiPalettesView != null) {
             mEmojiPalettesView.stopEmojiPalettes();
+            mEmojiPalettesView.setVisibility(View.GONE);
         }
         if (mKlipyPalettesView != null) {
             if (!mKlipyPalettesView.isSearchMode()) {
@@ -1071,7 +1082,7 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
                 mKlipyPalettesView.stopKlipyPalettes();
             }
         }
-        if (!emojiSearchActive) {
+        if (!emojiSearchActive && mEmojiTabStripView != null) {
             mEmojiTabStripView.setVisibility(View.GONE);
         }
         mClipboardStripScrollView.setVisibility(View.GONE);
@@ -1085,11 +1096,10 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
         if (mAccessPointMenuView != null) {
             mAccessPointMenuView.setVisibility(View.GONE);
         }
-        if (mSuggestionStripView != null) {
+        if (mSuggestionStripView != null && !klipySearchActive && !emojiSearchActive) {
             mSuggestionStripView.setAccessPointMenuOpen(false);
         }
-        setKeyboardPanelOffsets((mKlipyPalettesView != null && mKlipyPalettesView.isSearchMode())
-                || (mEmojiPalettesView != null && mEmojiPalettesView.isSearchMode()));
+        setKeyboardPanelOffsets(klipySearchActive || emojiSearchActive);
         updatePersistentEmojiRow();
         logTypingListenerInvariant("KeyboardSwitcher.setMainKeyboardFrame", false /* logWhenOk */);
     }
@@ -1118,6 +1128,10 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
                 mSuggestionStripView.setVisibility(View.GONE);
                 mClipboardStripScrollView.setVisibility(View.GONE);
                 mClipboardHistoryView.setVisibility(View.GONE);
+                if (mKlipyPalettesView != null) {
+                    mKlipyPalettesView.setVisibility(View.GONE);
+                    mKlipyPalettesView.stopKlipyPalettes();
+                }
                 if (mAiWritingToolsView != null) {
                     mAiWritingToolsView.setVisibility(View.GONE);
                     mAiWritingToolsView.onClose();
@@ -1160,6 +1174,10 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
                 mEmojiTabStripView.setVisibility(View.GONE);
                 mSuggestionStripView.setVisibility(View.GONE);
                 mEmojiPalettesView.setVisibility(View.GONE);
+                if (mKlipyPalettesView != null) {
+                    mKlipyPalettesView.setVisibility(View.GONE);
+                    mKlipyPalettesView.stopKlipyPalettes();
+                }
                 if (mAiWritingToolsView != null) {
                     mAiWritingToolsView.setVisibility(View.GONE);
                     mAiWritingToolsView.onClose();
@@ -1206,6 +1224,10 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
                 mEmojiPalettesView.setVisibility(View.GONE);
                 mClipboardHistoryView.setVisibility(View.GONE);
                 mClipboardStripScrollView.setVisibility(View.GONE);
+                if (mKlipyPalettesView != null) {
+                    mKlipyPalettesView.setVisibility(View.GONE);
+                    mKlipyPalettesView.stopKlipyPalettes();
+                }
                 if (mAccessPointMenuView != null) {
                     mAccessPointMenuView.setVisibility(View.GONE);
                 }
