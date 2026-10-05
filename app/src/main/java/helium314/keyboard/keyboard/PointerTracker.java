@@ -966,33 +966,12 @@ public final class PointerTracker implements PointerTrackerQueue.Element,
             int dX = x - mStartX;
             int dY = y - mStartY;
 
-            // Touchpad mode
+            // Touchpad mode logic handles all spacebar swiping now to prevent conflicts
+            if (!mInHorizontalSwipe && !mInVerticalSwipe) {
+                sTimerProxy.cancelKeyTimersOf(this);
+                mInHorizontalSwipe = true;
+            }
             mTouchpadHandler.enableTouchpadMove(mPointerId, x, y, sListener);
-
-            // Vertical movement
-            int stepsY = dY / sPointerStep;
-            if (stepsY != 0 && abs(dX) < abs(dY) && !mInHorizontalSwipe) {
-                if (!mInVerticalSwipe) {
-                    sTimerProxy.cancelKeyTimersOf(this);
-                    mInVerticalSwipe = true;
-                } else if (oneShotSwipe(sv.mSpaceSwipeVertical)) return;
-                if (sListener.onVerticalSpaceSwipe(stepsY)) {
-                    mStartY += stepsY * sPointerStep;
-                }
-                return;
-            }
-
-            // Horizontal movement
-            int stepsX = dX / sPointerStep;
-            if (stepsX != 0 && !mInVerticalSwipe) {
-                if (!mInHorizontalSwipe) {
-                    sTimerProxy.cancelKeyTimersOf(this);
-                    mInHorizontalSwipe = true;
-                } else if (oneShotSwipe(sv.mSpaceSwipeHorizontal)) return;
-                if (sListener.onHorizontalSpaceSwipe(stepsX)) {
-                    mStartX += stepsX * sPointerStep;
-                }
-            }
         } else if (code == KeyCode.DELETE) {
             // Delete slider
             int steps = (x - mStartX) / sPointerStep;
