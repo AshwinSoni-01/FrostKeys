@@ -2,8 +2,8 @@ name: Build and Release Mango.brrrBoard APK
 
 on:
   push:
-    branches:
-      - "real-*"
+    tags:
+      - "build-*"
   workflow_dispatch:
     inputs:
       description:
@@ -20,13 +20,14 @@ concurrency:
 
 jobs:
   build:
-    if: ${{ github.event_name == 'workflow_dispatch' || startsWith(github.event.head_commit.message, 'release:') }}
     runs-on: ubuntu-latest
     timeout-minutes: 25
 
     steps:
-      - name: Checkout
+      - name: Checkout exact tagged source
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -64,15 +65,15 @@ jobs:
           path: ${{ steps.apk.outputs.apk_path }}
           if-no-files-found: error
 
-      - name: Publish PRE-RELEASE
+      - name: Publish GitHub PRE-RELEASE
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
 
+          TAG="${GITHUB_REF_NAME}"
           SHORT_SHA="${GITHUB_SHA::7}"
-          TAG="build-${SHORT_SHA}"
 
           DESC="${{ inputs.description }}"
           if [ -z "$DESC" ]; then
