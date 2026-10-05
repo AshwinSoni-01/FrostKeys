@@ -21,6 +21,7 @@ import helium314.keyboard.keyboard.internal.keyboard_parser.LocaleKeyboardInfos;
 import helium314.keyboard.keyboard.internal.keyboard_parser.floris.KeyCode;
 import helium314.keyboard.latin.R;
 import helium314.keyboard.latin.settings.Settings;
+import helium314.keyboard.latin.settings.SettingsValues;
 import helium314.keyboard.latin.utils.ResourceUtils;
 
 import java.util.ArrayList;

@@ -1,4 +1,5 @@
 name: One-shot brrrBoard APK build
+# trigger: latest source-fix validation
 
 on:
   push:
@@ -35,8 +36,42 @@ jobs:
           chmod +x gradlew
           ./gradlew --version
 
+      - name: Inspect Java/Kotlin compilation boundary
+        shell: bash
+        run: |
+          set +e
+          ./gradlew :app:compileDebugJavaWithJavac --no-daemon --no-configuration-cache --no-build-cache --stacktrace
+          JAVA_RC=$?
+          echo "compileDebugJavaWithJavac exit=$JAVA_RC"
+          echo "=== KeyboardSwitcher.class candidates ==="
+          find app/build -type f -name 'KeyboardSwitcher.class' -print
+          echo "=== javap candidates ==="
+          for f in $(find app/build -type f -name 'KeyboardSwitcher.class'); do
+            d="$(dirname "$f")"
+            echo "--- $f ---"
+            javap -public -classpath "$d" helium314.keyboard.keyboard.KeyboardSwitcher 2>&1 | sed -n '1,220p'
+          done
+          echo "=== Relevant Gradle tasks ==="
+          ./gradlew :app:tasks --all --no-daemon --no-configuration-cache --no-build-cache | grep -E 'compileDebug(JavaWithJavac|Kotlin)|kotlin.*Debug' || true
+          exit 0
+
       - name: Build debug APK
-        run: ./gradlew --no-daemon --stacktrace assembleDebug
+        run: ./gradlew --no-daemon --no-configuration-cache --no-build-cache --stacktrace clean assembleDebug
+
+      - name: Dump Kotlin Java stubs on build failure
+        if: ${{ failure() }}
+        shell: bash
+        run: |
+          set +e
+          echo "=== All KeyboardSwitcher build artifacts ==="
+          find app/build -type f \( -name '*KeyboardSwitcher*' -o -name 'KeyboardSwitcher.java' \) -print
+          echo "=== Generated Java source references ==="
+          grep -RIn --include='*.java' --include='*.kt' 'class KeyboardSwitcher' app/build 2>/dev/null | head -80
+          echo "=== Generated stub declaration ==="
+          for f in $(grep -Rl --include='*.java' 'class KeyboardSwitcher' app/build 2>/dev/null); do
+            echo "--- $f ---"
+            grep -n -B4 -A20 'class KeyboardSwitcher' "$f" | head -80
+          done
 
       - name: Verify APK output
         shell: bash

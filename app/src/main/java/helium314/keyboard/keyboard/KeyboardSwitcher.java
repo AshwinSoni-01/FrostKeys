@@ -280,6 +280,7 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
         if (mClipboardHistoryView != null)
             mClipboardHistoryView.setAlpha(1f);
         
+    }
 
     private void setKeyboard(final int keyboardId, @NonNull final KeyboardSwitchState toggleState) {
         // with a hardware keyboard we might get here without ever calling
@@ -1041,6 +1042,23 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
         logTypingListenerInvariant("KeyboardSwitcher.setMainKeyboardFrame", false /* logWhenOk */);
     }
 
+    // The legacy AI-tools panel was removed from brrrBoard. Keep the state-machine
+    // contract intact and return to the normal alphabet keyboard when an old layout
+    // or state attempts to invoke the retired action.
+    @Override
+    public void setAiToolsKeyboard() {
+        if (DEBUG_ACTION) {
+            Log.d(TAG, "setAiToolsKeyboard: retired cloud AI panel");
+        }
+        if (mState != null && mLatinIME != null) {
+            mState.onResetKeyboardStateToAlphabet(
+                    mLatinIME.getCurrentAutoCapsState(),
+                    mLatinIME.getCurrentRecapitalizeState());
+        } else {
+            setAlphabetKeyboard();
+        }
+    }
+
     // Implements {@link KeyboardState.SwitchActions}.
     @Override
     public void setEmojiKeyboard() {
@@ -1121,11 +1139,6 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
             }
         });
     }
-
-    @Override
-    
-
-    
 
     @Override
     public void setAccessPointKeyboard() {
@@ -1291,7 +1304,6 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
             mEmojiTabStripView.setVisibility(View.GONE);
             mClipboardStripView.setVisibility(View.GONE);
         }
-    }
     }
 
     // Future method for requesting an updating to the shift state.
@@ -1479,3 +1491,229 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
             setClipboardKeyboard();
         }
     }
+
+    private void transitionToPanel(final View targetPanel, final Runnable action) {
+        if (mKeyboardView == null || targetPanel == null) {
+            action.run();
+            return;
+        }
+        if (mRunningAnimator != null) {
+            mRunningAnimator.cancel();
+            mRunningAnimator = null;
+        }
+        if (mCurrentAnimatingPanel != null) {
+            mCurrentAnimatingPanel.setAlpha(1f);
+            mCurrentAnimatingPanel = null;
+        }
+        action.run();
+        targetPanel.setAlpha(0f);
+        mCurrentAnimatingPanel = targetPanel;
+        mRunningAnimator = targetPanel.animate()
+                .alpha(1f)
+                .setDuration(350)
+                .withEndAction(new Runnable() {
+                    @Override
+                    public void run() {
+                        targetPanel.setAlpha(1f);
+                        mCurrentAnimatingPanel = null;
+                        mRunningAnimator = null;
+                    }
+                });
+        mRunningAnimator.start();
+    }
+
+    private static int getSecondaryStripVisibility() {
+        return Settings.getValues().mSecondaryStripVisible ? View.VISIBLE : View.GONE;
+    }
+
+    private void showFakeToast(final String text, final int timeMillis) {
+        if (mFakeToastView == null || mFakeToastView.getVisibility() == View.VISIBLE) {
+            return;
+        }
+        final Drawable appIcon = mFakeToastView.getCompoundDrawables()[0];
+        if (appIcon != null) {
+            final int bound = mFakeToastView.getLineHeight();
+            appIcon.setBounds(0, 0, bound, bound);
+            mFakeToastView.setCompoundDrawables(appIcon, null, null, null);
+        }
+        mFakeToastView.setText(text);
+        KeyboardTypeface.applyToTextView(mFakeToastView);
+        mFakeToastView.setVisibility(View.VISIBLE);
+        mFakeToastView.bringToFront();
+        mFakeToastView.startAnimation(AnimationUtils.loadAnimation(mLatinIME, R.anim.fade_in));
+        mFakeToastView.postDelayed(() -> {
+            mFakeToastView.startAnimation(AnimationUtils.loadAnimation(mLatinIME, R.anim.fade_out));
+            mFakeToastView.setVisibility(View.GONE);
+        }, timeMillis);
+    }
+
+    public FrameLayout getStripContainer() {
+        return mStripContainer;
+    }
+
+    public View getClipboardHistoryView() {
+        return mClipboardHistoryView;
+    }
+
+    public void logTypingListenerInvariant(final String reason, final boolean logWhenOk) {
+        // Diagnostics intentionally disabled in the offline keyboard build.
+    }
+
+    public void deallocateMemory() {
+        if (mKeyboardView != null) {
+            mKeyboardView.cancelAllOngoingEvents();
+            mKeyboardView.deallocateMemory();
+        }
+        if (mEmojiPalettesView != null) {
+            mEmojiPalettesView.stopEmojiPalettes();
+        }
+        if (mClipboardHistoryView != null) {
+            mClipboardHistoryView.stopClipboardHistory();
+        }
+    }
+
+    public void trimMemory() {
+        if (mEmojiPalettesView != null) {
+            mEmojiPalettesView.clearKeyboardCache();
+        }
+    }
+
+    @SuppressLint("InflateParams")
+    public View onCreateInputView(@NonNull Context displayContext, final boolean isHardwareAcceleratedDrawingEnabled) {
+        if (mKeyboardView != null) {
+            mKeyboardView.closing();
+        }
+        exitResizeMode();
+        PointerTracker.clearOldViewData();
+
+        final SharedPreferences prefs = KtxKt.prefs(displayContext);
+        if (mSuggestionStripView != null) {
+            prefs.unregisterOnSharedPreferenceChangeListener(mSuggestionStripView);
+        }
+        if (mClipboardHistoryView != null) {
+            prefs.unregisterOnSharedPreferenceChangeListener(mClipboardHistoryView);
+        }
+        if (mThemeNeedsReload) {
+            Settings.getInstance().loadSettings(
+                    displayContext,
+                    Settings.getValues().mLocale,
+                    Settings.getValues().mInputAttributes);
+        }
+
+        updateKeyboardThemeAndContextThemeWrapper(
+                displayContext,
+                KeyboardTheme.getKeyboardTheme(displayContext));
+
+        mCurrentInputView = (InputView) LayoutInflater.from(mThemeContext)
+                .inflate(R.layout.input_view, null);
+        mMainKeyboardFrame = mCurrentInputView.findViewById(R.id.main_keyboard_frame);
+        mEmojiPalettesView = mCurrentInputView.findViewById(R.id.emoji_palettes_view);
+        mClipboardHistoryView = mCurrentInputView.findViewById(R.id.clipboard_history_view);
+        mAccessPointMenuView = mCurrentInputView.findViewById(R.id.access_point_menu_view);
+        mFakeToastView = mCurrentInputView.findViewById(R.id.fakeToast);
+
+        mKeyboardViewWrapper = mCurrentInputView.findViewById(R.id.keyboard_view_wrapper);
+        mKeyboardViewWrapper.setKeyboardActionListener(mLatinIME.mKeyboardActionListener);
+
+        mKeyboardView = mCurrentInputView.findViewById(R.id.keyboard_view);
+        mKeyboardView.setHardwareAcceleratedDrawingEnabled(isHardwareAcceleratedDrawingEnabled);
+        mKeyboardView.setKeyboardActionListener(mLatinIME.mKeyboardActionListener);
+
+        if (mEmojiPalettesView != null) {
+            mEmojiPalettesView.setHardwareAcceleratedDrawingEnabled(isHardwareAcceleratedDrawingEnabled);
+            mEmojiPalettesView.setKeyboardActionListener(mLatinIME.mKeyboardActionListener);
+        }
+        if (mClipboardHistoryView != null) {
+            mClipboardHistoryView.setHardwareAcceleratedDrawingEnabled(isHardwareAcceleratedDrawingEnabled);
+            mClipboardHistoryView.setKeyboardActionListener(mLatinIME.mKeyboardActionListener);
+        }
+        if (mAccessPointMenuView != null) {
+            mAccessPointMenuView.setKeyboardActionListener(mLatinIME.mKeyboardActionListener);
+        }
+
+        mEmojiTabStripView = mCurrentInputView.findViewById(R.id.emoji_tab_strip_container);
+        mClipboardStripView = mCurrentInputView.findViewById(R.id.clipboard_strip);
+        mClipboardStripScrollView = mCurrentInputView.findViewById(R.id.clipboard_strip_scroll_view);
+        mSuggestionStripView = mCurrentInputView.findViewById(R.id.suggestion_strip_view);
+        mStripContainer = mCurrentInputView.findViewById(R.id.strip_container);
+        mPersistentEmojiRowScroll = mCurrentInputView.findViewById(R.id.persistent_emoji_row_scroll);
+        mPersistentEmojiRowContainer = mCurrentInputView.findViewById(R.id.persistent_emoji_row_container);
+
+        mKeyboardResizeOverlay = new helium314.keyboard.keyboard.resize.KeyboardResizeOverlayView(mThemeContext);
+        mKeyboardResizeOverlay.setId(R.id.keyboard_resize_overlay);
+        mKeyboardResizeOverlay.setVisibility(View.GONE);
+        mKeyboardResizeOverlay.init(mMainKeyboardFrame, this);
+        final FrameLayout.LayoutParams resizeOverlayParams = new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                0,
+                Gravity.BOTTOM);
+        mCurrentInputView.addView(mKeyboardResizeOverlay, resizeOverlayParams);
+
+        if (mMainKeyboardFrame instanceof ViewGroup) {
+            ((ViewGroup) mMainKeyboardFrame).setLayoutTransition(null);
+        }
+        if (mCurrentInputView != null) {
+            mCurrentInputView.setLayoutTransition(null);
+        }
+        if (mStripContainer != null) {
+            mStripContainer.setLayoutTransition(null);
+        }
+
+        prefs.registerOnSharedPreferenceChangeListener(mSuggestionStripView);
+        prefs.registerOnSharedPreferenceChangeListener(mClipboardHistoryView);
+        PointerTracker.switchTo(mKeyboardView);
+        return mCurrentInputView;
+    }
+
+    public String getLocaleAndConfidenceInfo() {
+        return mLatinIME.getLocaleAndConfidenceInfo();
+    }
+
+    public void updatePersistentEmojiRow() {
+        if (mPersistentEmojiRowScroll == null || mPersistentEmojiRowContainer == null || mCurrentInputView == null) {
+            return;
+        }
+        // Default brrrBoard layout intentionally keeps the persistent row hidden.
+        mPersistentEmojiRowScroll.setVisibility(View.GONE);
+        final View divider = mMainKeyboardFrame == null
+                ? null
+                : mMainKeyboardFrame.findViewById(R.id.persistent_emoji_row_divider);
+        if (divider != null) {
+            divider.setVisibility(View.GONE);
+        }
+        mCurrentlyDisplayedPersistentEmojis = null;
+    }
+
+    public boolean isShowingPersistentEmojiRow() {
+        return mPersistentEmojiRowScroll != null && mPersistentEmojiRowScroll.getVisibility() == View.VISIBLE;
+    }
+
+    public int getPersistentEmojiRowHeight() {
+        if (mPersistentEmojiRowScroll == null) {
+            return 0;
+        }
+        final float density = mPersistentEmojiRowScroll.getContext().getResources().getDisplayMetrics().density;
+        return (int) (41 * density);
+    }
+
+    public void updateLiveFrostedGlassColors() {
+        // Rendering hook for the future Liquid Glass/material layer.
+        // Avoid forcing expensive work here until the material layer is enabled.
+        if (mCurrentInputView != null) {
+            mCurrentInputView.invalidate();
+        }
+        if (mKeyboardView != null) {
+            mKeyboardView.invalidate();
+        }
+        if (mSuggestionStripView != null) {
+            mSuggestionStripView.invalidate();
+        }
+    }
+
+    public void forceUpdateKeyboardTheme(final Context context) {
+        mThemeNeedsReload = true;
+        mKeyboardTheme = null;
+        mThemeContext = null;
+    }
+
+}

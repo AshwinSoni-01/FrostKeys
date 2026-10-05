@@ -1174,18 +1174,7 @@ public final class EmojiPalettesView extends LinearLayout
             if (latinIME == null || keyboard == null) {
                 return;
             }
-            latinIME.getKlipySearchGestureSuggestion(batchPointers, keyboard, new Suggest.OnGetSuggestedWordsCallback() {
-                @Override
-                public void onGetSuggestedWords(final SuggestedWords suggestedWords) {
-                    if (suggestedWords == null || suggestedWords.isEmpty()) {
-                        return;
-                    }
-                    final String word = suggestedWords.getWord(0);
-                    if (word != null && !word.isBlank()) {
-                        post(() -> insertSearchText(word));
-                    }
-                }
-            });
+            // Gesture search uses the normal local suggestion path; retired Klipy integration is removed.
         }
 
         @Override
