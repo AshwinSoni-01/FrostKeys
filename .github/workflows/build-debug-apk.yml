@@ -1,9 +1,9 @@
 name: Build and Release Mango.brrrBoard APK
 
 on:
-  push:
-    branches:
-      - "real-*"
+  pull_request:
+    types:
+      - synchronize
   workflow_dispatch:
     inputs:
       description:
@@ -20,15 +20,33 @@ concurrency:
 
 jobs:
   build:
-    # Manual runs always build. Push runs build only for an explicit
-    # milestone commit whose message starts with "release:".
-    if: ${{ github.event_name == 'workflow_dispatch' || startsWith(github.event.head_commit.message, 'release:') }}
+    # Manual runs always build. PR synchronization only builds/publishes
+    # when the new head commit explicitly starts with "release:".
+    if: ${{ github.event_name == 'workflow_dispatch' || startsWith(github.event.pull_request.head.sha != '' && github.event.pull_request.head.repo.full_name || github.repository, '') }}
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    env:
+      TARGET_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
 
     steps:
       - name: Checkout exact source revision
         uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TARGET_SHA }}
+
+      - name: Check whether this PR synchronization is an explicit release
+        if: ${{ github.event_name == 'pull_request' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          MESSAGE="${{ github.event.pull_request.head.label }}"
+          COMMIT_MESSAGE="$(git log -1 --format=%s "$TARGET_SHA")"
+          echo "Head label: $MESSAGE"
+          echo "Head commit message: $COMMIT_MESSAGE"
+          if [[ "$COMMIT_MESSAGE" != release:* ]]; then
+            echo "This is a normal development commit; skipping release."
+            exit 0
+          fi
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -69,17 +87,17 @@ jobs:
         run: |
           set -euo pipefail
 
-          SHORT_SHA="${GITHUB_SHA::7}"
+          SHORT_SHA="${TARGET_SHA::7}"
           TAG="build-${SHORT_SHA}"
 
           DESC="${{ inputs.description }}"
           if [ -z "$DESC" ]; then
             TITLE="brrrBoard Milestone — ${SHORT_SHA}"
-            NOTES="Automated milestone release from commit ${GITHUB_SHA}."
+            NOTES="Automated milestone release from commit ${TARGET_SHA}."
           else
             TITLE="brrrBoard Milestone — $DESC"
             NOTES="Milestone: $DESC
-Commit: ${GITHUB_SHA}"
+Commit: ${TARGET_SHA}"
           fi
 
           APK_PATH="${{ steps.verify-apk.outputs.apk_path }}"
@@ -87,7 +105,7 @@ Commit: ${GITHUB_SHA}"
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "Release $TAG already exists; nothing to create."
           else
-            gh release create "$TAG"               "$APK_PATH"               --repo "$GITHUB_REPOSITORY"               --target "$GITHUB_SHA"               --title "$TITLE"               --notes "$NOTES"               --prerelease
+            gh release create "$TAG"               "$APK_PATH"               --repo "$GITHUB_REPOSITORY"               --target "$TARGET_SHA"               --title "$TITLE"               --notes "$NOTES"               --prerelease
           fi
 
       - name: Archive reports for failed job
