@@ -1290,7 +1290,11 @@ class KlipyPalettesView @JvmOverloads constructor(
             id
         }
 
-        val locale = ConfigurationCompat.getLocales(resources.configuration)[0]?.country?.lowercase() ?: "us"
+        val currentLocale = ConfigurationCompat.getLocales(resources.configuration)[0]
+        val locale = currentLocale?.country?.takeIf { it.isNotBlank() }?.lowercase()
+            ?: currentLocale?.language?.takeIf { it.isNotBlank() }?.lowercase()
+            ?: "us"
+        val formatFilter = if (tab == KlipyHistoryDao.TYPE_GIF) "gif,webp" else "webp,gif,png"
 
         val url = "https://api.klipy.com/api/v1/$apiKey/$endpoint/search".toHttpUrlOrNull()?.newBuilder()
             ?.addEncodedQueryParameter("q", encodedQuery)
@@ -1299,7 +1303,7 @@ class KlipyPalettesView @JvmOverloads constructor(
             ?.addQueryParameter("customer_id", customerId)
             ?.addQueryParameter("locale", locale)
             ?.addQueryParameter("content_filter", "medium")
-            ?.addQueryParameter("format_filter", "webp,gif,png")
+            ?.addQueryParameter("format_filter", formatFilter)
             ?.build() ?: return Pair(emptyList(), false)
 
         val request = Request.Builder()
