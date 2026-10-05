@@ -142,18 +142,20 @@ public class TouchpadHandler {
         mTouchpadLastX = x;
         mTouchpadLastY = y;
 
-        float accFactorX = 1.0f + (Math.abs(deltaX) / TOUCHPAD_ACCELERATION_FACTOR);
-        float accFactorY = 1.0f + (Math.abs(deltaY) / TOUCHPAD_ACCELERATION_FACTOR);
+        // Significantly reduce acceleration so movement is smoother and more iOS-like.
+        float accFactorX = 1.0f + (Math.abs(deltaX) / (TOUCHPAD_ACCELERATION_FACTOR * 3.0f));
+        float accFactorY = 1.0f + (Math.abs(deltaY) / (TOUCHPAD_ACCELERATION_FACTOR * 3.0f));
         mTouchpadAccX += (int) (deltaX * accFactorX);
         mTouchpadAccY += (int) (deltaY * accFactorY);
 
         // Calculate dynamic threshold based on sensitivity setting (0-100)
+        // We increase the threshold bounds to make it slower overall.
         // Higher sensitivity = Lower threshold (faster cursor)
-        // 0 -> 70px (Very Slow)
-        // 50 -> 40px (Default)
-        // 100 -> 10px (Very Fast)
+        // 0 -> 120px (Very Slow)
+        // 50 -> 80px (Default)
+        // 100 -> 40px (Fast)
         int sensitivity = Settings.getInstance().getCurrent().mTouchpadSensitivity;
-        int moveThreshold = 70 - (int) (sensitivity * 0.6f);
+        int moveThreshold = 120 - (int) (sensitivity * 0.8f);
 
         // Handle horizontal movement with accumulator
         while (Math.abs(mTouchpadAccX) >= moveThreshold) {
@@ -168,7 +170,10 @@ public class TouchpadHandler {
         }
 
         // Handle vertical movement with accumulator
-        while (Math.abs(mTouchpadAccY) >= moveThreshold) {
+        // We require a much larger threshold to trigger vertical movement
+        // to restrict cursor mainly to horizontal movement.
+        int verticalThreshold = moveThreshold * 4;
+        while (Math.abs(mTouchpadAccY) >= verticalThreshold) {
             boolean positive = mTouchpadAccY > 0;
             int direction = positive ? KeyCode.ARROW_DOWN : KeyCode.ARROW_UP;
             if (mSelecting) {
@@ -176,7 +181,7 @@ public class TouchpadHandler {
             } else {
                 mListener.onCodeInput(direction, Constants.NOT_A_COORDINATE, Constants.NOT_A_COORDINATE, false);
             }
-            mTouchpadAccY -= (positive ? moveThreshold : -moveThreshold);
+            mTouchpadAccY -= (positive ? verticalThreshold : -verticalThreshold);
         }
     }
 
@@ -216,15 +221,10 @@ public class TouchpadHandler {
         int thresholdX = (int) (keyboardWidth * EDGE_THRESHOLD_PERCENTAGE);
         int thresholdY = (int) (keyboardHeight * EDGE_THRESHOLD_PERCENTAGE);
 
-        if (y <= thresholdY) {
-            mCurrentScrollDirection = DIRECTION_UP;
-            startEdgeScrolling();
-            return true;
-        } else if (y >= (keyboardHeight - thresholdY)) {
-            mCurrentScrollDirection = DIRECTION_DOWN;
-            startEdgeScrolling();
-            return true;
-        } else if (x <= thresholdX) {
+        // Disable vertical edge scrolling when the user tries to drag the spacebar
+        // so it won't scroll wildly up or down if the finger goes above the keyboard.
+        // We only allow horizontal edge scrolling.
+        if (x <= thresholdX) {
             mCurrentScrollDirection = DIRECTION_LEFT;
             startEdgeScrolling();
             return true;

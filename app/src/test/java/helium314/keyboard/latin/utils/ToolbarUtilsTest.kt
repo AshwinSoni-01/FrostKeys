@@ -76,16 +76,16 @@ class ToolbarUtilsTest {
             putString(Settings.PREF_PINNED_TOOLBAR_KEYS, pinnedPref(enabled))
         }
 
-        assertFalse(addPinnedKey(prefs, ToolbarKey.STICKERS))
+        assertFalse(addPinnedKey(prefs, ToolbarKey.INCOGNITO))
         assertEquals(enabled, getPinnedToolbarKeys(prefs, ToolbarKey.VOICE))
     }
 
     @Test
     fun quickPinRefusesPersistentToolbarKeyDuplicate() {
-        prefs.edit { putString(Settings.PREF_PERSISTENT_TOOLBAR_KEY, ToolbarKey.STICKERS.name) }
+        prefs.edit { putString(Settings.PREF_PERSISTENT_TOOLBAR_KEY, ToolbarKey.INCOGNITO.name) }
 
-        assertFalse(addPinnedKey(prefs, ToolbarKey.STICKERS))
-        assertTrue(getPinnedToolbarKeys(prefs, ToolbarKey.STICKERS).isEmpty())
+        assertFalse(addPinnedKey(prefs, ToolbarKey.INCOGNITO))
+        assertTrue(getPinnedToolbarKeys(prefs, ToolbarKey.INCOGNITO).isEmpty())
     }
 
     @Test
@@ -97,8 +97,8 @@ class ToolbarUtilsTest {
         }
 
         assertEquals(
-            listOf(ToolbarKey.CLIPBOARD, ToolbarKey.NUMPAD, ToolbarKey.STICKERS, ToolbarKey.UNDO, ToolbarKey.REDO),
-            pinToolbarKeyAt(prefs, ToolbarKey.STICKERS, 2)
+            listOf(ToolbarKey.CLIPBOARD, ToolbarKey.NUMPAD, ToolbarKey.INCOGNITO, ToolbarKey.UNDO, ToolbarKey.REDO),
+            pinToolbarKeyAt(prefs, ToolbarKey.INCOGNITO, 2)
         )
     }
 
@@ -108,8 +108,8 @@ class ToolbarUtilsTest {
         prefs.edit { putString(Settings.PREF_PINNED_TOOLBAR_KEYS, pinnedPref(enabled)) }
 
         assertEquals(
-            listOf(ToolbarKey.CLIPBOARD, ToolbarKey.NUMPAD, ToolbarKey.UNDO, ToolbarKey.STICKERS),
-            pinToolbarKeyAt(prefs, ToolbarKey.STICKERS, 99)
+            listOf(ToolbarKey.CLIPBOARD, ToolbarKey.NUMPAD, ToolbarKey.UNDO, ToolbarKey.INCOGNITO),
+            pinToolbarKeyAt(prefs, ToolbarKey.INCOGNITO, 99)
         )
     }
 

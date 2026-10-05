@@ -1179,6 +1179,7 @@ public final class PointerTracker implements PointerTrackerQueue.Element,
         }
         final int code = key.getCode();
         if (code == Constants.CODE_SPACE && !Settings.getValues().mSpaceForLangChange) {
+            // Activate cursor control on long press for space
             mTouchpadHandler.activateTouchpad(mPointerId, mLastX, mLastY, sListener);
             mKeySwipeAllowed = true;
             sInKeySwipe = true;
