@@ -1,13 +1,13 @@
 name: Build and Release Mango.brrrBoard APK
 
 on:
-  pull_request:
-    types:
-      - synchronize
+  push:
+    branches:
+      - "real-*"
   workflow_dispatch:
     inputs:
       description:
-        description: 'Release milestone description'
+        description: "Release milestone description"
         required: false
         type: string
 
@@ -15,54 +15,26 @@ permissions:
   contents: write
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: brrrboard-release-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   build:
+    if: ${{ github.event_name == 'workflow_dispatch' || startsWith(github.event.head_commit.message, 'release:') }}
     runs-on: ubuntu-latest
     timeout-minutes: 25
-    env:
-      TARGET_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
 
     steps:
-      - name: Checkout exact source revision
+      - name: Checkout
         uses: actions/checkout@v4
-        with:
-          ref: ${{ env.TARGET_SHA }}
-
-      - name: Determine whether this is an explicit release
-        id: gate
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "should_release=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          COMMIT_MESSAGE="$(git log -1 --format=%s "$TARGET_SHA")"
-          echo "Head commit: $TARGET_SHA"
-          echo "Commit message: $COMMIT_MESSAGE"
-
-          if [[ "$COMMIT_MESSAGE" == release:* ]]; then
-            echo "Explicit milestone release requested."
-            echo "should_release=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "Normal development commit; no APK release."
-            echo "should_release=false" >> "$GITHUB_OUTPUT"
-          fi
 
       - name: Set up JDK 17
-        if: steps.gate.outputs.should_release == 'true'
         uses: actions/setup-java@v4
         with:
-          java-version: '17'
-          distribution: 'temurin'
+          java-version: "17"
+          distribution: "temurin"
 
       - name: Prepare and verify Gradle wrapper
-        if: steps.gate.outputs.should_release == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -71,59 +43,61 @@ jobs:
           ./gradlew --version
 
       - name: Build debug APK
-        if: steps.gate.outputs.should_release == 'true'
         run: ./gradlew --no-daemon --stacktrace assembleDebug
 
-      - name: Verify APK output
-        if: steps.gate.outputs.should_release == 'true'
-        id: verify-apk
+      - name: Locate and verify APK
+        id: apk
         shell: bash
         run: |
           set -euo pipefail
-          APK_PATH="$(find app/build/outputs/apk/debug/ -type f -name '*.apk' | head -n 1)"
-          if [ -z "$APK_PATH" ]; then
-            echo "Error: No APK found in expected directory"
-            exit 1
-          fi
+          APK_PATH="$(find app/build/outputs/apk/debug -type f -name "*.apk" | head -n 1)"
+          test -n "$APK_PATH"
           test -s "$APK_PATH"
-          echo "Found APK at: $APK_PATH"
-          ls -lh "$APK_PATH"
           echo "apk_path=$APK_PATH" >> "$GITHUB_OUTPUT"
+          echo "APK: $APK_PATH"
+          ls -lh "$APK_PATH"
 
-      - name: Publish GitHub prerelease
-        if: steps.gate.outputs.should_release == 'true'
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: brrrBoard-debug-${{ github.sha }}
+          path: ${{ steps.apk.outputs.apk_path }}
+          if-no-files-found: error
+
+      - name: Publish PRE-RELEASE
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
 
-          SHORT_SHA="${TARGET_SHA::7}"
+          SHORT_SHA="${GITHUB_SHA::7}"
           TAG="build-${SHORT_SHA}"
 
           DESC="${{ inputs.description }}"
           if [ -z "$DESC" ]; then
             TITLE="brrrBoard Milestone — ${SHORT_SHA}"
-            NOTES="Automated milestone release from commit ${TARGET_SHA}."
+            NOTES="Milestone build from commit ${GITHUB_SHA}."
           else
             TITLE="brrrBoard Milestone — $DESC"
             NOTES="Milestone: $DESC
-Commit: ${TARGET_SHA}"
+Commit: ${GITHUB_SHA}"
           fi
 
-          APK_PATH="${{ steps.verify-apk.outputs.apk_path }}"
+          APK_PATH="${{ steps.apk.outputs.apk_path }}"
 
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo "Release $TAG already exists; nothing to create."
-          else
-            gh release create "$TAG"               "$APK_PATH"               --repo "$GITHUB_REPOSITORY"               --target "$TARGET_SHA"               --title "$TITLE"               --notes "$NOTES"               --prerelease
+            echo "Release $TAG already exists."
+            exit 0
           fi
 
-      - name: Archive reports for failed job
+          gh release create "$TAG"             "$APK_PATH"             --repo "$GITHUB_REPOSITORY"             --target "$GITHUB_SHA"             --title "$TITLE"             --notes "$NOTES"             --prerelease
+
+      - name: Archive reports on failure
         if: ${{ failure() }}
         uses: actions/upload-artifact@v4
         with:
-          name: reports
+          name: brrrBoard-build-reports-${{ github.sha }}
           path: |
             app/build/reports
             build/reports
