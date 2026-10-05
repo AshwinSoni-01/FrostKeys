@@ -38,7 +38,7 @@ android {
         minSdk = 23
         targetSdk = 36
         versionCode = providers.of(GitCommitCountValueSource::class.java) {}.get()
-        versionName = "2.5.7"
+        versionName = project.findProperty("versionName") as? String ?: "1.0.0"
         buildConfigField("String", "CONTENT_PROVIDER_AUTHORITY", "\"${applicationId}.stickercontentprovider\"")
         manifestPlaceholders["stickerAuthority"] = "${applicationId}.stickercontentprovider"
         manifestPlaceholders["stickerProviderAuthority"] = "${applicationId}.stickercontentprovider"
@@ -108,7 +108,7 @@ android {
             }
             variant.outputs.forEach { output ->
                 if (output is com.android.build.api.variant.impl.VariantOutputImpl) {
-                    output.outputFileName = "Mango_brrrBoard_${defaultConfig.versionName}-${variant.buildType}.apk"
+                    output.outputFileName = "brrrBoard-${defaultConfig.versionName}-${variant.buildType}.apk"
                 }
             }
         }

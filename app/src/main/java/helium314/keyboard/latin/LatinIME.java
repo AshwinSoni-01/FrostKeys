@@ -1761,9 +1761,13 @@ public class LatinIME extends InputMethodService implements
         final int stripHeight = mKeyboardSwitcher.isShowingStripContainer() ? mKeyboardSwitcher.getStripContainer().getHeight() : 0;
         final int persistentEmojiRowHeight = mKeyboardSwitcher.isShowingPersistentEmojiRow() ? mKeyboardSwitcher.getPersistentEmojiRowHeight() : 0;
 
+        // Add footer height from corner actions to the inset calculation if visible
+        final View cornerActions = mInputView.findViewById(R.id.keyboard_corner_actions);
+        final int footerHeight = (cornerActions != null && cornerActions.getVisibility() == View.VISIBLE) ? cornerActions.getHeight() : 0;
+
         int keyboardHeight = 0;
         if (visibleKeyboardView != null && visibleKeyboardView.getHeight() > 0) {
-            keyboardHeight = visibleKeyboardView.getHeight();
+            keyboardHeight = visibleKeyboardView.getHeight() + footerHeight;
         } else if (mLastKeyboardHeight > 0) {
             // Fallback to last known height to prevent the gap from closing during transitions
             keyboardHeight = mLastKeyboardHeight - stripHeight - persistentEmojiRowHeight;

@@ -1,13 +1,10 @@
 name: Build and Release Mango.brrrBoard APK
 
 on:
-  push:
-    tags:
-      - "build-*"
   workflow_dispatch:
     inputs:
       description:
-        description: "Release milestone description"
+        description: 'Release milestone description'
         required: false
         type: string
 
@@ -15,7 +12,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: brrrboard-release-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -24,16 +21,14 @@ jobs:
     timeout-minutes: 25
 
     steps:
-      - name: Checkout exact tagged source
+      - name: Checkout
         uses: actions/checkout@v4
-        with:
-          ref: ${{ github.sha }}
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
-          java-version: "17"
-          distribution: "temurin"
+          java-version: '17'
+          distribution: 'temurin'
 
       - name: Prepare and verify Gradle wrapper
         shell: bash
@@ -43,62 +38,91 @@ jobs:
           chmod +x gradlew
           ./gradlew --version
 
-      - name: Build debug APK
-        run: ./gradlew --no-daemon --stacktrace assembleDebug
-
-      - name: Locate and verify APK
-        id: apk
+      - name: Calculate Version
+        id: calc_version
         shell: bash
         run: |
           set -euo pipefail
-          APK_PATH="$(find app/build/outputs/apk/debug -type f -name "*.apk" | head -n 1)"
-          test -n "$APK_PATH"
+
+          # Fetch tags
+          git fetch --tags --force
+
+          # Find highest v1.0.x tag
+          LATEST_TAG=$(git tag -l "v1.0.*" | sort -V | tail -n 1)
+
+          if [ -z "$LATEST_TAG" ]; then
+            NEXT_VERSION="1.0.0"
+          else
+            # Extract the patch number (e.g. from v1.0.1 get 1)
+            PATCH=$(echo "$LATEST_TAG" | awk -F. '{print $3}')
+            NEXT_PATCH=$((PATCH + 1))
+            NEXT_VERSION="1.0.$NEXT_PATCH"
+          fi
+
+          echo "Computed version: $NEXT_VERSION"
+          echo "version=$NEXT_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Build debug APK
+        run: ./gradlew --no-daemon --stacktrace -PversionName=${{ steps.calc_version.outputs.version }} assembleDebug
+
+      - name: Verify APK output
+        id: verify-apk
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Find the built APK dynamically
+          APK_PATH=$(find app/build/outputs/apk/debug/ -name "*.apk" | head -n 1)
+          if [ -z "$APK_PATH" ]; then
+            echo "Error: No APK found in expected directory"
+            exit 1
+          fi
           test -s "$APK_PATH"
-          echo "apk_path=$APK_PATH" >> "$GITHUB_OUTPUT"
-          echo "APK: $APK_PATH"
+          echo "Found APK at: $APK_PATH"
           ls -lh "$APK_PATH"
 
-      - name: Upload APK artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: brrrBoard-debug-${{ github.sha }}
-          path: ${{ steps.apk.outputs.apk_path }}
-          if-no-files-found: error
+          echo "apk_path=$APK_PATH" >> $GITHUB_OUTPUT
 
-      - name: Publish GitHub PRE-RELEASE
+      - name: Publish GitHub prerelease
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
 
-          TAG="${GITHUB_REF_NAME}"
+          # Generate deterministic release identity
           SHORT_SHA="${GITHUB_SHA::7}"
+          VERSION="${{ steps.calc_version.outputs.version }}"
+          TAG="v${VERSION}"
 
           DESC="${{ inputs.description }}"
           if [ -z "$DESC" ]; then
-            TITLE="brrrBoard Milestone — ${SHORT_SHA}"
-            NOTES="Milestone build from commit ${GITHUB_SHA}."
+            TITLE="brrrBoard ${VERSION}"
+            NOTES="Automated milestone release from commit ${GITHUB_SHA}."
           else
-            TITLE="brrrBoard Milestone — $DESC"
-            NOTES="Milestone: $DESC
-Commit: ${GITHUB_SHA}"
+            TITLE="brrrBoard ${VERSION}"
+            NOTES="Milestone: ${DESC}\nCommit: ${GITHUB_SHA}"
           fi
 
-          APK_PATH="${{ steps.apk.outputs.apk_path }}"
+          APK_PATH="${{ steps.verify-apk.outputs.apk_path }}"
 
+          # Check if tag exists to avoid duplicates
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo "Release $TAG already exists."
-            exit 0
+             echo "Release $TAG already exists, skipping creation."
+          else
+             gh release create "$TAG" \
+              "$APK_PATH" \
+              --repo "$GITHUB_REPOSITORY" \
+              --target "$GITHUB_SHA" \
+              --title "$TITLE" \
+              --notes "$NOTES" \
+              --prerelease
           fi
 
-          gh release create "$TAG"             "$APK_PATH"             --repo "$GITHUB_REPOSITORY"             --target "$GITHUB_SHA"             --title "$TITLE"             --notes "$NOTES"             --prerelease
-
-      - name: Archive reports on failure
+      - name: Archive reports for failed job
         if: ${{ failure() }}
         uses: actions/upload-artifact@v4
         with:
-          name: brrrBoard-build-reports-${{ github.sha }}
+          name: reports
           path: |
             app/build/reports
             build/reports

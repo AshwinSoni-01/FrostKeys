@@ -1072,7 +1072,7 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
                 mMainKeyboardFrame.setVisibility(View.VISIBLE);
                 mKeyboardView.setVisibility(View.GONE);
                 final View cornerActions = mCurrentInputView == null ? null : mCurrentInputView.findViewById(R.id.keyboard_corner_actions);
-                if (cornerActions != null) cornerActions.setVisibility(View.GONE);
+                if (cornerActions != null) cornerActions.setVisibility(View.VISIBLE);
 
                 // Start emoji palettes
                 mEmojiPalettesView.startEmojiPalettes(mKeyboardView.getKeyVisualAttribute(),
@@ -1112,7 +1112,7 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
                 mMainKeyboardFrame.setVisibility(View.VISIBLE);
                 mKeyboardView.setVisibility(View.GONE);
                 final View cornerActions = mCurrentInputView == null ? null : mCurrentInputView.findViewById(R.id.keyboard_corner_actions);
-                if (cornerActions != null) cornerActions.setVisibility(View.GONE);
+                if (cornerActions != null) cornerActions.setVisibility(View.VISIBLE);
 
                 // Start clipboard
                 mClipboardHistoryView.startClipboardHistory(mLatinIME.getClipboardHistoryManager(),
@@ -1152,7 +1152,7 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
                 mMainKeyboardFrame.setVisibility(View.VISIBLE);
                 mKeyboardView.setVisibility(View.GONE);
                 final View cornerActions = mCurrentInputView == null ? null : mCurrentInputView.findViewById(R.id.keyboard_corner_actions);
-                if (cornerActions != null) cornerActions.setVisibility(View.GONE);
+                if (cornerActions != null) cornerActions.setVisibility(View.VISIBLE);
                 mEmojiPalettesView.setVisibility(View.GONE);
                 mClipboardHistoryView.setVisibility(View.GONE);
                 
