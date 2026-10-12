@@ -2,6 +2,14 @@ import com.android.build.api.variant.ApplicationVariant
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import java.io.File
 import java.io.ByteArrayOutputStream
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
+import java.util.zip.ZipFile
+import java.util.zip.ZipOutputStream
+import java.util.zip.ZipEntry
+import java.util.zip.CRC32
+import org.gradle.api.tasks.UntrackedTask
+import org.gradle.api.tasks.Internal
 import javax.inject.Inject
 
 abstract class GitCommitCountValueSource : ValueSource<Int, ValueSourceParameters.None> {
@@ -120,8 +128,7 @@ android {
 
     packaging {
         jniLibs {
-            // shrinks APK by 3 MB, zipped size unchanged
-            useLegacyPackaging = true
+            useLegacyPackaging = false
         }
     }
 
@@ -194,4 +201,120 @@ dependencies {
     testImplementation("org.robolectric:robolectric:4.16.1")
     testImplementation("androidx.test:runner:1.7.0")
     testImplementation("androidx.test:core:1.7.0")
+}
+
+@UntrackedTask(because = "Patches compiled binaries in place for 16 KB page size support")
+abstract class PatchElf16KbTask : DefaultTask() {
+    @get:Internal
+    abstract val buildDirectory: DirectoryProperty
+
+    @TaskAction
+    fun run() {
+        val buildDir = buildDirectory.get().asFile
+        val targetAbis = setOf("arm64-v8a", "x86_64")
+        listOf("intermediates/merged_native_libs", "intermediates/stripped_native_libs").forEach { sub ->
+            val dir = File(buildDir, sub)
+            if (dir.exists()) {
+                dir.walkTopDown().filter { it.isFile && it.name.endsWith(".so") }.forEach { file ->
+                    val parent = file.parentFile?.name ?: ""
+                    if (parent in targetAbis) {
+                        patchElf(file)
+                    }
+                }
+            }
+        }
+        val bundleDir = File(buildDir, "outputs/bundle")
+        if (bundleDir.exists()) {
+            bundleDir.walkTopDown().filter { it.isFile && it.name.endsWith(".aab") }.forEach { file ->
+                patchAab(file)
+            }
+        }
+    }
+
+    private fun patchElf(file: File) {
+        val bytes = file.readBytes()
+        if (patchElfBytes(bytes)) {
+            file.writeBytes(bytes)
+            logger.lifecycle("[16KB Patch] Aligned ${file.name} in ${file.parentFile?.name} to 16 KB")
+        }
+    }
+
+    private fun patchAab(file: File) {
+        val tempFile = File(file.parentFile, "${file.name}.tmp")
+        var anyPatched = false
+        ZipFile(file).use { zipIn ->
+            tempFile.outputStream().use { fos ->
+                ZipOutputStream(fos).use { zipOut ->
+                    val entries = zipIn.entries()
+                    while (entries.hasMoreElements()) {
+                        val entry = entries.nextElement()
+                        val bytes = zipIn.getInputStream(entry).readBytes()
+                        if (entry.name.endsWith(".so") && ("arm64-v8a" in entry.name || "x86_64" in entry.name)) {
+                            if (patchElfBytes(bytes)) {
+                                anyPatched = true
+                                logger.lifecycle("[16KB Patch] Aligned ${entry.name} inside AAB to 16 KB")
+                            }
+                        }
+                        val newEntry = ZipEntry(entry.name)
+                        newEntry.time = entry.time
+                        newEntry.method = entry.method
+                        if (entry.method == ZipEntry.STORED) {
+                            newEntry.size = bytes.size.toLong()
+                            newEntry.compressedSize = bytes.size.toLong()
+                            val crc = CRC32()
+                            crc.update(bytes)
+                            newEntry.crc = crc.value
+                        }
+                        zipOut.putNextEntry(newEntry)
+                        zipOut.write(bytes)
+                        zipOut.closeEntry()
+                    }
+                }
+            }
+        }
+        if (anyPatched) {
+            if (file.delete()) {
+                tempFile.renameTo(file)
+            }
+        } else {
+            tempFile.delete()
+        }
+    }
+
+    private fun patchElfBytes(bytes: ByteArray): Boolean {
+        if (bytes.size < 64 || bytes[0] != 0x7F.toByte() || bytes[1] != 'E'.code.toByte() || bytes[2] != 'L'.code.toByte() || bytes[3] != 'F'.code.toByte()) return false
+        val eiClass = bytes[4].toInt()
+        if (eiClass != 2) return false
+        val isLittleEndian = bytes[5].toInt() == 1
+        val buffer = ByteBuffer.wrap(bytes).order(if (isLittleEndian) ByteOrder.LITTLE_ENDIAN else ByteOrder.BIG_ENDIAN)
+        val phOff = buffer.getLong(32).toInt()
+        val phEntrySize = buffer.getShort(54).toInt()
+        val phNum = buffer.getShort(56).toInt()
+
+        var patched = false
+        for (i in 0 until phNum) {
+            val entryOffset = phOff + (i * phEntrySize)
+            val pType = buffer.getInt(entryOffset)
+            if (pType == 1) { // PT_LOAD
+                val pAlign = buffer.getLong(entryOffset + 48)
+                if (pAlign < 0x4000L) {
+                    buffer.putLong(entryOffset + 48, 0x4000L)
+                    patched = true
+                }
+            }
+        }
+        return patched
+    }
+}
+
+val patchNativeLibs16Kb = tasks.register<PatchElf16KbTask>("patchNativeLibs16Kb") {
+    buildDirectory.set(layout.buildDirectory)
+}
+
+tasks.matching {
+    (it.name.startsWith("strip") && it.name.endsWith("DebugSymbols")) ||
+    (it.name.startsWith("merge") && it.name.endsWith("NativeLibs")) ||
+    (it.name.startsWith("sign") && it.name.endsWith("Bundle"))
+}.configureEach {
+    finalizedBy(patchNativeLibs16Kb)
 }
