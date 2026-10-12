@@ -129,6 +129,11 @@ android {
     packaging {
         jniLibs {
             useLegacyPackaging = false
+            pickFirsts.add("**/libsharpyuv.so")
+            pickFirsts.add("**/libwebp.so")
+            pickFirsts.add("**/libwebpcodec_jni.so")
+            pickFirsts.add("**/libwebpdemux.so")
+            pickFirsts.add("**/libwebpmux.so")
         }
     }
 
@@ -313,8 +318,21 @@ val patchNativeLibs16Kb = tasks.register<PatchElf16KbTask>("patchNativeLibs16Kb"
 
 tasks.matching {
     (it.name.startsWith("strip") && it.name.endsWith("DebugSymbols")) ||
-    (it.name.startsWith("merge") && it.name.endsWith("NativeLibs")) ||
-    (it.name.startsWith("sign") && it.name.endsWith("Bundle"))
+    (it.name.startsWith("merge") && it.name.endsWith("NativeLibs"))
 }.configureEach {
     finalizedBy(patchNativeLibs16Kb)
+}
+
+patchNativeLibs16Kb.configure {
+    mustRunAfter(tasks.matching {
+        (it.name.startsWith("strip") && it.name.endsWith("DebugSymbols")) ||
+        (it.name.startsWith("merge") && it.name.endsWith("NativeLibs"))
+    })
+}
+
+tasks.matching {
+    (it.name.startsWith("package") && it.name.endsWith("Bundle")) ||
+    (it.name.startsWith("bundle") && it.name != "bundle" && !it.name.contains("Resources") && !it.name.contains("Classes"))
+}.configureEach {
+    dependsOn(patchNativeLibs16Kb)
 }
