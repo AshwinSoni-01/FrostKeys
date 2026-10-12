@@ -242,7 +242,7 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
         mLatchForWaitingLoadingMainDictionaries = latchForWaitingLoadingMainDictionary
         scope.launch {
             try {
-                val useEmojiDict = Settings.getValues().mSuggestEmojis
+                val useEmojiDict = Settings.getValues()?.mSuggestEmojis ?: true
                 val dictGroupsWithNewMainDict = locales.mapNotNull {
                     val dictionaryGroup = findDictionaryGroupWithLocale(dictionaryGroups, it)
                     if (dictionaryGroup == null) {
@@ -259,9 +259,10 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
                 }
 
                 listener?.onUpdateMainDictionaryAvailability(hasAtLeastOneInitializedMainDictionary())
-                latchForWaitingLoadingMainDictionary.countDown()
             } catch (e: Throwable) {
                 Log.e(TAG, "could not initialize main dictionaries for $locales", e)
+            } finally {
+                latchForWaitingLoadingMainDictionary.countDown()
             }
         }
     }
@@ -309,7 +310,7 @@ class DictionaryFacilitatorImpl : DictionaryFacilitator {
             adjustConfidences(suggestion, wasAutoCapitalized)
 
         // Add word to user dictionary if it is in no other dictionary except user history dictionary (i.e. typed again).
-        val sv = Settings.getValues()
+        val sv = Settings.getValues() ?: return
         if (sv.mAddToPersonalDictionary // require the opt-in
             && sv.mAutoCorrectEnabled == sv.mAutoCorrectionEnabledPerUserSettings // don't add if user wants autocorrect but input field does not, see https://github.com/HeliBorg/HeliBoard/issues/427#issuecomment-1905438000
             && dictionaryGroups[0].hasDict(Dictionary.TYPE_USER_HISTORY) // require personalized suggestions
