@@ -140,8 +140,8 @@ fun MainSettingsScreen(
         val showDataGathering = remember {
             JniUtils.sHaveGestureLib && System.currentTimeMillis() < END_DATE_EPOCH_MILLIS + TWO_WEEKS_IN_MILLIS
         }
-        val telegramJoined = remember(b?.value) {
-            ctx.prefs().getBoolean("pref_telegram_joined", false)
+        val discordJoined = remember(b?.value) {
+            ctx.prefs().getBoolean("pref_discord_joined", false)
         }
         val isGestureComplete = remember(b?.value) {
             val gesturePrefs = listOf("pref_gesture_input", "pref_gesture_space_after")
@@ -160,12 +160,12 @@ fun MainSettingsScreen(
             ctx.prefs().getBoolean("pref_quick_setup_dismissed", false)
         }
 
-        if (!telegramJoined) {
-            TelegramInviteCard(
+        if (!discordJoined) {
+            DiscordInviteCard(
                 onJoinClick = {
-                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/FrostKeys"))
+                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://discord.gg/fjqJHq8c9j"))
                     ctx.startActivity(intent)
-                    SettingsActivity.clickedTelegramJoin = true
+                    SettingsActivity.clickedDiscordJoin = true
                 }
             )
         }
@@ -637,12 +637,12 @@ private fun QuickSetupStep(
     }
 }
 @Composable
-private fun TelegramInviteCard(
+private fun DiscordInviteCard(
     onJoinClick: () -> Unit
 ) {
     Card(
         colors = CardDefaults.cardColors(
-            containerColor = Color(0xFF229ED9)
+            containerColor = Color(0xFF5865F2)
         ),
         modifier = Modifier
             .fillMaxWidth()
@@ -656,7 +656,7 @@ private fun TelegramInviteCard(
                 .padding(16.dp)
         ) {
             Icon(
-                painter = painterResource(R.drawable.ic_telegram_white),
+                painter = painterResource(R.drawable.ic_discord_white),
                 contentDescription = null,
                 tint = Color.White,
                 modifier = Modifier.size(36.dp)
@@ -664,7 +664,7 @@ private fun TelegramInviteCard(
             Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "Join our Telegram Channel",
+                    text = "Join our Discord Server",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = Color.White

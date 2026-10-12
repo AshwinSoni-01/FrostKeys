@@ -1,14 +1,17 @@
 // SPDX-License-Identifier: GPL-3.0-only
 package helium314.keyboard.settings.screens
 
-import android.Manifest
 import android.content.Context
+import android.content.Intent
 import android.media.AudioManager
+import android.net.Uri
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -18,9 +21,13 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.core.content.edit
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import helium314.keyboard.keyboard.KeyboardLayoutSet
 import helium314.keyboard.keyboard.KeyboardSwitcher
 import helium314.keyboard.latin.AudioAndHapticFeedbackManager
+import helium314.keyboard.latin.ClipboardHistoryManager
 import helium314.keyboard.latin.R
 import helium314.keyboard.latin.database.ClipboardDao
 import helium314.keyboard.latin.permissions.PermissionsUtil
@@ -36,6 +43,7 @@ import helium314.keyboard.settings.Setting
 import helium314.keyboard.settings.preferences.ReorderSwitchPreference
 import helium314.keyboard.settings.SearchSettingsScreen
 import helium314.keyboard.settings.SettingsActivity
+import helium314.keyboard.settings.dialogs.ConfirmationDialog
 import helium314.keyboard.settings.preferences.Preference
 import helium314.keyboard.settings.preferences.SliderPreference
 import helium314.keyboard.settings.preferences.SettingsSwitch
@@ -49,11 +57,32 @@ import helium314.keyboard.latin.utils.previewDark
 fun PreferencesScreen(
     onClickBack: () -> Unit,
 ) {
-    val prefs = LocalContext.current.prefs()
-    val b = (LocalContext.current.getActivity() as? SettingsActivity)?.prefChanged?.collectAsState()
+    val ctx = LocalContext.current
+    val prefs = ctx.prefs()
+    val b = (ctx.getActivity() as? SettingsActivity)?.prefChanged?.collectAsState()
     if ((b?.value ?: 0) < 0)
         Log.v("irrelevant", "stupid way to trigger recomposition on preference change")
     val clipboardHistoryEnabled = prefs.getBoolean(Settings.PREF_ENABLE_CLIPBOARD_HISTORY, Defaults.PREF_ENABLE_CLIPBOARD_HISTORY)
+    val lifecycleOwner = LocalLifecycleOwner.current
+    var folderAccessGranted by remember {
+        mutableStateOf(hasScreenshotFolderAccess(ctx))
+    }
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                val hasAccess = hasScreenshotFolderAccess(ctx)
+                folderAccessGranted = hasAccess
+                if (!hasAccess && prefs.getBoolean(Settings.PREF_SHOW_SCREENSHOTS_IN_CLIPBOARD, false)) {
+                    prefs.edit { putBoolean(Settings.PREF_SHOW_SCREENSHOTS_IN_CLIPBOARD, false) }
+                }
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+    val showScreenshotsEnabled = prefs.getBoolean(Settings.PREF_SHOW_SCREENSHOTS_IN_CLIPBOARD, Defaults.PREF_SHOW_SCREENSHOTS_IN_CLIPBOARD) && folderAccessGranted
     val enabledSubtypes = remember { SubtypeSettings.getEnabledSubtypes(true) }
     val items = listOf(
         R.string.settings_category_input,
@@ -91,6 +120,7 @@ fun PreferencesScreen(
         R.string.settings_category_clipboard_history,
         Settings.PREF_ENABLE_CLIPBOARD_HISTORY,
         Settings.PREF_SHOW_SCREENSHOTS_IN_CLIPBOARD,
+        if (showScreenshotsEnabled) Settings.PREF_CHANGE_SCREENSHOTS_FOLDER else null,
         if (clipboardHistoryEnabled) Settings.PREF_CLIPBOARD_HISTORY_RETENTION_TIME else null,
         if (clipboardHistoryEnabled) Settings.PREF_CLIPBOARD_HISTORY_PINNED_FIRST else null
     )
@@ -186,6 +216,11 @@ fun createPreferencesSettings(context: Context) = listOf(
     {
         ScreenshotClipboardPreference(it)
     },
+    Setting(context, Settings.PREF_CHANGE_SCREENSHOTS_FOLDER,
+        R.string.change_screenshots_folder_title, R.string.change_screenshots_folder_summary)
+    {
+        ChangeScreenshotFolderPreference(it)
+    },
     Setting(context, Settings.PREF_CLIPBOARD_HISTORY_RETENTION_TIME, R.string.clipboard_history_retention_time) { setting ->
         val ctx = LocalContext.current
         SliderPreference(
@@ -236,25 +271,59 @@ private fun ScreenshotClipboardPreference(setting: Setting) {
     val ctx = LocalContext.current
     val activity = ctx.getActivity() ?: return
     val prefs = ctx.prefs()
-    val permission = screenshotClipboardPermission()
-    var permissionGranted by remember {
-        mutableStateOf(permission == null || PermissionsUtil.checkAllPermissionsGranted(ctx, permission))
+    val lifecycleOwner = LocalLifecycleOwner.current
+    var folderGranted by remember {
+        mutableStateOf(hasScreenshotFolderAccess(ctx))
+    }
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                folderGranted = hasScreenshotFolderAccess(ctx)
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+    var showFolderExplanationDialog by remember {
+        mutableStateOf(false)
     }
     val b = (activity as? SettingsActivity)?.prefChanged?.collectAsState()
     if ((b?.value ?: 0) < 0)
         Log.v("irrelevant", "stupid way to trigger recomposition on preference change")
 
-    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        permissionGranted = granted
-        if (granted) {
-            prefs.edit { putBoolean(setting.key, true) }
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+        if (uri != null) {
+            try {
+                val oldUriStr = prefs.getString(ClipboardHistoryManager.PREF_SCREENSHOTS_FOLDER_URI, null)
+                if (oldUriStr != null && oldUriStr != uri.toString()) {
+                    try {
+                        ctx.contentResolver.releasePersistableUriPermission(
+                            Uri.parse(oldUriStr),
+                            Intent.FLAG_GRANT_READ_URI_PERMISSION
+                        )
+                    } catch (_: Exception) { }
+                }
+                ctx.contentResolver.takePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+                prefs.edit {
+                    putString(ClipboardHistoryManager.PREF_SCREENSHOTS_FOLDER_URI, uri.toString())
+                    putBoolean(setting.key, true)
+                }
+                folderGranted = true
+            } catch (e: Exception) {
+                Log.e("PreferencesScreen", "Failed to take persistable permission", e)
+            }
         }
     }
-    val enabled = prefs.getBoolean(setting.key, Defaults.PREF_SHOW_SCREENSHOTS_IN_CLIPBOARD) && permissionGranted
+    val enabled = prefs.getBoolean(setting.key, Defaults.PREF_SHOW_SCREENSHOTS_IN_CLIPBOARD) && folderGranted
 
     fun switchTo(newValue: Boolean) {
-        if (newValue && permission != null && !permissionGranted) {
-            launcher.launch(permission)
+        if (newValue && !folderGranted) {
+            showFolderExplanationDialog = true
             return
         }
         prefs.edit { putBoolean(setting.key, newValue) }
@@ -263,20 +332,95 @@ private fun ScreenshotClipboardPreference(setting: Setting) {
     Preference(
         name = setting.title,
         description = setting.description,
-        onClick = { switchTo(!enabled) }
+        onClick = {
+            if (!folderGranted) {
+                showFolderExplanationDialog = true
+            } else {
+                switchTo(!enabled)
+            }
+        }
     ) {
         SettingsSwitch(
             checked = enabled,
             onCheckedChange = { switchTo(it) }
         )
     }
+
+    if (showFolderExplanationDialog) {
+        ConfirmationDialog(
+            onDismissRequest = { showFolderExplanationDialog = false },
+            onConfirmed = {
+                showFolderExplanationDialog = false
+                launcher.launch(null)
+            },
+            title = { Text(stringResource(R.string.select_screenshots_folder_title)) },
+            content = { Text(stringResource(R.string.select_screenshots_folder_message)) },
+            confirmButtonText = stringResource(android.R.string.ok),
+            cancelButtonText = stringResource(android.R.string.cancel)
+        )
+    }
 }
 
-private fun screenshotClipboardPermission(): String? {
-    return when {
-        Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU -> Manifest.permission.READ_MEDIA_IMAGES
-        Build.VERSION.SDK_INT >= Build.VERSION_CODES.M -> Manifest.permission.READ_EXTERNAL_STORAGE
-        else -> null
+@Composable
+private fun ChangeScreenshotFolderPreference(setting: Setting) {
+    val ctx = LocalContext.current
+    val prefs = ctx.prefs()
+    var showFolderExplanationDialog by remember { mutableStateOf(false) }
+
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+        if (uri != null) {
+            try {
+                val oldUriStr = prefs.getString(ClipboardHistoryManager.PREF_SCREENSHOTS_FOLDER_URI, null)
+                if (oldUriStr != null && oldUriStr != uri.toString()) {
+                    try {
+                        ctx.contentResolver.releasePersistableUriPermission(
+                            Uri.parse(oldUriStr),
+                            Intent.FLAG_GRANT_READ_URI_PERMISSION
+                        )
+                    } catch (_: Exception) { }
+                }
+                ctx.contentResolver.takePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+                prefs.edit {
+                    putString(ClipboardHistoryManager.PREF_SCREENSHOTS_FOLDER_URI, uri.toString())
+                    putBoolean(Settings.PREF_SHOW_SCREENSHOTS_IN_CLIPBOARD, true)
+                }
+            } catch (e: Exception) {
+                Log.e("PreferencesScreen", "Failed to take persistable permission", e)
+            }
+        }
+    }
+
+    Preference(
+        name = setting.title,
+        description = setting.description,
+        onClick = { showFolderExplanationDialog = true }
+    )
+
+    if (showFolderExplanationDialog) {
+        ConfirmationDialog(
+            onDismissRequest = { showFolderExplanationDialog = false },
+            onConfirmed = {
+                showFolderExplanationDialog = false
+                launcher.launch(null)
+            },
+            title = { Text(stringResource(R.string.select_screenshots_folder_title)) },
+            content = { Text(stringResource(R.string.select_screenshots_folder_message)) },
+            confirmButtonText = stringResource(android.R.string.ok),
+            cancelButtonText = stringResource(android.R.string.cancel)
+        )
+    }
+}
+
+private fun hasScreenshotFolderAccess(ctx: Context): Boolean {
+    val uriStr = ctx.prefs().getString(ClipboardHistoryManager.PREF_SCREENSHOTS_FOLDER_URI, null) ?: return false
+    val uri = Uri.parse(uriStr)
+    return try {
+        ctx.contentResolver.persistedUriPermissions.any { it.uri == uri && it.isReadPermission }
+    } catch (_: Exception) {
+        false
     }
 }
 

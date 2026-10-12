@@ -222,7 +222,11 @@
     <!-- Preferences item for showing screenshots and image clipboard entries in clipboard UI. -->
     <string name="show_screenshots_in_clipboard">Show recent screenshots and copied images in clipboard</string>
     <!-- Description for showing screenshots and image clipboard entries in clipboard UI. -->
-    <string name="show_screenshots_in_clipboard_summary">Requires storage permission. Shows copied images and recent screenshots from standard Screenshots folders in clipboard history and the paste suggestion</string>
+    <string name="show_screenshots_in_clipboard_summary">Shows copied images and recent screenshots from your selected Screenshots folder in clipboard history and paste suggestions</string>
+    <string name="select_screenshots_folder_title">Select Screenshots Folder</string>
+    <string name="select_screenshots_folder_message">To suggest recent screenshots in your clipboard without requesting broad device storage permissions, please select your Screenshots folder (usually under Pictures &gt; Screenshots, or DCIM &gt; Screenshots on Samsung devices) and tap \'Use this folder\'.</string>
+    <string name="change_screenshots_folder_title">Change selected folder</string>
+    <string name="change_screenshots_folder_summary">Choose a different folder for screenshot suggestions</string>
     <!-- Preferences item for controlling clipboard history retention time -->
     <string name="clipboard_history_retention_time">History retention time</string>
     <!-- Preferences item for showing pinned clipboard items first -->
@@ -849,6 +853,8 @@ New dictionary:
     <string name="about_github_link">View on GitHub</string>
     <!-- link to Telegram channel in about screen -->
     <string name="join_telegram_community">Join Telegram community</string>
+    <!-- link to Discord server in about screen -->
+    <string name="join_discord_community">Join Discord community</string>
     <!-- link to the wiki for about screen -->
     <string name="about_wiki_link">Go to Wiki</string>
     <!-- description for wiki link -->

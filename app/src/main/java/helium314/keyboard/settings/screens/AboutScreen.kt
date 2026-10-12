@@ -58,6 +58,7 @@ fun AboutScreen(
         SettingsWithoutKey.HIDDEN_FEATURES,
         SettingsWithoutKey.GITHUB_WIKI,
         SettingsWithoutKey.GITHUB,
+        SettingsWithoutKey.DISCORD,
         SettingsWithoutKey.TELEGRAM,
         SettingsWithoutKey.SAVE_LOG,
     )
@@ -173,6 +174,20 @@ fun createAboutSettings(context: Context) = listOf(
                 ctx.startActivity(intent)
             },
             icon = R.drawable.ic_settings_about_github
+        )
+    },
+    Setting(context, SettingsWithoutKey.DISCORD, R.string.join_discord_community) {
+        val ctx = LocalContext.current
+        Preference(
+            name = it.title,
+            description = it.description,
+            onClick = {
+                val intent = Intent()
+                intent.data = "https://discord.gg/fjqJHq8c9j".toUri()
+                intent.action = Intent.ACTION_VIEW
+                ctx.startActivity(intent)
+            },
+            icon = R.drawable.ic_discord
         )
     },
     Setting(context, SettingsWithoutKey.TELEGRAM, R.string.join_telegram_community) {

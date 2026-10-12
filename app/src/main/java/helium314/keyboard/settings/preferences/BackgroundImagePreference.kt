@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 package helium314.keyboard.settings.preferences
 
-import android.app.Activity
 import android.content.Context
-import android.content.Intent
 import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -48,9 +46,8 @@ fun BackgroundImagePref(setting: Setting, isLandscape: Boolean) {
     if (!dayNightPref)
         isNight = false
     val scope = rememberCoroutineScope { Dispatchers.IO }
-    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-        if (result.resultCode != Activity.RESULT_OK) return@rememberLauncherForActivityResult
-        val uri = result.data?.data ?: return@rememberLauncherForActivityResult
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
         showSelectionDialog = false
         showDayNightDialog = false
         scope.launch(Dispatchers.IO) {
@@ -58,16 +55,16 @@ fun BackgroundImagePref(setting: Setting, isLandscape: Boolean) {
                 showErrorDialog = true
         }
     }
-    val intent = Intent(Intent.ACTION_OPEN_DOCUMENT)
-        .addCategory(Intent.CATEGORY_OPENABLE)
-        .setType("image/*")
+    fun launchPicker() {
+        launcher.launch(androidx.activity.result.PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+    }
     Preference(
         name = setting.title,
         onClick = {
             if (dayNightPref) {
                 showDayNightDialog = true
             } else if (!getFile().exists()) {
-                launcher.launch(intent)
+                launchPicker()
             } else {
                 showSelectionDialog = true
             }
@@ -80,7 +77,7 @@ fun BackgroundImagePref(setting: Setting, isLandscape: Boolean) {
                 isNight = false
                 if (getFile().exists())
                     showSelectionDialog = true
-                else launcher.launch(intent)
+                else launchPicker()
             },
             confirmButtonText = stringResource(R.string.day_or_night_day),
             cancelButtonText = "",
@@ -88,7 +85,7 @@ fun BackgroundImagePref(setting: Setting, isLandscape: Boolean) {
                 isNight = true
                 if (getFile().exists())
                     showSelectionDialog = true
-                else launcher.launch(intent)
+                else launchPicker()
             },
             neutralButtonText = stringResource(R.string.day_or_night_night),
             title = { Text(stringResource(R.string.day_or_night_image)) },
@@ -99,7 +96,7 @@ fun BackgroundImagePref(setting: Setting, isLandscape: Boolean) {
             onDismissRequest = { showSelectionDialog = false },
             title = { Text(stringResource(R.string.customize_background_image)) },
             confirmButtonText = stringResource(R.string.button_load_custom),
-            onConfirmed = { launcher.launch(intent) },
+            onConfirmed = { launchPicker() },
             neutralButtonText = stringResource(R.string.delete),
             onNeutral = {
                 getFile().delete()

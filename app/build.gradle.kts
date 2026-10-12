@@ -35,7 +35,7 @@ android {
 
     defaultConfig {
         applicationId = "com.orion.frostkeys"
-        minSdk = 23
+        minSdk = 24
         targetSdk = 36
         versionCode = providers.of(GitCommitCountValueSource::class.java) {}.get()
         versionName = "2.5.8"
