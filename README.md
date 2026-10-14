@@ -75,7 +75,7 @@ Experience a modern, high-fidelity UI with our brand-new **Frosted Glass** engin
 > * **OEM Limitations:** Many brands disable real time window blurs on budget and mid-range devices to preserve performance, meaning the frosted effect will not render. Some manufacturers (like Samsung on budget devices) use a static snapshot blur in the UI, this is not a true real time blur and does not guarantee support for live keyboard blur.
 > * **Legacy Versions & Crashes:** On older Android versions or unsupported hardware, enabling blur effects may cause instability or crashes.
 > 
-> *If you experience crashes or visual glitches when toggling blur on your device, please share the logfile and report it in the [Telegram Group](https://t.me/FrostKeys) so we can implement a proper fallback for your device model.*
+> *If you experience crashes or visual glitches when toggling blur on your device, please share the logfile and report it in the [Discord Server](https://discord.gg/fjqJHq8c9js) so we can implement a proper fallback for your device model.*
 
 ### 3. Access Point Menu (Enhanced Toolbar)
 We have retired the old static toolbar in favor of the **Access Point Menu**.
@@ -90,7 +90,7 @@ While the core of the keyboard remains offline-first, we have added **optional**
 ### 5. Gemini AI Integration
 FrostKeys brings modern AI writing tools directly into your text field.
 * **AI Writing Assistant:** Proofread, rewrite, or change the tone of your text instantly.
-* **Bring Your Own Key:** Powered by Google Gemini. Simply input your own Gemini API key in settings to unlock local AI power without subscription fees.
+* **Bring Your Own Key:** Powered by Google Gemini. Simply input your own Gemini API key in settings to unlock AI power without subscription fees.
 
 ### 6. Material Design 3 Expressive UI
 FrostKeys embraces Google's latest **Material Design 3 Expressive** design language, delivering a fluid, modern visual experience.
