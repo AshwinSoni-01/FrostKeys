@@ -5,13 +5,25 @@
 **A personalized fork of [HeliBoard](https://github.com/HeliBorg/HeliBoard) with Blur UI effects, AI writing tools, and Klipy GIF & animated sticker support.**
 
 FrostKeys takes the privacy focused foundation of HeliBoard and adds modern, high performance features for users who want more from their keyboard without sacrificing their data.
+<br>
+
+<a href="https://play.google.com/store/apps/details?id=com.orion.frostkeys">
+  <img alt="Get it on Google Play" height="100" src="https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png" />
+</a>
+
+[![Discord](https://img.shields.io/badge/Discord-Join%20Community-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/fjqJHq8c9j)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg?style=for-the-badge)](https://www.gnu.org/licenses/gpl-3.0)
+
+
+---
+
+>
 >
 > [!NOTE]
 > ### 🚀 Distribution & Availability
-> **FrostKeys is transitioning to official distribution via Google Play Store.**
-> * **Closed Beta:** Currently underway (all tester slots are currently full).
-> * **Public Launch:** Will be available directly on Google Play Store upon completing the closed testing phase.
-> * **GitHub Releases:** Pre-compiled standalone APK binaries are no longer hosted here. In full compliance with the GPL v3.0 license, the complete source code remains open in this repository for local compilation and inspection.
+> **FrostKeys is officially live and available on Google Play Store!**
+> * **Google Play Store:** [Download the official release](https://play.google.com/store/apps/details?id=com.orion.frostkeys) for verified updates and signature protection.
+> * **GitHub Releases:** Standalone APK binaries are not hosted directly on GitHub. In full compliance with the GPL v3.0 license, the complete source code remains open in this repository for local compilation, audit, and inspection.
 >
 > ⚠️ **Important Security Notice**
 > 
@@ -130,10 +142,19 @@ If you love using FrostKeys and want to support ongoing development, maintenance
 * **Issues:** [HeliBoard Issue Tracker](https://github.com/HeliBorg/HeliBoard/issues)
 
 ---
-## 📢 Join Our Community!
+## 📢 Join Our Community
 
-If you enjoy using FrostKeys, please consider giving the repository a ⭐️! Have feedback or suggestions? Drop by the [Telegram Channel](https://t.me/FrostKeys) and let us know!
+If you enjoy using FrostKeys, please consider starring the repository ⭐!
 
+[![Join Discord](https://img.shields.io/badge/Discord-Join%20the%20Server-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/fjqJHq8c9j)
+
+Our **[Discord Server](https://discord.gg/fjqJHq8c9j)** is our primary community hub for:
+- 💬 General discussion and setup sharing
+- 💡 Feature requests and suggestions
+- 🐛 Bug reports, crash logs.
+
+>
+> Announcements and update broadcasts are also mirrored on [Telegram](https://t.me/FrostKeys).
 ---
 
 
