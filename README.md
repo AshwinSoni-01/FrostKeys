@@ -31,7 +31,7 @@ FrostKeys takes the privacy focused foundation of HeliBoard and adds modern, hig
 > 
 > A keyboard app handles your most sensitive inputs such as passwords, private messages, and personal credentials. Sideloading forwarded APKs or unofficial builds from third party channels carries high risks of tampering and keylogging injection. Only official builds on Google Play Store carry verified developer signatures and receive direct bug/security updates.
 > 
-> So please consider getting the app only from the official source, and wait for the full store release. 
+> So please consider getting the app only from the official source.
 ---
 
 ## 📸 Screenshots
