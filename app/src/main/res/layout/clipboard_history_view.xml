@@ -17,7 +17,7 @@
     <LinearLayout
         android:id="@+id/clipboard_toolbar"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="40dp"
         android:layout_marginBottom="4dp"
         android:gravity="center_vertical"
         android:orientation="horizontal"
@@ -42,12 +42,29 @@
             android:textStyle="bold" />
 
         <ImageButton
+            android:id="@+id/clipboard_view_mode_button"
+            android:layout_width="38dp"
+            android:layout_height="38dp"
+            android:layout_marginEnd="4dp"
+            android:contentDescription="@string/clipboard_switch_to_list_view"
+            android:src="@drawable/ic_view_list" />
+
+        <ImageButton
             android:id="@+id/clipboard_clear_button"
             android:layout_width="38dp"
             android:layout_height="38dp"
             android:contentDescription="@string/clear_clipboard" />
 
     </LinearLayout>
+
+    <androidx.compose.ui.platform.ComposeView
+        android:id="@+id/compose_clipboard_tabs"
+        android:layout_width="match_parent"
+        android:layout_height="38dp"
+        android:layout_marginBottom="4dp"
+        android:paddingStart="6dp"
+        android:paddingEnd="6dp"
+        android:visibility="gone" />
 
     <FrameLayout
         android:layout_width="match_parent"
@@ -68,6 +85,12 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:orientation="vertical"/>
+
+        <androidx.viewpager2.widget.ViewPager2
+            android:id="@+id/clipboard_view_pager"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:visibility="gone" />
 
         <LinearLayout
             android:id="@+id/clipboard_undo_bar"
@@ -104,6 +127,17 @@
                 android:textSize="13sp"
                 android:textStyle="bold" />
         </LinearLayout>
+
+        <helium314.keyboard.keyboard.internal.FloatingDeleteButton
+            android:id="@+id/clipboard_floating_backspace"
+            android:layout_width="52dp"
+            android:layout_height="52dp"
+            android:layout_gravity="bottom|end"
+            android:layout_marginEnd="16dp"
+            android:layout_marginBottom="16dp"
+            android:elevation="6dp"
+            android:visibility="gone"
+            android:contentDescription="@string/spoken_description_delete" />
 
     </FrameLayout>
 

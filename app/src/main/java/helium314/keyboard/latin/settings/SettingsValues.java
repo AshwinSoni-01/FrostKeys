@@ -96,6 +96,8 @@ public class SettingsValues {
     public final boolean mShowScreenshotsInClipboard;
     public final long mClipboardHistoryRetentionTime;
     public final boolean mClipboardHistoryPinnedFirst;
+    public final boolean mClipboardShowTabs;
+    public final boolean mRemovePanelBottomRow;
     public final boolean mOneHandedModeEnabled;
     public final int mOneHandedModeGravity;
     public final float mOneHandedModeScale;
@@ -288,6 +290,8 @@ public class SettingsValues {
         mShowScreenshotsInClipboard = prefs.getBoolean(Settings.PREF_SHOW_SCREENSHOTS_IN_CLIPBOARD, Defaults.PREF_SHOW_SCREENSHOTS_IN_CLIPBOARD);
         mClipboardHistoryRetentionTime = prefs.getInt(Settings.PREF_CLIPBOARD_HISTORY_RETENTION_TIME, Defaults.PREF_CLIPBOARD_HISTORY_RETENTION_TIME);
         mClipboardHistoryPinnedFirst = prefs.getBoolean(Settings.PREF_CLIPBOARD_HISTORY_PINNED_FIRST, Defaults.PREF_CLIPBOARD_HISTORY_PINNED_FIRST);
+        mClipboardShowTabs = prefs.getBoolean(Settings.PREF_CLIPBOARD_SHOW_TABS, Defaults.PREF_CLIPBOARD_SHOW_TABS);
+        mRemovePanelBottomRow = prefs.getBoolean(Settings.PREF_REMOVE_PANEL_BOTTOM_ROW, Defaults.PREF_REMOVE_PANEL_BOTTOM_ROW);
 
         mOneHandedModeEnabled = Settings.readOneHandedModeEnabled(prefs, isLandscape, mIsSplitKeyboardEnabled, isFolded);
         mOneHandedModeGravity = Settings.readOneHandedModeGravity(prefs, isLandscape, mIsSplitKeyboardEnabled, isFolded);

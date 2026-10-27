@@ -27,6 +27,7 @@ import helium314.keyboard.keyboard.KeyboardActionListener;
 import helium314.keyboard.keyboard.KeyboardTheme;
 import helium314.keyboard.keyboard.internal.PopupKeySpec;
 import helium314.keyboard.latin.AudioAndHapticFeedbackManager;
+import helium314.keyboard.latin.ClipboardHistoryManager;
 import helium314.keyboard.latin.InputAttributes;
 import helium314.keyboard.latin.PunctuationSuggestions;
 import helium314.keyboard.latin.R;
@@ -195,6 +196,9 @@ public final class Settings implements SharedPreferences.OnSharedPreferenceChang
     public static final String PREF_CHANGE_SCREENSHOTS_FOLDER = "change_screenshots_folder";
     public static final String PREF_CLIPBOARD_HISTORY_RETENTION_TIME = "clipboard_history_retention_time";
     public static final String PREF_CLIPBOARD_HISTORY_PINNED_FIRST = "clipboard_history_pinned_first";
+    public static final String PREF_CLIPBOARD_SHOW_TABS = "clipboard_show_tabs";
+    public static final String PREF_CLIPBOARD_AS_LIST = "clipboard_as_list";
+    public static final String PREF_REMOVE_PANEL_BOTTOM_ROW = "remove_panel_bottom_row";
 
     public static final String PREF_ADD_TO_PERSONAL_DICTIONARY = "add_to_personal_dictionary";
     public static final String PREF_NAVBAR_COLOR = "navbar_color";
@@ -281,6 +285,12 @@ public final class Settings implements SharedPreferences.OnSharedPreferenceChang
             add(PREF_ADAPTIVE_METADATA);
             add(PREF_FAST_ROW_CACHE);
             add(PREF_FAST_ROW_LAST_REFRESH);
+            add(ClipboardHistoryManager.PREF_SCREENSHOTS_FOLDER_URI);
+            add(ClipboardHistoryManager.PREF_PROCESSED_SCREENSHOT_MEDIA_URIS);
+            add(ClipboardHistoryManager.PREF_LAST_SCREENSHOT_MEDIA_URI);
+            add(ClipboardHistoryManager.PREF_LAST_SCREENSHOT_DATE_ADDED);
+            add(ClipboardHistoryManager.PREF_DISMISSED_CLIP_TIMESTAMP);
+            add(ClipboardHistoryManager.PREF_DISMISSED_CLIP_CONTENT);
         }
     };
 

@@ -16,7 +16,9 @@ import android.view.ViewGroup
 import android.view.ViewOutlineProvider
 import android.widget.ImageView
 import android.widget.TextView
+import androidx.core.graphics.ColorUtils
 import androidx.core.view.isGone
+import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
 import androidx.recyclerview.widget.StaggeredGridLayoutManager
 import coil.load
@@ -28,59 +30,228 @@ import helium314.keyboard.latin.R
 import helium314.keyboard.latin.common.ColorType
 import helium314.keyboard.latin.common.KeyBackgroundUtils
 import helium314.keyboard.latin.settings.Settings
-import androidx.core.graphics.ColorUtils
+
+enum class FilterMode {
+    ALL,
+    PINNED_ONLY,
+    RECENTS_ONLY
+}
+
+sealed class ClipboardItem {
+    data class Header(val isPinnedHeader: Boolean) : ClipboardItem()
+    data class Clip(val entry: ClipboardHistoryEntry) : ClipboardItem()
+}
 
 class ClipboardAdapter(
        val clipboardLayoutParams: ClipboardLayoutParams,
-       val keyEventListener: OnKeyEventListener
-) : RecyclerView.Adapter<ClipboardAdapter.ViewHolder>() {
+       val keyEventListener: OnKeyEventListener,
+       val filterMode: FilterMode = FilterMode.ALL
+) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
 
     var clipboardHistoryManager: ClipboardHistoryManager? = null
 
-    var pinnedIconResId = 0
     var itemBackgroundId = 0
     var itemTypeFace: Typeface? = null
     var itemTextColor = 0
     var itemTextSize = 0f
 
+    private val items = mutableListOf<ClipboardItem>()
+
     companion object {
         private const val VIEW_TYPE_TEXT = 0
         private const val VIEW_TYPE_IMAGE = 1
+        private const val VIEW_TYPE_HEADER = 2
         private const val ROUNDED_ENTRY_RADIUS_DP = 18f
         private const val DEFAULT_IMAGE_RADIUS_DP = 8f
     }
 
-    override fun getItemViewType(position: Int): Int {
-        val entry = getItem(position)
-        val imageClip = entry?.text?.let { ClipboardHistoryManager.decodeImageHistoryClip(it) }
-        return if (imageClip != null) VIEW_TYPE_IMAGE else VIEW_TYPE_TEXT
+    fun updateItems(newEntries: List<ClipboardHistoryEntry>, pinnedFirst: Boolean) {
+        val newItems = buildDisplayItems(newEntries, pinnedFirst)
+        val diffResult = DiffUtil.calculateDiff(object : DiffUtil.Callback() {
+            override fun getOldListSize(): Int = items.size
+            override fun getNewListSize(): Int = newItems.size
+
+            override fun areItemsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean {
+                val old = items[oldItemPosition]
+                val new = newItems[newItemPosition]
+                return when {
+                    old is ClipboardItem.Header && new is ClipboardItem.Header -> old.isPinnedHeader == new.isPinnedHeader
+                    old is ClipboardItem.Clip && new is ClipboardItem.Clip -> old.entry.id == new.entry.id
+                    else -> false
+                }
+            }
+
+            override fun areContentsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean {
+                val old = items[oldItemPosition]
+                val new = newItems[newItemPosition]
+                return when {
+                    old is ClipboardItem.Header && new is ClipboardItem.Header -> true
+                    old is ClipboardItem.Clip && new is ClipboardItem.Clip -> {
+                        old.entry.timeStamp == new.entry.timeStamp &&
+                        old.entry.isPinned == new.entry.isPinned &&
+                        old.entry.text == new.entry.text
+                    }
+                    else -> false
+                }
+            }
+        })
+        items.clear()
+        items.addAll(newItems)
+        diffResult.dispatchUpdatesTo(this)
     }
 
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
-        val layoutId = if (viewType == VIEW_TYPE_IMAGE) {
-            R.layout.clipboard_entry_image_key
-        } else {
-            R.layout.clipboard_entry_key
+    private fun buildDisplayItems(entries: List<ClipboardHistoryEntry>, pinnedFirst: Boolean): List<ClipboardItem> {
+        if (entries.isEmpty()) return emptyList()
+
+        return when (filterMode) {
+            FilterMode.PINNED_ONLY -> {
+                entries.filter { it.isPinned }
+                    .sortedByDescending { it.timeStamp }
+                    .map { ClipboardItem.Clip(it) }
+            }
+            FilterMode.RECENTS_ONLY -> {
+                entries.filter { !it.isPinned }
+                    .sortedByDescending { it.timeStamp }
+                    .map { ClipboardItem.Clip(it) }
+            }
+            FilterMode.ALL -> {
+                val pinnedClips = entries.filter { it.isPinned }.sortedByDescending { it.timeStamp }
+                val recentClips = entries.filter { !it.isPinned }.sortedByDescending { it.timeStamp }
+
+                val result = mutableListOf<ClipboardItem>()
+                if (pinnedFirst) {
+                    if (pinnedClips.isNotEmpty()) {
+                        result.add(ClipboardItem.Header(isPinnedHeader = true))
+                        pinnedClips.forEach { result.add(ClipboardItem.Clip(it)) }
+                    }
+                    if (recentClips.isNotEmpty()) {
+                        result.add(ClipboardItem.Header(isPinnedHeader = false))
+                        recentClips.forEach { result.add(ClipboardItem.Clip(it)) }
+                    }
+                } else {
+                    if (recentClips.isNotEmpty()) {
+                        result.add(ClipboardItem.Header(isPinnedHeader = false))
+                        recentClips.forEach { result.add(ClipboardItem.Clip(it)) }
+                    }
+                    if (pinnedClips.isNotEmpty()) {
+                        result.add(ClipboardItem.Header(isPinnedHeader = true))
+                        pinnedClips.forEach { result.add(ClipboardItem.Clip(it)) }
+                    }
+                }
+                result
+            }
         }
-        val view = LayoutInflater.from(parent.context)
-                .inflate(layoutId, parent, false)
-        return ViewHolder(parent, view)
     }
 
-    override fun onBindViewHolder(holder: ViewHolder, position: Int) {
-        holder.setContent(getItem(position))
+    fun clear() {
+        items.clear()
+        notifyDataSetChanged()
     }
 
-    private fun getItem(position: Int) = clipboardHistoryManager?.getHistoryEntry(position)
+    fun getItem(position: Int): ClipboardItem? = items.getOrNull(position)
 
-    override fun getItemCount() = clipboardHistoryManager?.getHistorySize() ?: 0
+    fun getClipEntryAt(position: Int): ClipboardHistoryEntry? {
+        val item = items.getOrNull(position)
+        return (item as? ClipboardItem.Clip)?.entry
+    }
+
+    fun canRemove(position: Int): Boolean {
+        val item = items.getOrNull(position) ?: return false
+        return when (item) {
+            is ClipboardItem.Header -> false
+            is ClipboardItem.Clip -> !item.entry.isPinned
+        }
+    }
+
+    fun findPositionOfClip(clipId: Long): Int {
+        return items.indexOfFirst { it is ClipboardItem.Clip && it.entry.id == clipId }
+    }
+
+    fun findFirstRecentPosition(): Int {
+        return items.indexOfFirst { it is ClipboardItem.Clip && !it.entry.isPinned }
+    }
+
+    override fun getItemViewType(position: Int): Int {
+        return when (val item = items.getOrNull(position)) {
+            is ClipboardItem.Header -> VIEW_TYPE_HEADER
+            is ClipboardItem.Clip -> {
+                val imageClip = item.entry.text.let { ClipboardHistoryManager.decodeImageHistoryClip(it) }
+                if (imageClip != null) VIEW_TYPE_IMAGE else VIEW_TYPE_TEXT
+            }
+            null -> VIEW_TYPE_TEXT
+        }
+    }
+
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
+        val inflater = LayoutInflater.from(parent.context)
+        return when (viewType) {
+            VIEW_TYPE_HEADER -> {
+                val view = inflater.inflate(R.layout.clipboard_header_item, parent, false)
+                HeaderViewHolder(view)
+            }
+            VIEW_TYPE_IMAGE -> {
+                val view = inflater.inflate(R.layout.clipboard_entry_image_key, parent, false)
+                ViewHolder(parent, view)
+            }
+            else -> {
+                val view = inflater.inflate(R.layout.clipboard_entry_key, parent, false)
+                ViewHolder(parent, view)
+            }
+        }
+    }
+
+    override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
+        when (val item = items.getOrNull(position)) {
+            is ClipboardItem.Header -> (holder as? HeaderViewHolder)?.bind(item.isPinnedHeader, position)
+            is ClipboardItem.Clip -> (holder as? ViewHolder)?.setContent(item.entry)
+            null -> {}
+        }
+    }
+
+    override fun getItemCount() = items.size
+
+    inner class HeaderViewHolder(view: View) : RecyclerView.ViewHolder(view) {
+        private val titleView: TextView = view.findViewById(R.id.clipboard_header_title)
+
+        init {
+            val lp = itemView.layoutParams
+            if (lp is StaggeredGridLayoutManager.LayoutParams) {
+                lp.isFullSpan = true
+            }
+            itemView.isClickable = false
+            itemView.isFocusable = false
+        }
+
+        fun bind(isPinnedHeader: Boolean, position: Int) {
+            val lp = itemView.layoutParams
+            if (lp is StaggeredGridLayoutManager.LayoutParams) {
+                lp.isFullSpan = true
+            }
+            val titleText = if (isPinnedHeader) {
+                itemView.context.getString(R.string.clipboard_header_pinned)
+            } else {
+                itemView.context.getString(R.string.clipboard_header_recents)
+            }
+            titleView.text = titleText
+            KeyboardTypeface.applyToTextView(titleView, titleText, itemTypeFace ?: Typeface.DEFAULT_BOLD)
+
+            val colors = Settings.getValues().mColors
+            val textColor = colors.get(ColorType.KEY_TEXT)
+            titleView.setTextColor(ColorUtils.setAlphaComponent(textColor, 0xDD))
+
+            val density = itemView.resources.displayMetrics.density
+            val topPad = if (position == 0) (4 * density).toInt() else (10 * density).toInt()
+            val bottomPad = (3 * density).toInt()
+            val sidePad = (10 * density).toInt()
+            titleView.setPadding(sidePad, topPad, sidePad, bottomPad)
+        }
+    }
 
     inner class ViewHolder(
             val parent: ViewGroup,
             view: View
     ) : RecyclerView.ViewHolder(view), View.OnClickListener, View.OnTouchListener, View.OnLongClickListener {
 
-        private val pinnedIconView: ImageView
         private val imageView: ImageView
         private val contentView: TextView?
 
@@ -100,10 +271,6 @@ class ClipboardAdapter(
             } else {
                 colors.setBackground(view, ColorType.KEY_BACKGROUND)
             }
-            pinnedIconView = view.findViewById<ImageView>(R.id.clipboard_entry_pinned_icon).apply {
-                visibility = View.GONE
-                setImageResource(pinnedIconResId)
-            }
             imageView = view.findViewById(R.id.clipboard_entry_image)
             configureImagePreviewCorners(usesRoundedCards)
             contentView = view.findViewById<TextView>(R.id.clipboard_entry_content)?.apply {
@@ -112,7 +279,6 @@ class ClipboardAdapter(
                 setTextSize(TypedValue.COMPLEX_UNIT_PX, itemTextSize)
             }
             clipboardLayoutParams.setItemProperties(view)
-            colors.setColor(pinnedIconView, ColorType.CLIPBOARD_PIN)
         }
 
         private fun createRoundedClipboardEntryBackground(view: View): StateListDrawable {
@@ -170,17 +336,23 @@ class ClipboardAdapter(
                 contentView?.text = imageClip.label
                 contentView?.let { KeyboardTypeface.applyToTextView(it, imageClip.label, itemTypeFace ?: android.graphics.Typeface.DEFAULT) }
 
-                // Enforce perfectly square dimension
+                // Enforce dimension: square for grid, capped banner height for list view
                 if (parent.width > 0) {
                     val layoutManager = (parent as? RecyclerView)?.layoutManager
                     val spanCount = when (layoutManager) {
                         is StaggeredGridLayoutManager -> layoutManager.spanCount
                         else -> 2
                     }
-                    val itemWidth = (parent.width - parent.paddingLeft - parent.paddingRight) / spanCount
+                    val totalWidth = parent.width - parent.paddingLeft - parent.paddingRight
+                    val itemWidth = totalWidth / spanCount
+                    val itemHeight = if (spanCount == 1) {
+                        (120 * parent.resources.displayMetrics.density).toInt()
+                    } else {
+                        itemWidth
+                    }
                     if (lp != null) {
                         lp.width = ViewGroup.LayoutParams.MATCH_PARENT
-                        lp.height = itemWidth
+                        lp.height = itemHeight
                         itemView.layoutParams = lp
                     }
                 } else {
@@ -204,7 +376,6 @@ class ClipboardAdapter(
                     itemView.layoutParams = lp
                 }
             }
-            pinnedIconView.visibility = if (historyEntry?.isPinned == true) View.VISIBLE else View.GONE
         }
 
         @SuppressLint("ClickableViewAccessibility")

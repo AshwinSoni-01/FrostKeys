@@ -48,9 +48,13 @@ import java.io.File
 import java.security.MessageDigest
 import java.util.ArrayDeque
 import java.util.Locale
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class ClipboardHistoryManager(
         private val latinIME: LatinIME
@@ -60,6 +64,7 @@ class ClipboardHistoryManager(
     private var clipboardSuggestionView: View? = null
     private var clipboardDao: ClipboardDao? = null
     private var screenshotObserver: ContentObserver? = null
+    private var screenshotDebounceJob: Job? = null
     private var lastProcessedImageUri: String? = null
     private val processedScreenshotUris = ArrayDeque<String>()
     private val screenshotInFlightUris = mutableSetOf<String>()
@@ -81,6 +86,8 @@ class ClipboardHistoryManager(
 
     fun onDestroy() {
         clipboardManager.removePrimaryClipChangedListener(this)
+        screenshotDebounceJob?.cancel()
+        screenshotDebounceJob = null
         unregisterScreenshotObserver()
     }
 
@@ -121,19 +128,12 @@ class ClipboardHistoryManager(
         if (screenshotObserver != null) return
         
         screenshotObserver = object : ContentObserver(Handler(Looper.getMainLooper())) {
-            override fun onChange(selfChange: Boolean) {
-                super.onChange(selfChange)
-                onScreenshotMediaChanged()
-            }
-
             override fun onChange(selfChange: Boolean, uri: Uri?) {
-                super.onChange(selfChange, uri)
                 onScreenshotMediaChanged()
             }
 
             @androidx.annotation.RequiresApi(Build.VERSION_CODES.R)
             override fun onChange(selfChange: Boolean, uris: Collection<Uri>, flags: Int) {
-                super.onChange(selfChange, uris, flags)
                 onScreenshotMediaChanged()
             }
         }
@@ -150,6 +150,8 @@ class ClipboardHistoryManager(
     }
 
     private fun unregisterScreenshotObserver() {
+        screenshotDebounceJob?.cancel()
+        screenshotDebounceJob = null
         screenshotObserver?.let {
             try {
                 latinIME.contentResolver.unregisterContentObserver(it)
@@ -165,54 +167,66 @@ class ClipboardHistoryManager(
             syncScreenshotObserver()
             return
         }
-        checkForNewScreenshot()
+        screenshotDebounceJob?.cancel()
+        screenshotDebounceJob = CoroutineScope(Dispatchers.IO).launch {
+            delay(200)
+            processNewScreenshots()
+        }
     }
 
     private fun checkForNewScreenshot() {
-        GlobalScope.launch(Dispatchers.IO) {
-            try {
-                if (!shouldObserveScreenshots()) return@launch
-                val dao = clipboardDao
-                var processedAny = false
+        screenshotDebounceJob?.cancel()
+        screenshotDebounceJob = CoroutineScope(Dispatchers.IO).launch {
+            processNewScreenshots()
+        }
+    }
 
-                for (screenshot in queryRecentScreenshots().asReversed()) {
-                    val uriString = screenshot.uri.toString()
-                    if (!claimScreenshotUri(uriString)) continue
+    private suspend fun processNewScreenshots() {
+        try {
+            if (!shouldObserveScreenshots()) return
+            val dao = clipboardDao ?: return
+            var processedAny = false
 
-                    var processed = false
-                    try {
-                        val timeStamp = System.currentTimeMillis()
-                        val imageClip = RecentClip.Image(
-                            uri = screenshot.uri,
-                            mimeType = normalizeImageMimeType(screenshot.mimeType).mimeType,
-                            label = "Screenshot",
-                            timeStamp = timeStamp
-                        )
+            for (screenshot in queryRecentScreenshots().asReversed()) {
+                val uriString = screenshot.uri.toString()
+                if (!claimScreenshotUri(uriString)) continue
 
-                        val cachedUri = cacheImageClip(imageClip)
-                        if (cachedUri != null && dao != null) {
-                            dao.addClip(
-                                timeStamp,
-                                false,
-                                encodeImageHistoryClip(cachedUri, imageClip.mimeType, imageClip.label)
-                            )
-                            rememberImageSuggestion(imageClip.copy(uri = cachedUri))
-                            processed = true
-                            processedAny = true
-                        }
-                    } catch (e: Exception) {
-                        Log.e("ClipboardHistoryManager", "Failed processing screenshot $uriString", e)
-                    } finally {
-                        completeScreenshotUri(uriString, screenshot.dateAdded, processed)
+                var processed = false
+                try {
+                    val timeStamp = if (screenshot.dateAdded > 0L) {
+                        if (screenshot.dateAdded < 10_000_000_000L) screenshot.dateAdded * 1000L else screenshot.dateAdded
+                    } else {
+                        System.currentTimeMillis()
                     }
-                }
+                    val imageClip = RecentClip.Image(
+                        uri = screenshot.uri,
+                        mimeType = normalizeImageMimeType(screenshot.mimeType).mimeType,
+                        label = "Screenshot",
+                        timeStamp = timeStamp
+                    )
 
-                if (processedAny) {
-                    refreshClipboardSuggestion()
+                    val cachedUri = cacheImageClip(imageClip)
+                    if (cachedUri != null) {
+                        val encodedClip = encodeImageHistoryClip(cachedUri, imageClip.mimeType, imageClip.label)
+                        withContext(Dispatchers.Main) {
+                            dao.addClip(timeStamp, false, encodedClip)
+                            rememberImageSuggestion(imageClip.copy(uri = cachedUri))
+                        }
+                        processed = true
+                        processedAny = true
+                    }
+                } catch (e: Exception) {
+                    Log.e("ClipboardHistoryManager", "Failed processing screenshot $uriString", e)
+                } finally {
+                    completeScreenshotUri(uriString, screenshot.dateAdded, processed)
                 }
-            } catch (e: Exception) {
-                Log.e("ClipboardHistoryManager", "Failed checking for new screenshot", e)
             }
+
+            if (processedAny) {
+                refreshClipboardSuggestion()
+            }
+        } catch (e: Exception) {
+            Log.e("ClipboardHistoryManager", "Failed checking for new screenshot", e)
         }
     }
 
@@ -549,6 +563,13 @@ class ClipboardHistoryManager(
         else null
     }
 
+    fun removeEntry(entry: ClipboardHistoryEntry): Boolean {
+        if (entry.isPinned) return false
+        return clipboardDao?.deleteClip(entry) == true
+    }
+
+    fun getAllEntries(): List<ClipboardHistoryEntry> = clipboardDao?.getAll() ?: emptyList()
+
     fun restoreEntry(entry: ClipboardHistoryEntry, index: Int): Int {
         return clipboardDao?.restoreClip(entry, index) ?: -1
     }
@@ -884,11 +905,11 @@ class ClipboardHistoryManager(
 
         const val PREF_SCREENSHOTS_FOLDER_URI = "clipboard_screenshots_folder_uri"
 
-        private const val PREF_PROCESSED_SCREENSHOT_MEDIA_URIS = "clipboard_processed_screenshot_media_uris"
-        private const val PREF_LAST_SCREENSHOT_MEDIA_URI = "clipboard_last_screenshot_media_uri"
-        private const val PREF_LAST_SCREENSHOT_DATE_ADDED = "clipboard_last_screenshot_date_added"
-        private const val PREF_DISMISSED_CLIP_TIMESTAMP = "clipboard_dismissed_clip_timestamp"
-        private const val PREF_DISMISSED_CLIP_CONTENT = "clipboard_dismissed_clip_content"
+        const val PREF_PROCESSED_SCREENSHOT_MEDIA_URIS = "clipboard_processed_screenshot_media_uris"
+        const val PREF_LAST_SCREENSHOT_MEDIA_URI = "clipboard_last_screenshot_media_uri"
+        const val PREF_LAST_SCREENSHOT_DATE_ADDED = "clipboard_last_screenshot_date_added"
+        const val PREF_DISMISSED_CLIP_TIMESTAMP = "clipboard_dismissed_clip_timestamp"
+        const val PREF_DISMISSED_CLIP_CONTENT = "clipboard_dismissed_clip_content"
         private const val SCREENSHOT_RECENT_WINDOW_SECONDS = 30L
         private const val MAX_SCREENSHOT_ROWS_TO_CHECK = 10
         private const val MAX_PROCESSED_SCREENSHOT_URIS = 20

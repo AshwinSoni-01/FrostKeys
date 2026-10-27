@@ -139,7 +139,8 @@ public class LatinIME extends InputMethodService implements
     private static LatinIME sInstance;
 
     private final LifecycleRegistry mLifecycleRegistry = new LifecycleRegistry(this);
-    private final SavedStateRegistryController mSavedStateRegistryController = SavedStateRegistryController.create(this);
+    private final SavedStateRegistryController mSavedStateRegistryController = SavedStateRegistryController
+            .create(this);
     private final ViewModelStore mViewModelStore = new ViewModelStore();
 
     @NonNull
@@ -599,8 +600,7 @@ public class LatinIME extends InputMethodService implements
 
     private static final long FROSTED_LIVE_REDRAW_THROTTLE_MS = 32L;
     private static final long FROSTED_HARD_RESET_DEBOUNCE_MS = 120L;
-    private final android.os.Handler mFrostedPrefsHandler =
-            new android.os.Handler(android.os.Looper.getMainLooper());
+    private final android.os.Handler mFrostedPrefsHandler = new android.os.Handler(android.os.Looper.getMainLooper());
     private boolean mFrostedLiveRedrawScheduled;
     private boolean mFrostedLiveRedrawDirty;
     private long mLastFrostedLiveRedrawUptimeMs;
@@ -623,21 +623,21 @@ public class LatinIME extends InputMethodService implements
         }
     };
 
-    private final SharedPreferences.OnSharedPreferenceChangeListener mPrefsListener =
-        new SharedPreferences.OnSharedPreferenceChangeListener() {
-            @Override
-            public void onSharedPreferenceChanged(SharedPreferences sharedPreferences, String key) {
-                if (key == null) return;
-                // Loophole Fix: Differentiate between live redraw and hard reset
-                if (helium314.keyboard.latin.settings.Settings.PREF_FROSTED_GLASS_TRIGGER.equals(key)) {
-                    Log.d(TAG, "Hard Reset trigger queued.");
-                    requestFrostedHardThemeReset();
-                } else if (key.startsWith("pref_frosted_")) {
-                    Log.d(TAG, "Live Redraw trigger queued for: " + key);
-                    requestFrostedLivePreviewRefresh();
-                }
+    private final SharedPreferences.OnSharedPreferenceChangeListener mPrefsListener = new SharedPreferences.OnSharedPreferenceChangeListener() {
+        @Override
+        public void onSharedPreferenceChanged(SharedPreferences sharedPreferences, String key) {
+            if (key == null)
+                return;
+            // Loophole Fix: Differentiate between live redraw and hard reset
+            if (helium314.keyboard.latin.settings.Settings.PREF_FROSTED_GLASS_TRIGGER.equals(key)) {
+                Log.d(TAG, "Hard Reset trigger queued.");
+                requestFrostedHardThemeReset();
+            } else if (key.startsWith("pref_frosted_")) {
+                Log.d(TAG, "Live Redraw trigger queued for: " + key);
+                requestFrostedLivePreviewRefresh();
             }
-        };
+        }
+    };
 
     public void requestFrostedLivePreviewRefresh() {
         if (android.os.Looper.myLooper() != android.os.Looper.getMainLooper()) {
@@ -691,7 +691,8 @@ public class LatinIME extends InputMethodService implements
                     android.view.Window window = getWindow().getWindow();
                     if (window != null) {
                         // A. Force the absolute bottom Dialog Window to be 100% Transparent
-                        window.setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT));
+                        window.setBackgroundDrawable(
+                                new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT));
 
                         // B. Strip the DecorView (System wrapper layer)
                         android.view.View decorView = window.getDecorView();
@@ -707,7 +708,8 @@ public class LatinIME extends InputMethodService implements
                     }
 
                     // --- PHASE 2: SCORCHED EARTH STRIP & GUT (INPUT FRAME) ---
-                    // Use internal mInputView for backward compatibility (replaces API 33+ getInputView())
+                    // Use internal mInputView for backward compatibility (replaces API 33+
+                    // getInputView())
                     if (mInputView != null) {
                         // Recursively crawl upwards and strip backgrounds from EVERY parent frame
                         android.view.View traverseView = mInputView;
@@ -844,8 +846,7 @@ public class LatinIME extends InputMethodService implements
             final InputContentInfoCompat inputContentInfo = new InputContentInfoCompat(
                     contentUri,
                     new ClipDescription(description, contentMimeTypes),
-                    null
-            );
+                    null);
 
             try {
                 grantUriPermission(editorInfo.packageName, contentUri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
@@ -855,7 +856,8 @@ public class LatinIME extends InputMethodService implements
 
             final boolean success = InputConnectionCompat.commitContent(inputConnection, editorInfo, inputContentInfo,
                     InputConnectionCompat.INPUT_CONTENT_GRANT_READ_URI_PERMISSION, null);
-            if (success) return true;
+            if (success)
+                return true;
             Log.w(TAG, "Target rejected rich content: package=" + editorInfo.packageName
                     + ", sentMimeTypes=" + Arrays.toString(contentMimeTypes)
                     + ", supportedMimeTypes=" + Arrays.toString(supportedMimeTypes)
@@ -873,13 +875,14 @@ public class LatinIME extends InputMethodService implements
 
     private String[] getKlipyContentMimeTypes(final String mimeType) {
         if ("image/webp.wasticker".equals(mimeType)) {
-            return new String[]{"image/webp.wasticker", "image/webp"};
+            return new String[] { "image/webp.wasticker", "image/webp" };
         }
-        return new String[]{mimeType};
+        return new String[] { mimeType };
     }
 
     private boolean isKlipyContentSupported(final String[] supportedMimeTypes, final String[] contentMimeTypes) {
-        if (supportedMimeTypes == null) return false;
+        if (supportedMimeTypes == null)
+            return false;
         for (String contentMimeType : contentMimeTypes) {
             for (String supportedMimeType : supportedMimeTypes) {
                 if (ClipDescription.compareMimeTypes(contentMimeType, supportedMimeType)) {
@@ -1050,7 +1053,7 @@ public class LatinIME extends InputMethodService implements
             if (getWindow() != null && getWindow().getWindow() != null) {
                 final android.view.View decorView = getWindow().getWindow().getDecorView();
                 if (decorView == null || decorView.getParent() == null) {
-                    // If the decorator view is already unparented or orphaned, 
+                    // If the decorator view is already unparented or orphaned,
                     // manually bypass standard dialog layout cascading triggers if possible
                 }
             }
@@ -1058,7 +1061,8 @@ public class LatinIME extends InputMethodService implements
             Log.w(TAG, "Pre-empted window lifecycle crash during cleanup", e);
         }
 
-        // Wrap super execution to catch unhandled framework lifecycle exceptions on Android 17
+        // Wrap super execution to catch unhandled framework lifecycle exceptions on
+        // Android 17
         mLifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_DESTROY);
         mViewModelStore.clear();
         try {
@@ -1082,8 +1086,10 @@ public class LatinIME extends InputMethodService implements
     public void onConfigurationChanged(final Configuration conf) {
         SettingsValues settingsValues = mSettings.getCurrent();
         Log.i(TAG, "onConfigurationChanged");
-        // Loophole fix: if we are in live preview mode, ignore system configuration changes to avoid flickers or theme fighting
-        if (helium314.keyboard.keyboard.KeyboardTheme.getThemeOverride() != null) return;
+        // Loophole fix: if we are in live preview mode, ignore system configuration
+        // changes to avoid flickers or theme fighting
+        if (helium314.keyboard.keyboard.KeyboardTheme.getThemeOverride() != null)
+            return;
         SubtypeSettings.INSTANCE.reloadSystemLocales(this);
         if (settingsValues.mDisplayOrientation != conf.orientation) {
             mHandler.startOrientationChanging();
@@ -1157,7 +1163,8 @@ public class LatinIME extends InputMethodService implements
         FrostedGlassHelper.configureFrostedGlass(this, view, FrostedGlassHelper.isFrostedTheme(this));
         updateSuggestionStripView(view);
         // Ensure navigation bar insets are dispatched immediately to the new view tree,
-        // preventing the first-frame race condition where the keyboard draws behind the nav bar.
+        // preventing the first-frame race condition where the keyboard draws behind the
+        // nav bar.
         view.requestApplyInsets();
     }
 
@@ -1465,7 +1472,8 @@ public class LatinIME extends InputMethodService implements
 
         mKeyboardSwitcher.clearCachedPersistentEmojis();
 
-        // Completely disable background blur composition, layout attributes and clear SemBlurInfo/window flags to save GPU context
+        // Completely disable background blur composition, layout attributes and clear
+        // SemBlurInfo/window flags to save GPU context
         FrostedGlassHelper.configureFrostedGlass(this, mInputView, false);
 
         final MainKeyboardView mainKeyboardView = mKeyboardSwitcher.getMainKeyboardView();
@@ -1474,10 +1482,12 @@ public class LatinIME extends InputMethodService implements
         }
         clearNavigationBarColor();
 
-        // Release keyboard buffers and stop active panels without forcing a process-wide GC.
+        // Release keyboard buffers and stop active panels without forcing a
+        // process-wide GC.
         deallocateMemory();
 
-        // Reset to the main alphabet keyboard so that reopening always shows the ABC view
+        // Reset to the main alphabet keyboard so that reopening always shows the ABC
+        // view
         // instead of whatever panel (emoji, clipboard, AI tools, klipy) was active.
         mKeyboardSwitcher.setAlphabetKeyboard();
     }
@@ -1663,36 +1673,48 @@ public class LatinIME extends InputMethodService implements
     @Override
     public void onComputeInsets(final InputMethodService.Insets outInsets) {
         super.onComputeInsets(outInsets);
-        if (mInputView == null) return;
+        if (mInputView == null)
+            return;
 
         View visibleKeyboardView = mKeyboardSwitcher.getWrapperView();
         if (visibleKeyboardView == null || visibleKeyboardView.getVisibility() != View.VISIBLE) {
-            if (mKeyboardSwitcher.getEmojiPalettesView() != null && mKeyboardSwitcher.getEmojiPalettesView().getVisibility() == View.VISIBLE) {
+            if (mKeyboardSwitcher.getEmojiPalettesView() != null
+                    && mKeyboardSwitcher.getEmojiPalettesView().getVisibility() == View.VISIBLE) {
                 visibleKeyboardView = mKeyboardSwitcher.getEmojiPalettesView();
-            } else if (mKeyboardSwitcher.getClipboardHistoryView() != null && mKeyboardSwitcher.getClipboardHistoryView().getVisibility() == View.VISIBLE) {
+            } else if (mKeyboardSwitcher.getClipboardHistoryView() != null
+                    && mKeyboardSwitcher.getClipboardHistoryView().getVisibility() == View.VISIBLE) {
                 visibleKeyboardView = mKeyboardSwitcher.getClipboardHistoryView();
-            } else if (mKeyboardSwitcher.getAccessPointMenuView() != null && mKeyboardSwitcher.getAccessPointMenuView().getVisibility() == View.VISIBLE) {
+            } else if (mKeyboardSwitcher.getAccessPointMenuView() != null
+                    && mKeyboardSwitcher.getAccessPointMenuView().getVisibility() == View.VISIBLE) {
                 visibleKeyboardView = mKeyboardSwitcher.getAccessPointMenuView();
             }
         }
 
         final int inputHeight = mInputView.getHeight();
-        final int stripHeight = mKeyboardSwitcher.isShowingStripContainer() ? mKeyboardSwitcher.getStripContainer().getHeight() : 0;
-        final int persistentEmojiRowHeight = mKeyboardSwitcher.isShowingPersistentEmojiRow() ? mKeyboardSwitcher.getPersistentEmojiRowHeight() : 0;
+        final int stripHeight = mKeyboardSwitcher.isShowingStripContainer()
+                ? mKeyboardSwitcher.getStripContainer().getHeight()
+                : 0;
+        final int persistentEmojiRowHeight = mKeyboardSwitcher.isShowingPersistentEmojiRow()
+                ? mKeyboardSwitcher.getPersistentEmojiRowHeight()
+                : 0;
 
         int keyboardHeight = 0;
         if (visibleKeyboardView != null && visibleKeyboardView.getHeight() > 0) {
             keyboardHeight = visibleKeyboardView.getHeight();
         } else if (mLastKeyboardHeight > 0) {
-            // Fallback to last known height to prevent the gap from closing during transitions
+            // Fallback to last known height to prevent the gap from closing during
+            // transitions
             keyboardHeight = mLastKeyboardHeight - stripHeight - persistentEmojiRowHeight;
-            if (keyboardHeight < 0) keyboardHeight = 0;
+            if (keyboardHeight < 0)
+                keyboardHeight = 0;
         }
 
-        if (keyboardHeight == 0 && visibleKeyboardView == null) return;
+        if (keyboardHeight == 0 && visibleKeyboardView == null)
+            return;
 
         int visibleTopY = inputHeight - keyboardHeight - stripHeight - persistentEmojiRowHeight;
-        if (visibleTopY < 0) visibleTopY = 0;
+        if (visibleTopY < 0)
+            visibleTopY = 0;
 
         outInsets.contentTopInsets = visibleTopY;
         outInsets.visibleTopInsets = visibleTopY;
@@ -1701,7 +1723,8 @@ public class LatinIME extends InputMethodService implements
             outInsets.touchableInsets = InputMethodService.Insets.TOUCHABLE_INSETS_CONTENT;
         }
 
-        if (mInsetsUpdater != null) mInsetsUpdater.setInsets(outInsets);
+        if (mInsetsUpdater != null)
+            mInsetsUpdater.setInsets(outInsets);
 
         if (keyboardHeight > 0) {
             mLastKeyboardHeight = keyboardHeight + stripHeight + persistentEmojiRowHeight;
@@ -1878,6 +1901,7 @@ public class LatinIME extends InputMethodService implements
             if (switcher.isShowingEmojiPalettes() || switcher.isShowingKlipyPalettes()
                     || switcher.isShowingClipboardHistory() || switcher.isShowingAiWritingTools()) {
                 switcher.setAlphabetKeyboard();
+                switcher.requestUpdatingShiftState(getCurrentAutoCapsState(), getCurrentRecapitalizeState());
                 return;
             }
         }

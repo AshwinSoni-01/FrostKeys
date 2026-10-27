@@ -117,12 +117,14 @@ fun PreferencesScreen(
         Settings.PREF_LANGUAGE_SWITCH_KEY,
         Settings.PREF_SHOW_EMOJI_KEY,
         Settings.PREF_REMOVE_REDUNDANT_POPUPS,
+        Settings.PREF_REMOVE_PANEL_BOTTOM_ROW,
         R.string.settings_category_clipboard_history,
         Settings.PREF_ENABLE_CLIPBOARD_HISTORY,
         Settings.PREF_SHOW_SCREENSHOTS_IN_CLIPBOARD,
         if (showScreenshotsEnabled) Settings.PREF_CHANGE_SCREENSHOTS_FOLDER else null,
         if (clipboardHistoryEnabled) Settings.PREF_CLIPBOARD_HISTORY_RETENTION_TIME else null,
-        if (clipboardHistoryEnabled) Settings.PREF_CLIPBOARD_HISTORY_PINNED_FIRST else null
+        if (clipboardHistoryEnabled) Settings.PREF_CLIPBOARD_HISTORY_PINNED_FIRST else null,
+        if (clipboardHistoryEnabled) Settings.PREF_CLIPBOARD_SHOW_TABS else null
     )
     SearchSettingsScreen(
         onClickBack = onClickBack,
@@ -205,6 +207,11 @@ fun createPreferencesSettings(context: Context) = listOf(
     {
         SwitchPreference(it, Defaults.PREF_REMOVE_REDUNDANT_POPUPS) { KeyboardSwitcher.getInstance().setThemeNeedsReload() }
     },
+    Setting(context, Settings.PREF_REMOVE_PANEL_BOTTOM_ROW,
+        R.string.remove_panel_bottom_row, R.string.remove_panel_bottom_row_summary)
+    {
+        SwitchPreference(it, Defaults.PREF_REMOVE_PANEL_BOTTOM_ROW) { KeyboardSwitcher.getInstance().reloadKeyboard() }
+    },
     Setting(context, Settings.PREF_ENABLE_CLIPBOARD_HISTORY,
         R.string.enable_clipboard_history, R.string.enable_clipboard_history_summary)
     {
@@ -236,6 +243,9 @@ fun createPreferencesSettings(context: Context) = listOf(
     },
     Setting(context, Settings.PREF_CLIPBOARD_HISTORY_PINNED_FIRST, R.string.clipboard_history_pinned_first) {
         SwitchPreference(it, Defaults.PREF_CLIPBOARD_HISTORY_PINNED_FIRST)
+    },
+    Setting(context, Settings.PREF_CLIPBOARD_SHOW_TABS, R.string.clipboard_show_tabs) {
+        SwitchPreference(it, Defaults.PREF_CLIPBOARD_SHOW_TABS)
     },
     Setting(context, Settings.PREF_VIBRATION_DURATION_SETTINGS, R.string.prefs_keypress_vibration_duration_settings) { setting ->
         SliderPreference(

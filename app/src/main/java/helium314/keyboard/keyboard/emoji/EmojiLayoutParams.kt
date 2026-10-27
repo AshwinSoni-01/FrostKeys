@@ -49,11 +49,17 @@ internal class EmojiLayoutParams(res: Resources) {
     }
 
     fun setEmojiListProperties(vp: View) {
-        val lp = vp.layoutParams as LinearLayout.LayoutParams
-        lp.height = 0
-        lp.weight = 1f
-        lp.bottomMargin = emojiListBottomMargin
-        vp.layoutParams = lp
+        val lp = vp.layoutParams
+        if (lp is LinearLayout.LayoutParams) {
+            lp.height = 0
+            lp.weight = 1f
+            lp.bottomMargin = emojiListBottomMargin
+            vp.layoutParams = lp
+        } else if (lp is android.widget.FrameLayout.LayoutParams) {
+            lp.height = android.widget.FrameLayout.LayoutParams.MATCH_PARENT
+            lp.width = android.widget.FrameLayout.LayoutParams.MATCH_PARENT
+            vp.layoutParams = lp
+        }
     }
 
     fun setCategoryPageIdViewProperties(v: View) {

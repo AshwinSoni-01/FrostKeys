@@ -66,7 +66,7 @@
     <!-- Settings category title for Preference/Additional keys settings -->
     <string name="settings_category_additional_keys">Additional keys</string>
     <!-- Settings category title for Preference/Additional keys settings -->
-    <string name="settings_category_clipboard_history">Clipboard history</string>
+    <string name="settings_category_clipboard_history">Clipboard</string>
     <!-- Settings category title for Text correction/Corrections -->
     <string name="settings_category_correction">Corrections</string>
     <!-- Settings category title for Text correction/Space -->
@@ -230,7 +230,16 @@
     <!-- Preferences item for controlling clipboard history retention time -->
     <string name="clipboard_history_retention_time">History retention time</string>
     <!-- Preferences item for showing pinned clipboard items first -->
-    <string name="clipboard_history_pinned_first">Show pinned items on top</string>
+    <string name="clipboard_history_pinned_first">Show pinned clips first</string>
+    <!-- Clipboard panel section header for pinned clips -->
+    <string name="clipboard_header_pinned">Pinned</string>
+    <!-- Preferences item for showing pinned and recent clips as tabs -->
+    <string name="clipboard_show_tabs">Show pinned and recents as Tabs</string>
+    <!-- Clipboard panel section header for recent clips -->
+    <string name="clipboard_header_recents">Recents</string>
+    <!-- Clipboard panel view mode switch descriptions -->
+    <string name="clipboard_switch_to_list_view">Switch to list view</string>
+    <string name="clipboard_switch_to_grid_view">Switch to grid view</string>
     <!-- Preferences item for enabling swipe deletion -->
     <string name="delete_swipe">Delete swipe</string>
     <!-- Description for "delete_swipe" option. -->
@@ -426,6 +435,10 @@
     <string name="remove_redundant_popups">Remove redundant popups</string>
     <!-- Description of the remove_redundant_popups setting -->
     <string name="remove_redundant_popups_summary">Suppress popup keys that are already present on the base layout</string>
+    <!-- Option to remove bottom row from keyboard panels and replace with floating backspace -->
+    <string name="remove_panel_bottom_row">Remove bottom row from all panels</string>
+    <!-- Description of the remove_panel_bottom_row setting -->
+    <string name="remove_panel_bottom_row_summary">Removes bottom row in clipboard and emoji panels and shows a floating backspace button</string>
     <!-- Title of the setting enabling long press on space key to change IME -->
     <string name="prefs_long_press_keyboard_to_change_lang">Change input method with space key</string>
     <!-- Description of the settings to change IME indicating long press triggers change. -->

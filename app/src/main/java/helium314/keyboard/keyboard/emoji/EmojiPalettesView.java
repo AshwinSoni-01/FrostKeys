@@ -52,6 +52,8 @@ import helium314.keyboard.keyboard.KeyboardSwitcher;
 import helium314.keyboard.keyboard.KeyboardView;
 import helium314.keyboard.keyboard.MainKeyboardView;
 import helium314.keyboard.keyboard.PointerTracker;
+import helium314.keyboard.keyboard.internal.FloatingDeleteButton;
+import helium314.keyboard.keyboard.internal.FloatingSearchButton;
 import helium314.keyboard.keyboard.internal.KeyDrawParams;
 import helium314.keyboard.keyboard.internal.KeyVisualAttributes;
 import helium314.keyboard.keyboard.internal.KeyboardBuilder;
@@ -111,7 +113,10 @@ public final class EmojiPalettesView extends LinearLayout
     private KeyboardActionListener mMainKeyboardActionListener = KeyboardActionListener.EMPTY_LISTENER;
     private final EmojiCategory mEmojiCategory;
     private RecyclerView mPager;
+    private View mPagerContainer;
     private MainKeyboardView mBottomRowKeyboard;
+    private FloatingDeleteButton mFloatingBackspace;
+    private FloatingSearchButton mFloatingSearch;
     private View mSearchBarContainer;
     private ImageButton mSearchBackButton;
     private EditText mSearchEditText;
@@ -218,7 +223,13 @@ public final class EmojiPalettesView extends LinearLayout
             }
         }
 
+        mPagerContainer = findViewById(R.id.emoji_pager_container);
         mPager = findViewById(R.id.emoji_pager);
+        mFloatingBackspace = findViewById(R.id.emoji_floating_backspace);
+        mFloatingSearch = findViewById(R.id.emoji_floating_search);
+        if (mFloatingSearch != null) {
+            mFloatingSearch.setOnClickListener(v -> enterSearchMode());
+        }
         mPager.setHasFixedSize(true);
         mPager.setItemAnimator(null);
         final LinearLayoutManager layoutManager = new LinearLayoutManager(getContext(), LinearLayoutManager.VERTICAL, false);
@@ -242,7 +253,7 @@ public final class EmojiPalettesView extends LinearLayout
             }
         });
 
-        mEmojiLayoutParams.setEmojiListProperties(mPager);
+        mEmojiLayoutParams.setEmojiListProperties(mPagerContainer != null ? mPagerContainer : mPager);
         mEmojiCategoryPageIndicatorView = findViewById(R.id.emoji_category_page_id_view);
         mEmojiCategoryPageIndicatorView.setVisibility(View.GONE);
         mEmojiLayoutParams.setCategoryPageIdViewProperties(mEmojiCategoryPageIndicatorView);
@@ -495,10 +506,30 @@ public final class EmojiPalettesView extends LinearLayout
         setCurrentCategoryId(mEmojiCategory.getCurrentCategoryId(), true);
 
         setupBottomRowKeyboard(editorInfo, keyboardActionListener);
+        if (mFloatingBackspace != null) {
+            mFloatingBackspace.init(keyboardActionListener, Settings.getValues().mColors);
+        }
+        if (mFloatingSearch != null) {
+            mFloatingSearch.applyTheme(Settings.getValues().mColors);
+        }
+        applyBottomRowVisibility();
         final KeyDrawParams params = new KeyDrawParams();
         params.updateParams(mEmojiLayoutParams.getBottomRowKeyboardHeight(), keyVisualAttr);
         setupSidePadding();
         initDictionaryFacilitator();
+    }
+
+    private void applyBottomRowVisibility() {
+        final boolean removeBottomRow = Settings.getValues().mRemovePanelBottomRow;
+        if (mBottomRowKeyboard != null) {
+            mBottomRowKeyboard.setVisibility(removeBottomRow ? View.GONE : View.VISIBLE);
+        }
+        if (mFloatingBackspace != null) {
+            mFloatingBackspace.setVisibility(removeBottomRow ? View.VISIBLE : View.GONE);
+        }
+        if (mFloatingSearch != null) {
+            mFloatingSearch.setVisibility(removeBottomRow ? View.VISIBLE : View.GONE);
+        }
     }
 
     public boolean isSearchMode() {
@@ -516,9 +547,18 @@ public final class EmojiPalettesView extends LinearLayout
         mCurrentSearchKeyboardElementId = KeyboardId.ELEMENT_ALPHABET;
 
         mPager.setVisibility(View.GONE);
+        if (mPagerContainer != null) {
+            mPagerContainer.setVisibility(View.GONE);
+        }
         mEmojiCategoryPageIndicatorView.setVisibility(View.GONE);
         if (mBottomRowKeyboard != null) {
             mBottomRowKeyboard.setVisibility(View.GONE);
+        }
+        if (mFloatingBackspace != null) {
+            mFloatingBackspace.setVisibility(View.GONE);
+        }
+        if (mFloatingSearch != null) {
+            mFloatingSearch.setVisibility(View.GONE);
         }
         final View tabStripView = KeyboardSwitcher.getInstance().getEmojiTabStrip();
         if (tabStripView != null) {
@@ -570,6 +610,9 @@ public final class EmojiPalettesView extends LinearLayout
         if (mSearchResultsView != null) {
             mSearchResultsView.setVisibility(View.GONE);
         }
+        if (mPagerContainer != null) {
+            mPagerContainer.setVisibility(View.VISIBLE);
+        }
         if (mPager != null) {
             mPager.setAlpha(0f);
             mPager.setVisibility(View.VISIBLE);
@@ -578,10 +621,33 @@ public final class EmojiPalettesView extends LinearLayout
         if (mEmojiCategoryPageIndicatorView != null) {
             mEmojiCategoryPageIndicatorView.setVisibility(View.GONE);
         }
+        final boolean removeBottomRow = Settings.getValues().mRemovePanelBottomRow;
         if (mBottomRowKeyboard != null) {
-            mBottomRowKeyboard.setAlpha(0f);
-            mBottomRowKeyboard.setVisibility(View.VISIBLE);
-            mBottomRowKeyboard.animate().alpha(1f).setDuration(350).start();
+            if (!removeBottomRow) {
+                mBottomRowKeyboard.setAlpha(0f);
+                mBottomRowKeyboard.setVisibility(View.VISIBLE);
+                mBottomRowKeyboard.animate().alpha(1f).setDuration(350).start();
+            } else {
+                mBottomRowKeyboard.setVisibility(View.GONE);
+            }
+        }
+        if (mFloatingBackspace != null) {
+            if (removeBottomRow) {
+                mFloatingBackspace.setAlpha(0f);
+                mFloatingBackspace.setVisibility(View.VISIBLE);
+                mFloatingBackspace.animate().alpha(1f).setDuration(350).start();
+            } else {
+                mFloatingBackspace.setVisibility(View.GONE);
+            }
+        }
+        if (mFloatingSearch != null) {
+            if (removeBottomRow) {
+                mFloatingSearch.setAlpha(0f);
+                mFloatingSearch.setVisibility(View.VISIBLE);
+                mFloatingSearch.animate().alpha(1f).setDuration(350).start();
+            } else {
+                mFloatingSearch.setVisibility(View.GONE);
+            }
         }
         swapKeyboardToEmojiSearch(false, restoreViews);
         if (restoreViews) {
@@ -591,7 +657,11 @@ public final class EmojiPalettesView extends LinearLayout
         if (mainKeyboardView != null) {
             mainKeyboardView.setKeyboardActionListener(mMainKeyboardActionListener);
         }
-        PointerTracker.switchTo(mBottomRowKeyboard != null ? mBottomRowKeyboard : mainKeyboardView);
+        if (!removeBottomRow && mBottomRowKeyboard != null) {
+            PointerTracker.switchTo(mBottomRowKeyboard);
+        } else if (mainKeyboardView != null) {
+            PointerTracker.switchTo(mainKeyboardView);
+        }
         KeyboardSwitcher.getInstance().logTypingListenerInvariant(
                 "EmojiSearch.exit", true /* logWhenOk */);
         requestLayout();
@@ -1492,7 +1562,9 @@ public final class EmojiPalettesView extends LinearLayout
     private void setupBottomRowKeyboard(final EditorInfo editorInfo, final KeyboardActionListener keyboardActionListener) {
         MainKeyboardView keyboardView = findViewById(R.id.bottom_row_keyboard);
         keyboardView.setKeyboardActionListener(keyboardActionListener);
-        PointerTracker.switchTo(keyboardView);
+        if (!Settings.getValues().mRemovePanelBottomRow) {
+            PointerTracker.switchTo(keyboardView);
+        }
         final KeyboardLayoutSet kls = KeyboardLayoutSet.Builder.buildEmojiClipBottomRow(getContext(), editorInfo);
         final Keyboard keyboard = kls.getKeyboard(KeyboardId.ELEMENT_EMOJI_BOTTOM_ROW);
         keyboardView.setKeyboard(keyboard);
@@ -1526,6 +1598,9 @@ public final class EmojiPalettesView extends LinearLayout
     public void stopEmojiPalettes() {
         if (!initialized) return;
 
+        if (mFloatingBackspace != null) {
+            mFloatingBackspace.setKeyboardActionListener(null);
+        }
         if (mSearchMode) {
             exitSearchMode(false, false);
         }
@@ -1574,15 +1649,10 @@ public final class EmojiPalettesView extends LinearLayout
                     Settings.getValues().mColors.setColor((ImageView) old, ColorType.EMOJI_CATEGORY);
                 }
                 if (current instanceof TabImageView) {
-                    android.util.TypedValue typedValue = new android.util.TypedValue();
-                    getContext().getTheme().resolveAttribute(android.R.attr.colorAccent, typedValue, true);
-                    int accentColor = typedValue.data;
-                    ((TabImageView) current).setSelectedCategory(true, accentColor);
-
-                    // Set contrasting color for the icon so it's visible on the accent circle
-                    double y = (299 * android.graphics.Color.red(accentColor) + 587 * android.graphics.Color.green(accentColor) + 114 * android.graphics.Color.blue(accentColor)) / 1000.0;
-                    int contrastColor = y >= 128 ? android.graphics.Color.BLACK : android.graphics.Color.WHITE;
-                    ((TabImageView) current).setColorFilter(contrastColor, android.graphics.PorterDuff.Mode.SRC_IN);
+                    final int circleColor = mColors.get(ColorType.SPECIAL_KEY_BACKGROUND);
+                    final int iconColor = mColors.get(ColorType.FUNCTIONAL_KEY_TEXT);
+                    ((TabImageView) current).setSelectedCategory(true, circleColor);
+                    ((TabImageView) current).setColorFilter(iconColor, android.graphics.PorterDuff.Mode.SRC_IN);
                 }
             }
         }

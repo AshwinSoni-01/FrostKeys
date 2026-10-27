@@ -5,6 +5,8 @@ import android.content.ContentValues
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import android.net.Uri
+import android.os.Handler
+import android.os.Looper
 import android.os.SystemClock
 import helium314.keyboard.latin.ClipboardImageHistoryClip
 import helium314.keyboard.latin.ClipboardHistoryEntry
@@ -35,6 +37,16 @@ class ClipboardDao private constructor(private val db: Database, context: Contex
 
     var listener: Listener? = null
     private val context = context.applicationContext
+    private val mainHandler = Handler(Looper.getMainLooper())
+
+    private inline fun notifyListener(crossinline action: Listener.() -> Unit) {
+        val l = listener ?: return
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            l.action()
+        } else {
+            mainHandler.post { listener?.action() }
+        }
+    }
 
     // we clean up old clips when a new clip is added, but not too frequently
     private var lastClearOldClips = 0L
@@ -59,7 +71,20 @@ class ClipboardDao private constructor(private val db: Database, context: Contex
 
     fun addClip(timestamp: Long, pinned: Boolean, text: String) {
         clearOldClips()
-        val existingIndex = cache.indexOfFirst { it.text == text }
+        var existingIndex = cache.indexOfFirst { it.text == text }
+        if (existingIndex < 0 && text.startsWith("\u0001image\t")) {
+            val newClip = ClipboardImageHistoryClip.decode(text)
+            if (newClip != null) {
+                val newToken = newClip.uri.lastPathSegment?.substringAfterLast('_')?.substringBefore('.')
+                existingIndex = cache.indexOfFirst { entry ->
+                    if (!entry.text.startsWith("\u0001image\t")) return@indexOfFirst false
+                    val existingClip = ClipboardImageHistoryClip.decode(entry.text) ?: return@indexOfFirst false
+                    if (existingClip.uri == newClip.uri) return@indexOfFirst true
+                    val existingToken = existingClip.uri.lastPathSegment?.substringAfterLast('_')?.substringBefore('.')
+                    newToken != null && existingToken != null && newToken == existingToken
+                }
+            }
+        }
         if (existingIndex >= 0 && cache[existingIndex].timeStamp == timestamp)
             return // nothing to do
         if (existingIndex >= 0) {
@@ -79,14 +104,16 @@ class ClipboardDao private constructor(private val db: Database, context: Contex
         val entry = ClipboardHistoryEntry(rowId, timestamp, pinned, text)
         cache.add(entry)
         cache.sort()
-        listener?.onClipInserted(cache.indexOf(entry))
+        val index = cache.indexOf(entry)
+        notifyListener { onClipInserted(index) }
     }
 
     private fun updateTimestampAt(index: Int, timestamp: Long) {
         val entry = cache[index]
         entry.timeStamp = timestamp
         cache.sort()
-        listener?.onClipMoved(index, cache.indexOf(entry))
+        val newIndex = cache.indexOf(entry)
+        notifyListener { onClipMoved(index, newIndex) }
         val cv = ContentValues(1)
         cv.put(COLUMN_TIMESTAMP, timestamp)
         db.writableDatabase.update(TABLE, cv, "$COLUMN_ID = ${entry.id}", null)
@@ -100,6 +127,8 @@ class ClipboardDao private constructor(private val db: Database, context: Contex
 
     fun count() = cache.size
 
+    fun getAll(): List<ClipboardHistoryEntry> = cache.toList()
+
     fun sort() = cache.sort()
 
     fun togglePinned(id: Long) {
@@ -110,7 +139,7 @@ class ClipboardDao private constructor(private val db: Database, context: Contex
             val oldPos = cache.indexOf(entry)
             cache.sort()
             val newPos = cache.indexOf(entry)
-            listener?.onClipMoved(oldPos, newPos)
+            notifyListener { onClipMoved(oldPos, newPos) }
         } else {
             cache.sort()
         }
@@ -126,6 +155,14 @@ class ClipboardDao private constructor(private val db: Database, context: Contex
         cache.remove(entry)
         db.writableDatabase.delete(TABLE, "$COLUMN_ID = ${entry.id}", null)
         return entry
+    }
+
+    fun deleteClip(entry: ClipboardHistoryEntry): Boolean {
+        val removed = cache.remove(entry)
+        if (removed) {
+            db.writableDatabase.delete(TABLE, "$COLUMN_ID = ${entry.id}", null)
+        }
+        return removed
     }
 
     fun restoreClip(entry: ClipboardHistoryEntry, targetIndex: Int): Int {
@@ -173,7 +210,9 @@ class ClipboardDao private constructor(private val db: Database, context: Contex
                     indicesToRemove.add(idx)
             }
             cache.removeAll(entriesToRemove.toSet())
-            listener?.onClipsRemoved(indicesToRemove[0], indicesToRemove.size)
+            val firstRemoved = indicesToRemove[0]
+            val removedCount = indicesToRemove.size
+            notifyListener { onClipsRemoved(firstRemoved, removedCount) }
         } else {
             cache.removeAll(entriesToRemove.toSet())
         }
@@ -186,7 +225,7 @@ class ClipboardDao private constructor(private val db: Database, context: Contex
         val entriesToRemove = cache.toList()
         val removedCount = entriesToRemove.size
         cache.clear()
-        listener?.onClipsRemoved(0, removedCount)
+        notifyListener { onClipsRemoved(0, removedCount) }
         db.writableDatabase.delete(TABLE, null, null)
         deleteCachedImageFiles(entriesToRemove)
     }

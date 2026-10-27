@@ -292,10 +292,10 @@ fun <T: Any?> SearchScreen(
                                             Box(
                                                 contentAlignment = Alignment.Center,
                                                 modifier = Modifier
-                                                    .size(28.dp)
+                                                    .size(38.dp)
                                                     .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape)
                                             ) {
-                                                Text("arrow_back", fontFamily = materialSymbols, fontSize = 18.sp, color = MaterialTheme.colorScheme.onSurface)
+                                                Text("arrow_back", fontFamily = materialSymbols, fontSize = 22.sp, color = MaterialTheme.colorScheme.onSurface)
                                             }
                                         }
                                     }

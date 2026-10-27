@@ -77,6 +77,13 @@ class KeyboardState(private val switchActions: SwitchActions) {
 
     private val savedKeyboardState = SavedKeyboardState()
 
+    val isAlphabetMode: Boolean
+        get() = mode == Mode.ALPHABET
+
+    fun clearSavedKeyboardState() {
+        savedKeyboardState.isValid = false
+    }
+
     private class SavedKeyboardState {
         var isValid = false
         var isAlphabetShiftLocked = false
@@ -141,8 +148,8 @@ class KeyboardState(private val switchActions: SwitchActions) {
             Mode.ALPHABET -> {
                 setAlphabetKeyboard(autoCapsFlags, recapitalizeMode)
                 setShiftLocked(savedKeyboardState.isAlphabetShiftLocked)
-                if (!savedKeyboardState.isAlphabetShiftLocked) {
-                    setShifted(savedKeyboardState.shiftMode)
+                if (!savedKeyboardState.isAlphabetShiftLocked && savedKeyboardState.shiftMode == ShiftMode.MANUAL) {
+                    setShifted(ShiftMode.MANUAL)
                 }
             }
             Mode.SYMBOLS -> if (savedKeyboardState.shiftMode == ShiftMode.MANUAL) setSymbolsShiftedKeyboard() else setSymbolsKeyboard()
@@ -224,7 +231,10 @@ class KeyboardState(private val switchActions: SwitchActions) {
         if (DebugFlags.DEBUG_ENABLED) {
             Log.d(TAG, "resetKeyboardStateToAlphabet: ${stateToString(autoCapsFlags, recapitalizeMode)}")
         }
-        if (mode == Mode.ALPHABET) return
+        if (mode == Mode.ALPHABET) {
+            updateAlphabetShiftState(autoCapsFlags, recapitalizeMode)
+            return
+        }
 
         prevSymbolsKeyboardWasShifted = isSymbolShifted
         setAlphabetKeyboard(autoCapsFlags, recapitalizeMode)
@@ -247,11 +257,11 @@ class KeyboardState(private val switchActions: SwitchActions) {
             Log.d(TAG, "setAlphabetKeyboard: ${stateToString(autoCapsFlags, recapitalizeMode)}")
         }
 
-        switchActions.setAlphabetKeyboard()
         mode = Mode.ALPHABET
         isSymbolShifted = false
         this.recapitalizeMode = null
         switchState = SwitchState.ALPHA
+        switchActions.setAlphabetKeyboard()
         switchActions.requestUpdatingShiftState(autoCapsFlags, recapitalizeMode)
     }
 
@@ -503,6 +513,19 @@ class KeyboardState(private val switchActions: SwitchActions) {
         resetKeyboardStateToAlphabet(autoCapsFlags, recapitalizeMode)
     }
 
+    fun setAlphabetModeFromSwitcher(autoCapsFlags: Int, recapitalizeMode: RecapitalizeMode?) {
+        if (DEBUG_EVENT) {
+            Log.d(TAG, "setAlphabetModeFromSwitcher: ${stateToString(autoCapsFlags, recapitalizeMode)}")
+        }
+        mode = Mode.ALPHABET
+        isSymbolShifted = false
+        this.recapitalizeMode = null
+        switchState = SwitchState.ALPHA
+        prevSymbolsKeyboardWasShifted = false
+        prevMainKeyboardWasShiftLocked = false
+        switchActions.requestUpdatingShiftState(autoCapsFlags, recapitalizeMode)
+    }
+
     private fun updateShiftStateForRecapitalize(recapitalizeMode: RecapitalizeMode?) {
         val shiftMode = when (recapitalizeMode) {
             null                                 -> ShiftMode.UNSHIFT
@@ -537,12 +560,16 @@ class KeyboardState(private val switchActions: SwitchActions) {
         if (recapitalizeMode != null) {
             return
         }
-        if (mode != Mode.ALPHABET) {
+        if (mode == Mode.SYMBOLS) {
             // In symbol mode, just toggle symbol and symbol popup keyboard.
             toggleShiftInSymbols()
             switchState = SwitchState.MOMENTARY_SYMBOL_AND_MORE
             shiftKeyState.onPress()
             return
+        }
+        if (mode != Mode.ALPHABET) {
+            // If in a non-alphabet, non-symbol mode (e.g. stale panel mode), recover to alphabet mode
+            setAlphabetKeyboard(Constants.TextUtils.CAP_MODE_OFF, null)
         }
         isInDoubleTapShiftKey = switchActions.isInDoubleTapShiftKeyTimeout
         if (isInDoubleTapShiftKey) {

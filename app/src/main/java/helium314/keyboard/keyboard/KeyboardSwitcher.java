@@ -265,6 +265,9 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
         if (mKeyboardView != null) {
             mKeyboardView.onHideWindow();
         }
+        if (mState != null) {
+            mState.clearSavedKeyboardState();
+        }
     }
 
     private void clearTransitions() {
@@ -378,6 +381,9 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
                         EmojiParserKt.loadEmojiDefaultVersionsAndPopupSpecs(mThemeContext);
                     }
                     updatePersistentEmojiRow();
+                    if (mMainKeyboardFrame != null) {
+                        mMainKeyboardFrame.requestLayout();
+                    }
                     if (mCurrentInputView != null) {
                         mCurrentInputView.requestLayout();
                     }
@@ -985,13 +991,28 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
         }
     }
 
+    private boolean mIsSettingAlphabetKeyboard = false;
+
     // Implements {@link KeyboardState.SwitchActions}.
     @Override
     public void setAlphabetKeyboard() {
-        if (DEBUG_ACTION) {
-            Log.d(TAG, "setAlphabetKeyboard");
+        if (mIsSettingAlphabetKeyboard) {
+            return;
         }
-        setKeyboard(KeyboardId.ELEMENT_ALPHABET, KeyboardSwitchState.OTHER);
+        mIsSettingAlphabetKeyboard = true;
+        try {
+            if (DEBUG_ACTION) {
+                Log.d(TAG, "setAlphabetKeyboard");
+            }
+            setKeyboard(KeyboardId.ELEMENT_ALPHABET, KeyboardSwitchState.OTHER);
+            if (mState != null && !mState.isAlphabetMode()) {
+                mState.setAlphabetModeFromSwitcher(
+                        mLatinIME.getCurrentAutoCapsState(),
+                        mLatinIME.getCurrentRecapitalizeState());
+            }
+        } finally {
+            mIsSettingAlphabetKeyboard = false;
+        }
     }
 
     // Implements {@link KeyboardState.SwitchActions}.

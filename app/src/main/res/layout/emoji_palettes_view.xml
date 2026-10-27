@@ -103,11 +103,40 @@
             android:layout_height="wrap_content" />
     </HorizontalScrollView>
 
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/emoji_pager"
+    <FrameLayout
+        android:id="@+id/emoji_pager_container"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1" />
+        android:layout_weight="1">
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/emoji_pager"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+
+        <helium314.keyboard.keyboard.internal.FloatingSearchButton
+            android:id="@+id/emoji_floating_search"
+            android:layout_width="52dp"
+            android:layout_height="52dp"
+            android:layout_gravity="bottom|start"
+            android:layout_marginStart="16dp"
+            android:layout_marginBottom="16dp"
+            android:elevation="6dp"
+            android:visibility="gone"
+            android:contentDescription="@string/spoken_description_search" />
+
+        <helium314.keyboard.keyboard.internal.FloatingDeleteButton
+            android:id="@+id/emoji_floating_backspace"
+            android:layout_width="52dp"
+            android:layout_height="52dp"
+            android:layout_gravity="bottom|end"
+            android:layout_marginEnd="16dp"
+            android:layout_marginBottom="16dp"
+            android:elevation="6dp"
+            android:visibility="gone"
+            android:contentDescription="@string/spoken_description_delete" />
+
+    </FrameLayout>
     <helium314.keyboard.keyboard.emoji.EmojiCategoryPageIndicatorView
         android:id="@+id/emoji_category_page_id_view"
         android:layout_width="match_parent"
