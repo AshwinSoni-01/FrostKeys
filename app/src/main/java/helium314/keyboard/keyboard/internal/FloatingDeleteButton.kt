@@ -101,6 +101,12 @@ class FloatingDeleteButton @JvmOverloads constructor(
     }
 
     override fun draw(canvas: Canvas) {
+        val underlying = FloatingButtonBlurHelper.findUnderlyingView(this)
+        if (underlying is RecyclerView && !attachedRecyclerViews.contains(underlying)) {
+            underlying.removeOnScrollListener(scrollListener)
+            underlying.addOnScrollListener(scrollListener)
+            attachedRecyclerViews.add(underlying)
+        }
         blurRenderer.drawBlurBackdrop(this, canvas, cornerRadius)
         super.draw(canvas)
     }

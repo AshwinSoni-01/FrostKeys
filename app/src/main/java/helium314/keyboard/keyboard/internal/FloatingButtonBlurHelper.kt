@@ -59,11 +59,33 @@ object FloatingButtonBlurHelper {
             val child = parentGroup.getChildAt(i)
             if (child === button) continue
             if (child.visibility != View.VISIBLE) continue
-            if (child is RecyclerView) {
-                return child
-            } else if (child is ViewPager2) {
+            if (child is ViewPager2) {
                 val innerRv = child.getChildAt(0) as? RecyclerView
+                if (innerRv != null) {
+                    val currentItem = child.currentItem
+                    val pageView = innerRv.findViewHolderForAdapterPosition(currentItem)?.itemView
+                        ?: (0 until innerRv.childCount)
+                            .map { innerRv.getChildAt(it) }
+                            .firstOrNull { it.visibility == View.VISIBLE && it.left < child.width && it.right > 0 }
+                    if (pageView != null) {
+                        val nestedRv = findVisibleRecyclerView(pageView)
+                        if (nestedRv != null) return nestedRv
+                    }
+                }
                 return innerRv ?: child
+            } else if (child is RecyclerView) {
+                return child
+            }
+        }
+        return null
+    }
+
+    private fun findVisibleRecyclerView(view: View): RecyclerView? {
+        if (view is RecyclerView && view.visibility == View.VISIBLE) return view
+        if (view is ViewGroup && view.visibility == View.VISIBLE) {
+            for (i in 0 until view.childCount) {
+                val found = findVisibleRecyclerView(view.getChildAt(i))
+                if (found != null) return found
             }
         }
         return null
@@ -72,19 +94,21 @@ object FloatingButtonBlurHelper {
     fun attachScrollListeners(view: View, listener: RecyclerView.OnScrollListener): List<RecyclerView> {
         val parentGroup = view.parent as? ViewGroup ?: return emptyList()
         val attached = mutableListOf<RecyclerView>()
-        for (i in 0 until parentGroup.childCount) {
-            val child = parentGroup.getChildAt(i)
-            if (child === view) continue
-            if (child is RecyclerView) {
-                child.addOnScrollListener(listener)
-                attached.add(child)
-            } else if (child is ViewPager2) {
-                val innerRv = child.getChildAt(0) as? RecyclerView
-                if (innerRv != null) {
-                    innerRv.addOnScrollListener(listener)
-                    attached.add(innerRv)
+        fun attachRecursive(v: View) {
+            if (v === view) return
+            if (v is RecyclerView) {
+                v.removeOnScrollListener(listener)
+                v.addOnScrollListener(listener)
+                attached.add(v)
+            }
+            if (v is ViewGroup) {
+                for (i in 0 until v.childCount) {
+                    attachRecursive(v.getChildAt(i))
                 }
             }
+        }
+        for (i in 0 until parentGroup.childCount) {
+            attachRecursive(parentGroup.getChildAt(i))
         }
         return attached
     }
@@ -229,7 +253,10 @@ object FloatingButtonBlurHelper {
             try {
                 bCanvas.clipRect(0, 0, snapshotWidth, snapshotHeight)
                 bCanvas.translate(-cropLeft.toFloat(), -cropTop.toFloat())
-                sibling.draw(bCanvas)
+                try {
+                    sibling.draw(bCanvas)
+                } catch (_: Throwable) {
+                }
             } finally {
                 bCanvas.restoreToCount(bSave)
             }

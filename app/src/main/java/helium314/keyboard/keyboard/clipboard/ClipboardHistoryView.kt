@@ -885,11 +885,9 @@ class ClipboardHistoryView @JvmOverloads constructor(
         }
     }
 
-    override fun onKeyDown(clipId: Long) {
-        keyboardActionListener.onPressKey(KeyCode.NOT_SPECIFIED, 0, true, HapticEvent.KEY_PRESS)
-    }
 
     override fun onKeyUp(clipId: Long) {
+        keyboardActionListener.onPressKey(KeyCode.NOT_SPECIFIED, 0, true, HapticEvent.KEY_PRESS)
         val clipContent = clipboardHistoryManager.getHistoryEntryContent(clipId)
         if (clipContent != null && !clipboardHistoryManager.pasteHistoryEntry(clipContent)) {
             keyboardActionListener.onTextInput(clipContent.text)

@@ -2,7 +2,6 @@
 
 package helium314.keyboard.keyboard.clipboard
 
-import android.annotation.SuppressLint
 import android.graphics.Color
 import android.graphics.Outline
 import android.graphics.Typeface
@@ -10,7 +9,6 @@ import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.StateListDrawable
 import android.util.TypedValue
 import android.view.LayoutInflater
-import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.ViewOutlineProvider
@@ -250,7 +248,7 @@ class ClipboardAdapter(
     inner class ViewHolder(
             val parent: ViewGroup,
             view: View
-    ) : RecyclerView.ViewHolder(view), View.OnClickListener, View.OnTouchListener, View.OnLongClickListener {
+    ) : RecyclerView.ViewHolder(view), View.OnClickListener, View.OnLongClickListener {
 
         private val imageView: ImageView
         private val contentView: TextView?
@@ -258,7 +256,6 @@ class ClipboardAdapter(
         init {
             view.apply {
                 setOnClickListener(this@ViewHolder)
-                setOnTouchListener(this@ViewHolder)
                 setOnLongClickListener(this@ViewHolder)
                 setBackgroundResource(itemBackgroundId)
                 isHapticFeedbackEnabled = false
@@ -332,7 +329,9 @@ class ClipboardAdapter(
 
             if (imageClip != null) {
                 imageView.isGone = false
-                imageView.load(imageClip.uri)
+                imageView.load(imageClip.uri) {
+                    allowHardware(false)
+                }
                 contentView?.text = imageClip.label
                 contentView?.let { KeyboardTypeface.applyToTextView(it, imageClip.label, itemTypeFace ?: android.graphics.Typeface.DEFAULT) }
 
@@ -378,13 +377,6 @@ class ClipboardAdapter(
             }
         }
 
-        @SuppressLint("ClickableViewAccessibility")
-        override fun onTouch(view: View, event: MotionEvent): Boolean {
-            if (event.actionMasked == MotionEvent.ACTION_DOWN) {
-                keyEventListener.onKeyDown(view.tag as Long)
-            }
-            return false
-        }
 
         override fun onClick(view: View) {
             keyEventListener.onKeyUp(view.tag as Long)
